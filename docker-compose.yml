@@ -66,9 +66,9 @@ services:
       - STREAMING_SERVICE_URL=http://streaming-service:8012
       - NOTIFICATION_SERVICE_URL=http://notification-service:8010
       - FEEDBACK_SERVICE_URL=http://feedback-service:8011
-      - LIVEKIT_URL=http://livekit:7880
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      - LIVEKIT_URL=http://livekit:7881
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=this-is-a-very-long-and-secure-secret-for-livekit
       - PYTHONUNBUFFERED=1
     depends_on:
       postgres:
@@ -104,10 +104,10 @@ services:
       - "8012:8012"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
-      - LIVEKIT_URL=http://livekit:7880
-      - LIVEKIT_EXTERNAL_URL=https://monitoring-system.online/livekit
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      - LIVEKIT_URL=http://livekit:7881
+      - LIVEKIT_EXTERNAL_URL=https://livekit.eduaihub.aitalenthub.ru
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=this-is-a-very-long-and-secure-secret-for-livekit
       - PYTHONUNBUFFERED=1
     depends_on:
       postgres:
