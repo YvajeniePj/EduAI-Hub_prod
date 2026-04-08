@@ -12,12 +12,16 @@ import time
 import httpx
 import logging
 import json
+import mimetypes
+from pathlib import Path
 from urllib.parse import unquote
 
 from app.database import get_db
 from app.models import Material
 from app.schemas import MaterialCreate, MaterialResponse
 from app.services.text_extraction import extract_text_from_file
+from app.utils.converters import convert_latex_to_pdf, convert_jupyter_to_html
+import asyncio
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -137,6 +141,12 @@ async def create_material(
         db.add(material)
         db.commit()
         db.refresh(material)
+        
+        # Async compilation for specific file types
+        if mime_type == "application/x-tex" or original_name.endswith(".tex"):
+            asyncio.create_task(convert_latex_to_pdf(file_path))
+        elif mime_type == "application/x-ipynb+json" or original_name.endswith(".ipynb"):
+            asyncio.create_task(convert_jupyter_to_html(file_path))
         
         # Notify about new material
         await create_notification(
@@ -281,19 +291,150 @@ async def delete_material(material_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/{material_id}/download")
-async def download_material(material_id: UUID, db: Session = Depends(get_db)):
-    """Download a material file"""
+async def download_material(
+    material_id: UUID, 
+    format: Optional[str] = Query(None, description="Optional format to download (e.g., 'pdf', 'html')"),
+    inline: bool = Query(False, description="Whether to serve the file inline for preview"),
+    db: Session = Depends(get_db)
+):
+    """Download a material file, optionally requesting a specific converted format"""
+    # ... (existing logic for target_path and mime_type)
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
         raise HTTPException(status_code=404, detail="Material not found")
     
-    if not os.path.exists(material.path):
+    target_path = material.path
+    mime_type = material.mime_type
+    filename = material.original_name or material.name
+    
+    if format:
+        base, _ = os.path.splitext(target_path)
+        converted_path = f"{base}.{format}"
+        
+        if os.path.exists(converted_path):
+            target_path = converted_path
+            fb, _ = os.path.splitext(filename)
+            filename = f"{fb}.{format}"
+            if format == 'pdf':
+                mime_type = "application/pdf"
+            elif format == 'html':
+                mime_type = "text/html"
+        else:
+            # If requested format doesn't exist and we are in inline mode, 
+            # we should NOT fallback to original if it causes download.
+            # But for now, let's just throw 404 if format is missing.
+            raise HTTPException(status_code=404, detail=f"Requested format {format} is not ready. Please check status.")
+            
+    if not os.path.exists(target_path):
         raise HTTPException(status_code=404, detail="Material file not found on disk")
+    
+    # Final MIME type check to avoid octet-stream
+    if not mime_type or mime_type == "application/octet-stream":
+        guessed, _ = mimetypes.guess_type(filename)
+        if guessed:
+            mime_type = guessed
+        elif filename.endswith(".tex"):
+            mime_type = "text/plain"
+        elif filename.endswith(".ipynb"):
+            mime_type = "application/json"
         
     return FileResponse(
-        path=material.path, 
-        filename=material.original_name or material.name,
-        media_type=material.mime_type
+        path=target_path, 
+        filename=filename,
+        media_type=mime_type,
+        content_disposition_type="inline" if inline else "attachment"
     )
+
+
+@router.get("/{material_id}/status")
+async def get_material_status(
+    material_id: UUID,
+    format: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Check if a material (or its converted version) is ready"""
+    material = db.query(Material).filter(Material.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+        
+    if not format:
+        return {"status": "ready", "id": material_id}
+        
+    base = material.path.rsplit(".", 1)[0] if "." in material.path else material.path
+    converted_path = f"{base}.{format}"
+    
+    if os.path.exists(converted_path) and os.path.getsize(converted_path) > 100:
+        return {"status": "ready", "id": material_id, "format": format}
+        
+    # Check marker files
+    processing_file = converted_path + ".processing"
+    error_file = converted_path + ".error"
+    
+    if os.path.exists(processing_file):
+        return {"status": "processing", "id": material_id, "format": format}
+        
+    if os.path.exists(error_file):
+        try:
+            error_detail = Path(error_file).read_text()
+        except:
+            error_detail = "Unknown error"
+        return {"status": "failed", "id": material_id, "format": format, "detail": error_detail}
+        
+    # Check if we should trigger conversion
+    mime_type = material.mime_type
+    filename = material.original_name or material.name
+    
+    should_convert = False
+    conversion_task = None
+    
+    if format == 'pdf' and (mime_type == "application/x-tex" or filename.lower().endswith(".tex")):
+        should_convert = True
+        conversion_task = convert_latex_to_pdf
+    elif format == 'html' and (mime_type == "application/x-ipynb+json" or filename.lower().endswith(".ipynb")):
+        should_convert = True
+        conversion_task = convert_jupyter_to_html
+        
+    logger.info(f"Checking status for material {material_id}, format {format}. MIME: {mime_type}, Filename: {filename}")
+    
+    if should_convert:
+        logger.info(f"Triggering conversion task for {material.path}")
+        asyncio.create_task(conversion_task(material.path))
+        return {"status": "processing", "id": material_id, "format": format}
+        
+    return {"status": "unsupported", "id": material_id, "format": format}
+
+
+@router.post("/clone")
+async def clone_materials(data: dict, db: Session = Depends(get_db)):
+    """Clone all materials from one subject to another"""
+    old_subject_id = data.get("old_subject_id")
+    new_subject_id = data.get("new_subject_id")
+    
+    if not old_subject_id or not new_subject_id:
+        raise HTTPException(status_code=400, detail="Missing subject IDs")
+        
+    materials = db.query(Material).filter(Material.subject_id == old_subject_id).all()
+    id_mapping = {}
+    
+    for mat in materials:
+        new_mat = Material(
+            subject_id=new_subject_id,
+            name=mat.name,
+            original_name=mat.original_name,
+            path=mat.path,
+            size=mat.size,
+            mime_type=mat.mime_type,
+            uploader=mat.uploader,
+            note=mat.note,
+            annotation_ru=mat.annotation_ru,
+            annotation_en=mat.annotation_en,
+            allowed_groups=mat.allowed_groups
+        )
+        db.add(new_mat)
+        db.flush()
+        id_mapping[str(mat.id)] = str(new_mat.id)
+        
+    db.commit()
+    return id_mapping
 
 

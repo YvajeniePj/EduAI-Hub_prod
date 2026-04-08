@@ -78,11 +78,25 @@ class TestUpdate(BaseModel):
     allowed_groups: Optional[List[str]] = None
 
 
+class TestFileResponse(BaseModel):
+    id: UUID
+    test_id: UUID
+    file_path: str
+    original_name: str
+    mime_type: Optional[str] = None
+    size: Optional[int] = None
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class TestResponse(TestBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
     questions: List[QuestionResponse] = []
+    assets: List[TestFileResponse] = []
 
     @field_validator('due_date', 'available_until', mode='before')
     @classmethod

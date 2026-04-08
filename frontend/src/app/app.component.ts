@@ -56,7 +56,7 @@ import { interval, Subscription } from 'rxjs';
             <mat-icon matListItemIcon>quiz</mat-icon>
             <span matListItemTitle>Тесты</span>
           </a>
-          <a mat-list-item routerLink="/ai-test" (click)="sidenav.close()" routerLinkActive="active-link">
+          <a mat-list-item routerLink="/ai-test" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role !== 'student'">
             <mat-icon matListItemIcon>psychology</mat-icon>
             <span matListItemTitle>AI-генерация</span>
           </a>
@@ -73,11 +73,11 @@ import { interval, Subscription } from 'rxjs';
             <mat-icon matListItemIcon>library_books</mat-icon>
             <span matListItemTitle>Курсы</span>
           </a>
-          <a mat-list-item routerLink="/tests/create" (click)="sidenav.close()" routerLinkActive="active-link">
+          <a mat-list-item routerLink="/tests/create" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role !== 'student'">
             <mat-icon matListItemIcon>add_task</mat-icon>
             <span matListItemTitle>Конструктор тестов</span>
           </a>
-          <a mat-list-item routerLink="/course-builder" (click)="sidenav.close()" routerLinkActive="active-link">
+          <a mat-list-item routerLink="/course-builder" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role !== 'student'">
             <mat-icon matListItemIcon>construction</mat-icon>
             <span matListItemTitle>Конструктор курсов</span>
           </a>
@@ -98,7 +98,7 @@ import { interval, Subscription } from 'rxjs';
           <div class="nav-divider"></div>
 
           <!-- Block: Analytics (Teachers Only) -->
-          <ng-container *ngIf="currentUser.role === 'teacher'">
+          <ng-container *ngIf="currentUser.role === 'teacher' || currentUser.role === 'admin'">
           <div class="nav-block-header">АНАЛИТИКА</div>
           <a mat-list-item routerLink="/analytics" (click)="sidenav.close()" routerLinkActive="active-link">
             <mat-icon matListItemIcon>insights</mat-icon>
@@ -125,7 +125,7 @@ import { interval, Subscription } from 'rxjs';
             <mat-icon matListItemIcon>person_search</mat-icon>
             <span matListItemTitle>Пользователи</span>
           </a>
-          <a mat-list-item routerLink="/news/manage" (click)="sidenav.close()" routerLinkActive="active-link">
+          <a mat-list-item routerLink="/news/manage" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role === 'teacher' || currentUser.role === 'admin'">
             <mat-icon matListItemIcon>feed</mat-icon>
             <span matListItemTitle>Новости</span>
           </a>
@@ -140,7 +140,7 @@ import { interval, Subscription } from 'rxjs';
 
           <div class="nav-divider"></div>
           
-          <a mat-list-item routerLink="/admin/db" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role === 'teacher'">
+          <a mat-list-item routerLink="/admin/db" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role === 'teacher' || currentUser.role === 'admin'">
             <mat-icon matListItemIcon>database</mat-icon>
             <span matListItemTitle>База данных</span>
           </a>
@@ -196,11 +196,13 @@ import { interval, Subscription } from 'rxjs';
           </mat-menu>
           
           <button mat-button routerLink="/profile" class="profile-button">
-            <div class="avatar-container" *ngIf="currentUser.avatar_url">
-              <img [src]="currentUser.avatar_url" alt="avatar" class="toolbar-avatar">
+            <div class="profile-content">
+              <div class="avatar-container" *ngIf="currentUser.avatar_url">
+                <img [src]="currentUser.avatar_url" alt="avatar" class="toolbar-avatar">
+              </div>
+              <mat-icon *ngIf="!currentUser.avatar_url" class="toolbar-avatar-icon">person</mat-icon>
+              <span class="toolbar-user-name">{{ currentUser.name }}</span>
             </div>
-            <mat-icon *ngIf="!currentUser.avatar_url">person</mat-icon>
-            {{ currentUser.name }}
           </button>
           <button mat-icon-button (click)="logout()" matTooltip="Выйти">
             <mat-icon>logout</mat-icon>
@@ -304,9 +306,19 @@ import { interval, Subscription } from 'rxjs';
       object-fit: cover;
     }
     .profile-button {
-      display: flex;
-      align-items: center;
       padding: 0 12px;
+    }
+    .profile-content {
+      display: flex !important;
+      align-items: center;
+      gap: 8px;
+    }
+    .toolbar-user-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .toolbar-avatar-icon {
+        margin-right: 0 !important;
     }
     mat-icon.status-connected {
       color: #4caf50;

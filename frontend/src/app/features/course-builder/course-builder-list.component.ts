@@ -33,7 +33,7 @@ import { ApiService } from '../../core/services/api.service';
         <mat-icon>school</mat-icon>
         <p>Нет созданных курсов</p>
         <p class="empty-hint">Создайте курс на странице "Курсы", чтобы начать работу с конструктором</p>
-        <button mat-raised-button color="primary" routerLink="/subjects" style="margin-top: 16px;">
+        <button mat-raised-button color="primary" routerLink="/subjects" class="create-course-btn">
           <mat-icon>add</mat-icon>
           Создать курс
         </button>
@@ -67,9 +67,7 @@ import { ApiService } from '../../core/services/api.service';
   `,
   styles: [`
     .builder-list-container {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      padding: 24px;
+      min-height: 100%;
     }
 
     .page-header {
@@ -202,7 +200,7 @@ import { ApiService } from '../../core/services/api.service';
       padding: 80px 20px;
     }
 
-    .empty-state mat-icon {
+    .empty-state > mat-icon {
       font-size: 96px;
       width: 96px;
       height: 96px;
@@ -222,6 +220,25 @@ import { ApiService } from '../../core/services/api.service';
       font-size: 16px;
       color: #9e9e9e;
       margin: 0 0 24px 0;
+    }
+
+    .create-course-btn {
+      padding: 12px 32px;
+      font-size: 16px;
+      font-weight: 500;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 48px;
+      box-shadow: 0 4px 12px rgba(26, 35, 126, 0.2);
+    }
+
+    .create-course-btn mat-icon {
+      margin: 0;
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
     }
 
     @media (max-width: 768px) {

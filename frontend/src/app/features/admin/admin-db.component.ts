@@ -386,9 +386,7 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
   `,
   styles: [`
     .admin-container {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      padding: 24px;
+      min-height: 100%;
     }
 
     .admin-header {
@@ -655,8 +653,12 @@ export class AdminDbComponent implements OnInit {
 
   deleteUser(id: string) {
     if (confirm('Удалить пользователя? Это действие нельзя отменить.')) {
-      // Note: API doesn't have delete user endpoint, you may need to add it
-      alert('Функция удаления пользователя не реализована в API');
+      this.api.deleteUser(id).subscribe({
+        next: () => {
+          this.users = this.users.filter(u => u.id !== id);
+        },
+        error: (err) => alert(err.error?.detail || 'Ошибка при удалении пользователя')
+      });
     }
   }
 

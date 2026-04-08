@@ -1,7 +1,7 @@
 """
 Database models for Submission Service
 """
-from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, JSON
+from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, JSON, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -23,9 +23,15 @@ class Submission(Base):
     started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     finished_at = Column(DateTime, nullable=True)
     is_finished = Column(String, default="false")  # Store as string for flexibility
+    version = Column(Integer, default=1, nullable=False)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey('submissions.id'), nullable=True)
+    status = Column(String, default="pending")  # pending, approved, rejected
+    teacher_feedback = Column(String, nullable=True)
 
     # Relationships
     answers = relationship("Answer", back_populates="submission", cascade="all, delete-orphan")
+    files = relationship("SubmissionFile", back_populates="submission", cascade="all, delete-orphan")
+    parent = relationship("Submission", remote_side=[id], backref="versions")
 
     def __repr__(self):
         return f"<Submission(id={self.id}, user={self.user}, test_id={self.test_id})>"
@@ -38,6 +44,7 @@ class User(Base):
     name = Column(String, unique=True, nullable=False)
     avatar_url = Column(String, nullable=True)
     role = Column(String, default="student")
+    is_hidden_admin = Column(Boolean, default=False)
 
     def __repr__(self):
         return f"<User(id={self.id}, name={self.name})>"
@@ -61,4 +68,22 @@ class Answer(Base):
 
     def __repr__(self):
         return f"<Answer(id={self.id}, question_id={self.question_id}, score={self.score})>"
+
+
+class SubmissionFile(Base):
+    __tablename__ = "submission_files"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    submission_id = Column(UUID(as_uuid=True), ForeignKey("submissions.id"), nullable=False)
+    file_path = Column(String, nullable=False)
+    original_name = Column(String, nullable=False)
+    mime_type = Column(String, nullable=True)
+    size = Column(Integer, nullable=True)
+    uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    submission = relationship("Submission", back_populates="files")
+
+    def __repr__(self):
+        return f"<SubmissionFile(id={self.id}, submission_id={self.submission_id}, name={self.original_name})>"
 

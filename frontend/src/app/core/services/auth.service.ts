@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
-import { ApiService } from './api.service';
-import { tap, catchError, map } from 'rxjs/operators';
-import { Observable, of, BehaviorSubject, throwError } from 'rxjs';
 import { HttpClient, HttpHeaders, HttpBackend } from '@angular/common/http';
+import { Observable, BehaviorSubject, from, of, throwError } from 'rxjs';
+import { map, catchError, switchMap, tap } from 'rxjs/operators';
+import { UserManager, User, UserManagerSettings } from 'oidc-client-ts';
 
 export interface CurrentUser {
   id: string;
@@ -15,94 +15,131 @@ export interface CurrentUser {
   providedIn: 'root'
 })
 export class AuthService {
-  private storageKey = 'eduai-jwt-token';
-  private userStorageKey = 'eduai-current-user';
-  private currentUserSubject = new BehaviorSubject<CurrentUser | null>(this.getCurrentUserFromStorage());
-  private tokenSubject = new BehaviorSubject<string | null>(this.getTokenFromStorage());
+  private userManager: UserManager;
+  private currentUserSubject = new BehaviorSubject<CurrentUser | null>(null);
+  private tokenSubject = new BehaviorSubject<string | null>(null);
+
+  currentUser$ = this.currentUserSubject.asObservable();
+  token$ = this.tokenSubject.asObservable();
 
   private apiBaseUrl = '/api';
   private httpWithoutInterceptor: HttpClient;
-
-  // Observable для подписки на изменения текущего пользователя
-  currentUser$ = this.currentUserSubject.asObservable();
-  token$ = this.tokenSubject.asObservable();
 
   constructor(
     private http: HttpClient,
     private handler: HttpBackend
   ) {
     this.httpWithoutInterceptor = new HttpClient(handler);
+    
+    const settings: UserManagerSettings = {
+      authority: 'https://keycloak.aitalenthub.ru/realms/aith',
+      client_id: 'eduaihub',
+      redirect_uri: `${window.location.origin}/callback`,
+      post_logout_redirect_uri: window.location.origin,
+      response_type: 'code',
+      scope: 'openid profile email offline_access',
+      automaticSilentRenew: true,
+      filterProtocolClaims: true,
+      loadUserInfo: true
+    };
 
-    // Инициализируем текущего пользователя при создании сервиса
-    const user = this.getCurrentUserFromStorage();
-    const token = this.getTokenFromStorage();
+    this.userManager = new UserManager(settings);
+    
+    // Initialize from storage if exists
+    this.userManager.getUser().then(user => {
+      if (user && !user.expired) {
+        this.handleUser(user);
+      }
+    });
 
-    if (user && token) {
-      this.currentUserSubject.next(user);
-      this.tokenSubject.next(token);
-      // Проверяем валидность токена
-      this.validateToken();
+    this.userManager.events.addUserLoaded((user) => {
+      this.handleUser(user);
+    });
+
+    this.userManager.events.addUserSignedOut(() => {
+      this.logout();
+    });
+  }
+
+  private handleUser(user: User) {
+    if (user && user.access_token) {
+      this.tokenSubject.next(user.access_token);
+      
+      // In OIDC, profile info is in user.profile
+      const profile = user.profile;
+      const currentUser: CurrentUser = {
+        id: profile.sub,
+        name: (profile.preferred_username as string) || (profile.name as string),
+        avatar_url: profile['avatar_url'] as string,
+        role: this.mapRoles(profile)
+      };
+      
+      this.currentUserSubject.next(currentUser);
+      
+      // Sync with our backend /auth/me for any specific user linking/roles
+      this.syncUserWithBackend().subscribe();
     }
   }
 
-  // ...
+  private mapRoles(profile: any): string {
+    const realmAccess = profile.realm_access || {};
+    const roles = realmAccess.roles || [];
+    if (roles.includes('admin') || roles.includes('Admin')) return 'admin';
+    if (roles.includes('teacher') || roles.includes('Teacher')) return 'teacher';
+    return 'student';
+  }
+
+  private syncUserWithBackend(): Observable<any> {
+    const token = this.getToken();
+    if (!token) return of(null);
+    
+    return this.http.get<any>(`${this.apiBaseUrl}/auth/me`).pipe(
+      tap(backendUser => {
+        const current = this.currentUserSubject.value;
+        if (current) {
+          this.currentUserSubject.next({
+            ...current,
+            id: backendUser.user_id,
+            name: backendUser.username,
+            role: backendUser.role,
+            avatar_url: backendUser.avatar_url
+          });
+        }
+      }),
+      catchError(err => {
+        console.error('Error syncing user with backend:', err);
+        return of(null);
+      })
+    );
+  }
+
+  login(): Promise<void> {
+    return this.userManager.signinRedirect();
+  }
+
+  completeLogin(): Observable<void> {
+    return from(this.userManager.signinRedirectCallback()).pipe(
+      tap(user => {
+        this.handleUser(user);
+      }),
+      map(() => void 0)
+    );
+  }
 
   logout() {
     const currentUser = this.getCurrentUser();
     if (currentUser) {
-      // Track logout activity
-      try {
-        this.httpWithoutInterceptor.post(`${this.apiBaseUrl}/analytics/activities`, {
-          user_name: currentUser.name,
-          action_type: 'logout',
-          resource_type: 'system',
-          session_duration: null
-        }).subscribe({
-          error: (err) => console.error('Error tracking logout activity:', err)
-        });
-      } catch (err) {
-        console.error('Error tracking logout activity:', err);
-      }
+      this.httpWithoutInterceptor.post(`${this.apiBaseUrl}/analytics/activities`, {
+        user_name: currentUser.name,
+        action_type: 'logout',
+        resource_type: 'system',
+        session_duration: null
+      }).subscribe();
     }
-    localStorage.removeItem(this.storageKey);
-    localStorage.removeItem(this.userStorageKey);
-    this.currentUserSubject.next(null);
+    
     this.tokenSubject.next(null);
-  }
-
-  // ...
-
-  loginByName(name: string): Observable<CurrentUser> {
-    return this.http.post<{ token: string, user: CurrentUser }>(`${this.apiBaseUrl}/auth/login`, { name }).pipe(
-      tap((response) => {
-        this.setToken(response.token);
-        this.setCurrentUser(response.user);
-        // Track login activity
-        this.httpWithoutInterceptor.post(`${this.apiBaseUrl}/analytics/activities`, {
-          user_name: response.user.name,
-          action_type: 'login',
-          resource_type: 'system',
-          session_duration: null
-        }).subscribe({
-          error: (err) => console.error('Error tracking login activity:', err)
-        });
-      }),
-      map((response) => response.user)
-    );
-  }
-
-  private getTokenFromStorage(): string | null {
-    return localStorage.getItem(this.storageKey);
-  }
-
-  private getCurrentUserFromStorage(): CurrentUser | null {
-    const raw = localStorage.getItem(this.userStorageKey);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
+    this.currentUserSubject.next(null);
+    this.userManager.signoutRedirect();
   }
 
   getToken(): string | null {
@@ -113,76 +150,19 @@ export class AuthService {
     return this.currentUserSubject.value;
   }
 
-  private setToken(token: string) {
-    localStorage.setItem(this.storageKey, token);
-    this.tokenSubject.next(token);
+  isAuthenticated(): boolean {
+    return this.tokenSubject.value !== null && this.currentUserSubject.value !== null;
   }
 
-  private setCurrentUser(user: CurrentUser) {
-    localStorage.setItem(this.userStorageKey, JSON.stringify(user));
-    this.currentUserSubject.next(user);
+  // Compatible for old components
+  loginByName(name: string): Observable<CurrentUser> {
+    console.warn('loginByName is deprecated for OIDC, use login() instead');
+    return throwError(() => new Error('Use OIDC login instead'));
   }
-
-  private validateToken() {
-    const token = this.getToken();
-    if (!token) {
-      this.logout();
-      return;
-    }
-
-    // Проверяем токен через API
-    this.http.get<any>('/api/auth/me', {
-      headers: new HttpHeaders({
-        'Authorization': `Bearer ${token}`
-      })
-    }).pipe(
-      catchError((error) => {
-        // Токен невалиден только при 401 или 403
-        if (error.status === 401 || error.status === 403) {
-          this.logout();
-          return throwError(() => new Error('Invalid token'));
-        }
-        // При ошибках сети или 5xx нe выходим
-        console.warn('Token validation failed temporarily:', error);
-        return of(null); // Return observable to keep stream alive (though current logic ends here)
-      })
-    ).subscribe({
-      next: (userData) => {
-        if (userData) {
-          // Токен валиден, обновляем пользователя если нужно
-          const currentUser = this.getCurrentUser();
-          if (!currentUser || currentUser.id !== userData.user_id) {
-            this.setCurrentUser({
-              id: userData.user_id,
-              name: userData.username,
-              avatar_url: userData.avatar_url,
-              role: userData.role
-            });
-          }
-        }
-      },
-      error: () => {
-        // This shouldn't be reached if we handle catchError correctly, 
-        // but just in case of unhandled error
-        console.error('Unhandled token validation error');
-      }
-    });
-  }
-
-
 
   register(name: string, role: string = 'student'): Observable<CurrentUser> {
-    return this.http.post<{ token: string, user: CurrentUser }>('/api/auth/register', { name, role }).pipe(
-      tap((response) => {
-        this.setToken(response.token);
-        this.setCurrentUser(response.user);
-      }),
-      map((response) => response.user)
-    );
-  }
-
-  isAuthenticated(): boolean {
-    return this.getToken() !== null && this.getCurrentUser() !== null;
+    console.warn('register is deprecated for OIDC');
+    return throwError(() => new Error('Registration should be handled via University SSO'));
   }
 }
 

@@ -44,6 +44,24 @@ class SubmissionUpdate(BaseModel):
     answers: List[AnswerCreate] = []
 
 
+class SubmissionStatusUpdate(BaseModel):
+    status: str
+    teacher_feedback: Optional[str] = None
+    total_score: Optional[int] = None
+
+
+class SubmissionFileResponse(BaseModel):
+    id: UUID
+    file_path: str
+    original_name: str
+    mime_type: Optional[str] = None
+    size: Optional[int] = None
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class SubmissionResponse(BaseModel):
     id: UUID
     test_id: UUID
@@ -55,7 +73,12 @@ class SubmissionResponse(BaseModel):
     started_at: datetime
     finished_at: Optional[datetime] = None
     is_finished: str
+    version: int
+    parent_id: Optional[UUID] = None
+    status: str = "pending"
+    teacher_feedback: Optional[str] = None
     answers: List[AnswerResponse] = []
+    files: List[SubmissionFileResponse] = []
 
     class Config:
         from_attributes = True
@@ -67,6 +90,7 @@ class SubmissionResults(BaseModel):
 
 
 class UserCreate(BaseModel):
+    id: Optional[UUID] = None
     name: str
     role: str = "student"
     avatar_url: Optional[str] = None

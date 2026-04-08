@@ -13,7 +13,7 @@ import httpx
 import logging
 
 from app.database import get_db
-from app.models import Subject
+from app.models import Subject, CourseModule, CourseLesson, CourseContent
 from app.schemas import SubjectCreate, SubjectResponse
 
 router = APIRouter()
@@ -21,6 +21,8 @@ router = APIRouter()
 
 STORAGE_PATH = os.getenv("STORAGE_PATH", "/app/storage")
 NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-service:8010")
+MATERIAL_SERVICE_URL = os.getenv("MATERIAL_SERVICE_URL", "http://material-service:8004")
+TEST_SERVICE_URL = os.getenv("TEST_SERVICE_URL", "http://test-service:8002")
 logger = logging.getLogger(__name__)
 
 
@@ -160,3 +162,117 @@ async def get_cover_image(subject_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Cover image file not found")
     
     return FileResponse(filepath)
+
+
+@router.post("/{subject_id}/clone", response_model=SubjectResponse)
+async def clone_subject(subject_id: UUID, db: Session = Depends(get_db), x_user_name: Optional[str] = Header(None, alias="X-User-Name")):
+    """Clone a subject with all its materials, ignoring students and groups"""
+    original = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Subject not found")
+        
+    # Copy subject with unique name
+    base_name = f"{original.name} (Copy)"
+    new_name = base_name
+    counter = 1
+    while db.query(Subject).filter(Subject.name == new_name).first():
+        new_name = f"{base_name} ({counter})"
+        counter += 1
+        
+    cloned_subject = Subject(
+        name=new_name,
+        description=original.description,
+        cover_image=original.cover_image
+    )
+    db.add(cloned_subject)
+    db.flush()
+    
+    # Clone materials and tests in their respective services
+    material_mapping = {}
+    test_mapping = {}
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # Clone materials
+        try:
+            m_resp = await client.post(
+                f"{MATERIAL_SERVICE_URL}/materials/clone",
+                json={"old_subject_id": str(subject_id), "new_subject_id": str(cloned_subject.id)}
+            )
+            if m_resp.status_code == 200:
+                material_mapping = m_resp.json()
+        except Exception as e:
+            logger.error(f"Failed to clone materials: {e}")
+            
+        # Clone tests
+        try:
+            t_resp = await client.post(
+                f"{TEST_SERVICE_URL}/tests/clone",
+                json={"old_subject_id": str(subject_id), "new_subject_id": str(cloned_subject.id)}
+            )
+            if t_resp.status_code == 200:
+                test_mapping = t_resp.json()
+        except Exception as e:
+            logger.error(f"Failed to clone tests: {e}")
+    
+    # Copy modules, lessons, and content
+    for module in original.modules:
+        cloned_module = CourseModule(
+            subject_id=cloned_subject.id,
+            title=module.title,
+            description=module.description,
+            order_index=module.order_index,
+            is_collapsed=module.is_collapsed
+        )
+        db.add(cloned_module)
+        db.flush()
+        
+        for lesson in module.lessons:
+            cloned_lesson = CourseLesson(
+                module_id=cloned_module.id,
+                title=lesson.title,
+                lesson_type=lesson.lesson_type,
+                order_index=lesson.order_index
+            )
+            db.add(cloned_lesson)
+            db.flush()
+            
+            if lesson.content:
+                ext_content = lesson.content
+                
+                # Use mapped IDs if they exist
+                new_material_id = material_mapping.get(str(ext_content.material_id)) if ext_content.material_id else None
+                new_test_id = test_mapping.get(str(ext_content.test_id)) if ext_content.test_id else None
+                
+                # If not mapped (e.g. clone failed or not found), fallback to original (placeholder behavior)
+                # But if we found a mapping, use the new one.
+                
+                cloned_content = CourseContent(
+                    lesson_id=cloned_lesson.id,
+                    text_content=ext_content.text_content,
+                    video_url=ext_content.video_url,
+                    video_platform=ext_content.video_platform,
+                    material_id=new_material_id or ext_content.material_id,
+                    test_id=new_test_id or ext_content.test_id,
+                    extra_data=ext_content.extra_data
+                )
+                db.add(cloned_content)
+                
+    db.commit()
+    db.refresh(cloned_subject)
+    
+    try:
+        decoded_name = unquote(x_user_name) if x_user_name else None
+    except:
+        decoded_name = x_user_name
+
+    await create_notification(
+        user_name=None, 
+        title="Курс скопирован", 
+        message=f"Создана копия курса: {cloned_subject.name}",
+        type="success",
+        related_type="subject",
+        related_id=str(cloned_subject.id),
+        exclude_user_name=decoded_name
+    )
+    
+    return cloned_subject

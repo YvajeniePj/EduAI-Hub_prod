@@ -9,8 +9,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-eduai}
       POSTGRES_USER: ${POSTGRES_USER:-eduai}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eduai_password}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Ports are NOT exposed to host/internet, only accessible within Docker network
+    # For local debugging via DBeaver, you could uncomment:
+    # ports:
+    #   - "10.10.0.1:5439:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -26,8 +28,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: eduai-redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    # ports:
+    #   - "10.10.0.1:6399:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -45,10 +47,13 @@ services:
       dockerfile: Dockerfile
     container_name: eduai-api-gateway
     ports:
-      - "8000:8000"
+      - "10.10.0.1:8100:8000"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
       - REDIS_URL=redis://redis:6379
+      - KEYCLOAK_URL=https://keycloak.aitalenthub.ru
+      - KEYCLOAK_REALM=aith
+      - JWKS_URI=https://keycloak.aitalenthub.ru/realms/aith/protocol/openid-connect/certs
       - SUBJECT_SERVICE_URL=http://subject-service:8001
       - TEST_SERVICE_URL=http://test-service:8002
       - SUBMISSION_SERVICE_URL=http://submission-service:8003
@@ -123,8 +128,8 @@ services:
       context: ./services/subject-service
       dockerfile: Dockerfile
     container_name: eduai-subject-service
-    ports:
-      - "8001:8001"
+    # ports:
+    #   - "8001:8001"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
       - PYTHONUNBUFFERED=1
@@ -143,10 +148,11 @@ services:
       context: ./services/test-service
       dockerfile: Dockerfile
     container_name: eduai-test-service
-    ports:
-      - "8002:8002"
+    # ports:
+    #   - "8002:8002"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
+      - STORAGE_PATH=/app/storage
       - PYTHONUNBUFFERED=1
     depends_on:
       postgres:
@@ -155,6 +161,7 @@ services:
       - eduai-network
     volumes:
       - ./services/test-service:/app
+      - test_storage:/app/storage
     command: uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload --reload-dir /app
 
   # Submission Service
@@ -163,8 +170,8 @@ services:
       context: ./services/submission-service
       dockerfile: Dockerfile
     container_name: eduai-submission-service
-    ports:
-      - "8003:8003"
+    # ports:
+    #   - "8003:8003"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
       - REDIS_URL=redis://redis:6379
@@ -181,6 +188,7 @@ services:
       - eduai-network
     volumes:
       - ./services/submission-service:/app
+      - static_storage:/app/static
     command: uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload --reload-dir /app
 
   # Material Service
@@ -189,8 +197,8 @@ services:
       context: ./services/material-service
       dockerfile: Dockerfile
     container_name: eduai-material-service
-    ports:
-      - "8004:8004"
+    # ports:
+    #   - "8004:8004"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
       - STORAGE_PATH=/app/storage
@@ -212,8 +220,8 @@ services:
       context: ./services/video-service
       dockerfile: Dockerfile
     container_name: eduai-video-service
-    ports:
-      - "8005:8005"
+    # ports:
+    #   - "8005:8005"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
       - PYTHONUNBUFFERED=1
@@ -232,8 +240,8 @@ services:
       context: ./services/peer-review-service
       dockerfile: Dockerfile
     container_name: eduai-peer-review-service
-    ports:
-      - "8006:8006"
+    # ports:
+    #   - "8006:8006"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
       - SUBMISSION_SERVICE_URL=http://submission-service:8003
@@ -254,8 +262,8 @@ services:
       context: ./services/gamification-service
       dockerfile: Dockerfile
     container_name: eduai-gamification-service
-    ports:
-      - "8007:8007"
+    # ports:
+    #   - "8007:8007"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
       - PYTHONUNBUFFERED=1
@@ -274,8 +282,8 @@ services:
       context: ./services/ai-service
       dockerfile: Dockerfile
     container_name: eduai-ai-service
-    ports:
-      - "8008:8008"
+    # ports:
+    #   - "8008:8008"
     environment:
       - GIGACHAT_API_KEY=${GIGACHAT_API_KEY:-}
       - PYTHONUNBUFFERED=1
@@ -291,8 +299,8 @@ services:
       context: ./services/analytics-service
       dockerfile: Dockerfile
     container_name: eduai-analytics-service
-    ports:
-      - "8009:8009"
+    # ports:
+    #   - "8009:8009"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
       - PYTHONUNBUFFERED=1
@@ -311,8 +319,8 @@ services:
       context: ./services/notification-service
       dockerfile: Dockerfile
     container_name: eduai-notification-service
-    ports:
-      - "8010:8010"
+    # ports:
+    #   - "8010:8010"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
       - SUBMISSION_SERVICE_URL=http://submission-service:8003
@@ -332,8 +340,8 @@ services:
       context: ./services/feedback-service
       dockerfile: Dockerfile
     container_name: eduai-feedback-service
-    ports:
-      - "8011:8011"
+    # ports:
+    #   - "8011:8011"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-eduai}:${POSTGRES_PASSWORD:-eduai_password}@postgres:5432/${POSTGRES_DB:-eduai}
       - PYTHONUNBUFFERED=1
@@ -358,39 +366,17 @@ services:
       - api-gateway
     networks:
       - eduai-network
-    expose:
-      - "80"
-
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:alpine
-    container_name: eduai-nginx
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
-      - ./certbot/www:/var/www/certbot:ro
-    depends_on:
-      - api-gateway
-      - frontend
-    networks:
-      - eduai-network
+      - "10.10.0.1:3100:80"
 
-  # Certbot for SSL certificates
-  certbot:
-    image: certbot/certbot:latest
-    container_name: eduai-certbot
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
 
 volumes:
   postgres_data:
   redis_data:
   material_storage:
+  test_storage:
+  static_storage:
 
 
 networks:

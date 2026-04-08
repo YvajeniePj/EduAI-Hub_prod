@@ -33,7 +33,7 @@ import { ApiService } from '../../core/services/api.service';
   ],
   template: `
     <div class="container">
-      <h1>Создать тест</h1>
+    <h1>{{ isEditMode ? 'Редактировать тест' : 'Создать тест' }}</h1>
       
       <form [formGroup]="testForm" (ngSubmit)="onSubmit()">
         <mat-card>
@@ -86,7 +86,8 @@ import { ApiService } from '../../core/services/api.service';
               <mat-label>Тип теста</mat-label>
               <mat-select formControlName="test_type" required (selectionChange)="onTestTypeChange()">
                 <mat-option value="multiple_choice">С вариантами ответов</mat-option>
-                <mat-option value="keyword_based">С ключевыми словами</mat-option>
+                <mat-option value="keyword_based">Развёрнутый ответ</mat-option>
+                <mat-option value="project">Проект (Загрузка файлов)</mat-option>
               </mat-select>
             </mat-form-field>
             </div>
@@ -119,6 +120,44 @@ import { ApiService } from '../../core/services/api.service';
                 <mat-hint>Максимальное время на прохождение теста в минутах (опционально)</mat-hint>
               </mat-form-field>
             </div>
+
+            <!-- Project Assets Section -->
+            <div class="assets-section" *ngIf="isProject()">
+              <h3>Файлы проекта (материалы)</h3>
+              
+              <!-- Existing Files -->
+              <div class="file-list" *ngIf="existingFiles.length > 0">
+                <mat-card *ngFor="let file of existingFiles" class="file-inline-item existing">
+                  <mat-icon>cloud_done</mat-icon>
+                  <span class="file-name">{{ file.original_name }}</span>
+                  <span class="file-size">({{ (file.size / 1024).toFixed(1) }} KB)</span>
+                  <button mat-icon-button type="button" (click)="deleteExistingFile(file.id)" color="warn" matTooltip="Удалить с сервера">
+                    <mat-icon>delete_forever</mat-icon>
+                  </button>
+                </mat-card>
+              </div>
+
+              <p class="hint-text">Загрузите файлы, которые студенты должны будут использовать (например, Jupyter ноутбуки, датасеты).</p>
+              
+              <div class="file-list" *ngIf="selectedFiles.length > 0">
+                <mat-card *ngFor="let file of selectedFiles; let i = index" class="file-inline-item">
+                  <mat-icon>insert_drive_file</mat-icon>
+                  <span class="file-name">{{ file.name }}</span>
+                  <span class="file-size">({{ (file.size / 1024).toFixed(1) }} KB)</span>
+                  <button mat-icon-button type="button" (click)="removeAsset(i)" color="warn">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </mat-card>
+              </div>
+
+              <div class="upload-actions">
+                <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none" multiple>
+                <button mat-stroked-button type="button" (click)="fileInput.click()">
+                  <mat-icon>upload_file</mat-icon>
+                  Прикрепить новые файлы
+                </button>
+              </div>
+            </div>
           </mat-card-content>
         </mat-card>
 
@@ -150,6 +189,11 @@ import { ApiService } from '../../core/services/api.service';
                     Укажите количество баллов
                   </mat-error>
                 </mat-form-field>
+              </div>
+
+              <!-- Project Instruction -->
+              <div *ngIf="testForm.get('test_type')?.value === 'project'">
+                <p class="hint-text">Студенты должны загрузить файлы (код, отчеты и т.д.) в качестве ответа.</p>
               </div>
 
               <!-- Multiple Choice -->
@@ -208,6 +252,16 @@ import { ApiService } from '../../core/services/api.service';
                   <mat-icon>add</mat-icon>
                   {{ getQuestionKeywords(i).length === 0 ? 'Добавить ключевое слово' : 'Добавить еще ключевое слово' }}
                 </button>
+
+                <div class="form-row" style="margin-top: 24px;">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Образец правильного ответа (для ИИ)</mat-label>
+                    <textarea matInput formControlName="correct_answer" rows="4" 
+                              placeholder="Введите идеальный ответ, на который должен ориентироваться ИИ при проверке..."
+                              (input)="onQuestionFieldChange()"></textarea>
+                    <mat-hint>ИИ будет сравнивать ответ студента с этим образцом по смыслу</mat-hint>
+                  </mat-form-field>
+                </div>
               </div>
             </mat-card-content>
           </mat-card>
@@ -220,9 +274,9 @@ import { ApiService } from '../../core/services/api.service';
 
         <div class="actions">
           <button mat-raised-button color="primary" type="submit" [disabled]="!isFormValid()">
-            Создать тест
+            {{ isEditMode ? 'Сохранить изменения' : 'Создать тест' }}
           </button>
-          <button mat-button type="button" routerLink="/tests">Отмена</button>
+          <button mat-button type="button" (click)="onCancel()">Отмена</button>
         </div>
       </form>
     </div>
@@ -305,13 +359,54 @@ import { ApiService } from '../../core/services/api.service';
     .deadline-time-field mat-icon {
       color: #666;
     }
+    .assets-section {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #eee;
+    }
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .file-inline-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 16px !important;
+      gap: 12px;
+      background: #f8f9fa !important;
+      box-shadow: none !important;
+      border: 1px solid #e0e0e0;
+    }
+    .file-name {
+      flex: 1;
+      font-weight: 500;
+    }
+    .file-size {
+      color: #757575;
+      font-size: 13px;
+    }
+    .upload-actions {
+      display: flex;
+      justify-content: flex-start;
+    }
+    .file-inline-item.existing {
+      background: #e8f5e9 !important;
+      border-color: #c8e6c9;
+    }
   `]
 })
 export class TestCreateComponent implements OnInit {
   testForm!: FormGroup;
+  isEditMode = false;
+  testId: string | null = null;
   subjects: any[] = [];
   availableGroups: any[] = [];
   minDate: Date = new Date();
+  selectedFiles: File[] = [];
+  existingFiles: any[] = [];
+  source: string | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -347,8 +442,91 @@ export class TestCreateComponent implements OnInit {
       }
     });
 
-
     this.loadSubjects();
+
+    // Capture source from query params
+    this.source = this.route.snapshot.queryParamMap.get('source');
+
+    // Check for edit mode
+    this.route.params.subscribe(params => {
+      if (params['id']) {
+        this.isEditMode = true;
+        this.testId = params['id'];
+        this.loadTestData(this.testId!);
+      }
+    });
+  }
+
+  loadTestData(id: string) {
+    this.apiService.getTest(id).subscribe({
+      next: (test) => {
+        // Prepare questions array
+        while (this.questions.length > 0) {
+          this.questions.removeAt(0);
+        }
+
+        test.questions?.forEach((q: any) => {
+          const questionGroup = this.fb.group({
+            question_id: [q.question_id],
+            title: [q.title, Validators.required],
+            max_points: [q.max_points, [Validators.required, Validators.min(1)]],
+            options: this.fb.array(q.options?.map((o: string) => this.fb.control(o)) || [this.fb.control(''), this.fb.control('')]),
+            correct_answer: [q.correct_answer || ''],
+            keywords: this.fb.array(q.keywords?.map((k: any) => this.fb.group({
+              word: [k.word, Validators.required],
+              points: [k.points, [Validators.required, Validators.min(1)]]
+            })) || [])
+          });
+          this.questions.push(questionGroup);
+        });
+
+        // Parse due_date
+        let dueDate: Date | null = null;
+        let dueTime: string = '';
+        if (test.due_date) {
+          const d = new Date(test.due_date);
+          dueDate = d;
+          dueTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+
+        this.testForm.patchValue({
+          subject_id: test.subject_id,
+          allowed_groups: test.allowed_groups || [],
+          title: test.title,
+          description: test.description,
+          test_type: test.test_type,
+          due_date: dueDate,
+          due_time: dueTime,
+          time_limit_minutes: test.time_limit_minutes
+        });
+
+        if (test.subject_id) {
+          this.loadGroups(test.subject_id);
+        }
+
+        if (test.test_type === 'project') {
+          this.loadExistingFiles(id);
+        }
+
+        this.updateQuestionValidators(test.test_type);
+      },
+      error: (err) => {
+        console.error('Error loading test data:', err);
+        alert('Не удалось загрузить данные теста');
+      }
+    });
+  }
+
+  loadExistingFiles(testId: string) {
+    this.apiService.getTestFiles(testId).subscribe(files => this.existingFiles = files);
+  }
+
+  deleteExistingFile(fileId: string) {
+    if (confirm('Вы уверены, что хотите удалить этот файл с сервера?')) {
+      this.apiService.deleteTestFile(this.testId!, fileId).subscribe(() => {
+        this.loadExistingFiles(this.testId!);
+      });
+    }
   }
 
   loadGroups(subjectId: string) {
@@ -402,6 +580,10 @@ export class TestCreateComponent implements OnInit {
     setTimeout(() => {
       this.testForm.updateValueAndValidity();
     }, 0);
+  }
+
+  isProject(): boolean {
+    return this.testForm.get('test_type')?.value === 'project';
   }
 
   get questions() {
@@ -585,6 +767,11 @@ export class TestCreateComponent implements OnInit {
         return false;
       }
 
+      if (testType === 'project') {
+        // Project just needs a title/instruction
+        continue;
+      }
+
       if (testType === 'multiple_choice') {
         // For multiple_choice: need correct_answer and at least 2 options
         const correctAnswer = question.get('correct_answer')?.value;
@@ -624,12 +811,12 @@ export class TestCreateComponent implements OnInit {
       question.markAllAsTouched();
     });
 
-    const formValue = this.testForm.value;
-    const testType = formValue.test_type;
+    const testType = this.testForm.get('test_type')?.value;
 
     // Проверяем валидность времени дедлайна перед отправкой
-    const dueDateValue = formValue.due_date;
-    const dueTimeValue = formValue.due_time;
+    const dueDateValue = this.testForm.get('due_date')?.value;
+    const dueTimeValue = this.testForm.get('due_time')?.value;
+
     if (dueDateValue && dueTimeValue) {
       if (this.testForm.get('due_time')?.hasError('pastTime')) {
         alert('Невозможно создать тест: выбранное время дедлайна уже прошло. Выберите будущее время.');
@@ -664,26 +851,27 @@ export class TestCreateComponent implements OnInit {
         dueDate = `${year}-${month}-${day}T23:59:00+03:00`;
       }
       const testData = {
-        subject_id: formValue.subject_id,
-        allowed_groups: formValue.allowed_groups,
-        title: formValue.title,
-        description: formValue.description,
+        subject_id: this.testForm.get('subject_id')?.value,
+        allowed_groups: this.testForm.get('allowed_groups')?.value,
+        title: this.testForm.get('title')?.value,
+        description: this.testForm.get('description')?.value,
         test_type: testType,
         due_date: dueDate,
         available_until: dueDate, // Используем ту же дату что и дедлайн
-        time_limit_minutes: formValue.time_limit_minutes ? parseInt(formValue.time_limit_minutes) : null,
-        questions: formValue.questions.map((q: any, index: number) => {
+        time_limit_minutes: this.testForm.get('time_limit_minutes')?.value ? parseInt(this.testForm.get('time_limit_minutes')?.value) : null,
+        questions: this.questions.controls.map((qForm: any, index: number) => {
+          const q = qForm.value;
           const question: any = {
-            question_id: 'q' + (index + 1),
+            question_id: q.question_id || ('q' + (index + 1)),
             title: q.title,
             max_points: q.max_points,
             test_type: testType
           };
 
           if (testType === 'multiple_choice') {
-            question.options = q.options.filter((opt: string) => opt.trim() !== '');
+            question.options = q.options.filter((opt: string) => opt && opt.trim() !== '');
             question.correct_answer = q.correct_answer;
-          } else {
+          } else if (testType === 'keyword_based') {
             // For keyword_based, ensure we have at least one keyword
             if (!q.keywords || q.keywords.length === 0) {
               throw new Error('Добавьте хотя бы одно ключевое слово для вопроса');
@@ -708,22 +896,39 @@ export class TestCreateComponent implements OnInit {
         return;
       }
 
-      console.log('Creating test with data:', testData);
-      this.apiService.createTest(testData).subscribe({
-        next: (response) => {
-          console.log('Test created successfully:', response);
-          if (testData.subject_id) {
-            this.router.navigate(['/courses', testData.subject_id]);
-          } else {
-            this.router.navigate(['/tests']);
+      if (this.isEditMode) {
+        this.apiService.updateTest(this.testId!, testData).subscribe({
+          next: () => {
+            if (this.selectedFiles.length > 0) {
+              this.uploadAssets(this.testId!, testData.subject_id);
+            } else {
+              this.finishCreation(testData.subject_id);
+            }
+          },
+          error: (err) => {
+            console.error('Error updating test:', err);
+            alert('Ошибка при обновлении теста');
           }
-        },
-        error: (err) => {
-          console.error('Error creating test:', err);
-          console.error('Error details:', err.error);
-          alert('Ошибка при создании теста: ' + (err.error?.detail || err.error?.message || err.message || 'Неизвестная ошибка'));
-        }
-      });
+        });
+      } else {
+        this.apiService.createTest(testData).subscribe({
+          next: (response) => {
+            console.log('Test created successfully:', response);
+            const testId = response.id;
+            
+            if (this.selectedFiles.length > 0) {
+              this.uploadAssets(testId, testData.subject_id);
+            } else {
+              this.finishCreation(testData.subject_id);
+            }
+          },
+          error: (err) => {
+            console.error('Error creating test:', err);
+            console.error('Error details:', err.error);
+            alert('Ошибка при создании теста: ' + (err.error?.detail || err.error?.message || err.message || 'Неизвестная ошибка'));
+          }
+        });
+      }
     } else {
       // Show validation errors
       const errors: string[] = [];
@@ -767,6 +972,69 @@ export class TestCreateComponent implements OnInit {
 
       if (errors.length > 0) {
         alert('Исправьте ошибки:\n' + errors.join('\n'));
+      }
+    }
+  }
+
+  onFileSelected(event: any) {
+    const files = event.target.files;
+    if (files) {
+      for (let i = 0; i < files.length; i++) {
+        this.selectedFiles.push(files[i]);
+      }
+    }
+  }
+
+  removeAsset(index: number) {
+    this.selectedFiles.splice(index, 1);
+  }
+
+  uploadAssets(testId: string, subjectId: string) {
+    let uploadedCount = 0;
+    const totalFiles = this.selectedFiles.length;
+
+    this.selectedFiles.forEach(file => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      this.apiService.uploadTestFile(testId, formData).subscribe({
+        next: () => {
+          uploadedCount++;
+          if (uploadedCount === totalFiles) {
+            this.finishCreation(subjectId);
+          }
+        },
+        error: (err) => {
+          console.error('Error uploading file:', err);
+          uploadedCount++;
+          if (uploadedCount === totalFiles) {
+            alert('Некоторые файлы не удалось загрузить');
+            this.finishCreation(subjectId);
+          }
+        }
+      });
+    });
+  }
+
+  finishCreation(subjectId: string) {
+    if (this.source === 'tests') {
+      this.router.navigate(['/tests']);
+    } else if (subjectId) {
+      this.router.navigate(['/courses', subjectId]);
+    } else {
+      this.router.navigate(['/tests']);
+    }
+  }
+
+  onCancel() {
+    if (this.source === 'tests') {
+      this.router.navigate(['/tests']);
+    } else {
+      const subjectId = this.testForm.get('subject_id')?.value || this.route.snapshot.queryParams['subjectId'];
+      if (subjectId) {
+        this.router.navigate(['/courses', subjectId]);
+      } else {
+        this.router.navigate(['/tests']);
       }
     }
   }

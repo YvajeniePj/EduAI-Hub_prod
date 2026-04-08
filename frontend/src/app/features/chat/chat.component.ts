@@ -52,6 +52,7 @@ interface ChatMessage {
         <mat-card-content>
           <div class="messages-container">
             <div *ngIf="messages.length === 0" class="welcome-message">
+              <h2>Чем я могу вам помочь сегодня?</h2>
               <p>Задайте вопрос ассистенту! Он поможет вам с:</p>
               <ul>
                 <li>📅 Дедлайнами и сроками</li>
@@ -109,73 +110,105 @@ interface ChatMessage {
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      height: calc(100vh - 100px);
+      height: calc(100vh - 120px);
     }
     mat-card {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     .chat-messages {
       flex: 1;
-      overflow: hidden;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .chat-messages mat-card-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 0 !important;
+      overflow: hidden;
     }
     .messages-container {
       flex: 1;
       overflow-y: auto;
-      padding: 20px;
-      max-height: 500px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
     .message {
-      margin-bottom: 20px;
-      padding: 15px;
-      border-radius: 8px;
+      padding: 16px 20px;
+      border-radius: 16px;
+      max-width: 85%;
+      position: relative;
+      line-height: 1.5;
     }
     .message.user {
-      background-color: #e3f2fd;
-      margin-left: 20%;
+      background-color: #3f51b5;
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
     }
     .message.assistant {
-      background-color: #f5f5f5;
-      margin-right: 20%;
+      background-color: #f1f3f4;
+      color: #333;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
     }
     .message-header {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 0.9em;
-      color: #666;
+      margin-bottom: 6px;
+      font-size: 0.85em;
+      opacity: 0.8;
     }
     .message-content {
       white-space: pre-wrap;
-      line-height: 1.6;
+      word-break: break-word;
     }
     .timestamp {
       font-size: 0.8em;
+      margin-left: 12px;
     }
     .welcome-message {
       text-align: center;
-      padding: 40px;
-      color: #666;
+      padding: 60px 40px;
+      color: #70757a;
+    }
+    .welcome-message h2 {
+      margin-bottom: 24px;
+      color: #3c4043;
     }
     .welcome-message ul {
       text-align: left;
       display: inline-block;
+      margin-top: 20px;
     }
     .loading-indicator {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 20px;
-      color: #666;
+      gap: 12px;
+      padding: 12px 20px;
+      color: #70757a;
+      font-size: 0.9em;
     }
     .chat-input {
-      position: sticky;
-      bottom: 0;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      margin-top: 16px;
     }
     .input-container {
       display: flex;
       align-items: center;
+      gap: 12px;
+    }
+    mat-form-field {
+      width: 100%;
+    }
+    ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+      display: none;
     }
   `]
 })

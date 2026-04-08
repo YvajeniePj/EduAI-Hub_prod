@@ -9,6 +9,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-videos',
@@ -43,7 +44,7 @@ import { ApiService } from '../../core/services/api.service';
         </mat-card-content>
       </mat-card>
 
-      <mat-card class="add-video-card">
+      <mat-card class="add-video-card" *ngIf="isAdmin">
         <mat-card-header>
           <mat-card-title>
             <mat-icon>video_library</mat-icon>
@@ -100,7 +101,7 @@ import { ApiService } from '../../core/services/api.service';
                 </a>
               </div>
             </mat-card-content>
-            <mat-card-actions>
+            <mat-card-actions *ngIf="isAdmin">
               <button mat-button color="warn" (click)="deleteVideo(video.id)" class="delete-button">
                 <mat-icon>delete</mat-icon>
                 Удалить
@@ -279,10 +280,16 @@ export class VideosComponent implements OnInit {
   videoUrl: string = '';
   videoNote: string = '';
 
+  isAdmin = false;
+
   constructor(
     private apiService: ApiService,
+    private authService: AuthService,
     private sanitizer: DomSanitizer
-  ) {}
+  ) {
+    const user = this.authService.getCurrentUser();
+    this.isAdmin = user?.role === 'teacher' || user?.role === 'admin';
+  }
 
   ngOnInit() {
     this.loadSubjects();

@@ -75,7 +75,7 @@ import { AuthService } from '../../core/services/auth.service';
                 <div class="summary-item">
                   <mat-icon>access_time</mat-icon>
                   <div>
-                    <div class="summary-value">{{ getTotalTime() }} ч</div>
+                    <div class="summary-value">{{ formatTime(totalSeconds) }}</div>
                     <div class="summary-label">Общее время</div>
                   </div>
                 </div>
@@ -158,9 +158,7 @@ import { AuthService } from '../../core/services/auth.service';
   `,
   styles: [`
     .monitor-container {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      padding: 24px;
+      min-height: 100%;
     }
 
     .monitor-content {
@@ -339,16 +337,22 @@ export class ActivityMonitorComponent implements OnInit {
   }
 
   formatTime(seconds: number): string {
+    if (seconds > 0 && seconds < 60) return '< 1 мин';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     if (hours > 0) {
+      if (minutes === 0) return `${hours} ч`;
       return `${hours} ч ${minutes} мин`;
     }
     return `${minutes} мин`;
   }
 
+  get totalSeconds(): number {
+    return this.activityStats.reduce((sum, stat) => sum + stat.total_time_seconds, 0);
+  }
+
   getTotalTime(): number {
-    return this.activityStats.reduce((sum, stat) => sum + stat.total_time_seconds, 0) / 3600;
+    return this.totalSeconds / 3600;
   }
 
   getTotalLogins(): number {

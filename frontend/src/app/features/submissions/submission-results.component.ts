@@ -8,6 +8,13 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { FormsModule } from '@angular/forms';
+import { MatIconModule } from '@angular/material/icon';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-submission-results',
@@ -20,25 +27,52 @@ import { ApiService } from '../../core/services/api.service';
     MatListModule,
     MatChipsModule,
     MatExpansionModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    FormsModule,
+    MatIconModule
   ],
   template: `
     <div class="results-container" *ngIf="results">
       <div class="results-content">
         <div class="results-header">
-          <h1 class="results-title">Результаты теста</h1>
+          <div class="header-main">
+            <h1 class="results-title">Результаты теста</h1>
+            <div class="status-badge" [ngClass]="results.submission.status" *ngIf="results.submission.status">
+              {{ getStatusLabel(results.submission.status) }}
+            </div>
+          </div>
+          
+          <div class="version-info" *ngIf="results.submission.version">
+            <span class="version-label">Версия {{ results.submission.version }}</span>
+            <div class="version-selector" *ngIf="allVersions.length > 1">
+              <mat-form-field appearance="outline" class="version-field">
+                <mat-label>Другие версии</mat-label>
+                <mat-select [ngModel]="results.submission.id" (selectionChange)="switchVersion($event.value)">
+                  <mat-option *ngFor="let v of allVersions" [value]="v.id">
+                    Версия {{ v.version }} ({{ v.finished_at | date:'dd.MM.yyyy HH:mm' }})
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
         </div>
         
-        <mat-card class="summary-card">
+        <mat-card class="summary-card" [ngClass]="results.submission.status">
           <mat-card-content class="summary-content">
             <div class="summary-info">
               <h2 class="summary-label">Итоговая оценка</h2>
-              <div class="score-display">
+              <div class="score-display" *ngIf="(testType.toLowerCase() !== 'project' && testType.toLowerCase() !== 'keyword_based') || results.submission.status !== 'pending'">
                 <span class="score-value">{{ results.submission.total_score }}</span>
                 <span class="score-separator">/</span>
                 <span class="score-max">{{ results.submission.total_max }}</span>
               </div>
-              <div class="points-info">
+              <div class="score-display" *ngIf="(testType.toLowerCase() === 'project' || testType.toLowerCase() === 'keyword_based') && results.submission.status === 'pending'">
+                <span class="score-value-pending">Ожидает проверки</span>
+              </div>
+              <div class="points-info" *ngIf="testType.toLowerCase() !== 'project' || results.submission.status !== 'pending'">
                 <span class="points-label">Начислено очков:</span>
                 <span class="points-value">{{ results.submission.points_awarded }}</span>
               </div>
@@ -46,7 +80,51 @@ import { ApiService } from '../../core/services/api.service';
           </mat-card-content>
         </mat-card>
 
-        <div class="questions-section">
+        <!-- Teacher Review Panel -->
+        <mat-card class="review-panel" *ngIf="isTeacher && results.submission.status === 'pending'">
+          <mat-card-header>
+            <mat-card-title>Проверка работы</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="project-score-input" *ngIf="testType.toLowerCase() === 'project' || testType.toLowerCase() === 'keyword_based'" style="margin-bottom: 20px;">
+              <mat-form-field appearance="outline" class="score-field">
+                <mat-label>Итоговый балл (0-{{ results.submission.total_max }})</mat-label>
+                <input matInput type="number" [(ngModel)]="projectScore" min="0" [max]="results.submission.total_max">
+                <span matSuffix>/ {{ results.submission.total_max }}</span>
+                <mat-hint *ngIf="testType.toLowerCase() === 'keyword_based' && results.submission.total_score > 0">
+                  Рекомендация ИИ: {{ results.submission.total_score }} баллов
+                </mat-hint>
+              </mat-form-field>
+            </div>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Комментарий преподавателя</mat-label>
+              <textarea matInput [(ngModel)]="teacherFeedback" placeholder="Оставьте отзыв или укажите на ошибки..."></textarea>
+            </mat-form-field>
+          </mat-card-content>
+          <mat-card-actions align="end">
+            <button mat-stroked-button color="warn" (click)="rejectSubmission()">
+              <mat-icon>cancel</mat-icon> Отклонить
+            </button>
+            <button mat-raised-button color="primary" (click)="approveSubmission()">
+              <mat-icon>check_circle</mat-icon> Одобрить
+            </button>
+          </mat-card-actions>
+        </mat-card>
+
+        <!-- Feedback for Student -->
+        <mat-card class="feedback-card" *ngIf="results.submission.teacher_feedback">
+          <mat-card-header>
+            <mat-card-title>
+              <mat-icon>comment</mat-icon> Комментарий преподавателя
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <p class="feedback-text">{{ results.submission.teacher_feedback }}</p>
+          </mat-card-content>
+        </mat-card>
+
+        <div class="questions-section" *ngIf="isTeacher || results.submission.status === 'approved'">
           <h2 class="section-title">Детали по вопросам</h2>
           <mat-card *ngFor="let result of results.per_question_results; let i = index" class="result-card">
             <mat-card-header class="result-header">
@@ -59,6 +137,24 @@ import { ApiService } from '../../core/services/api.service';
             </mat-card-header>
             <mat-card-content class="result-content">
               <h3 class="question-title">{{ result.title }}</h3>
+              <div class="test-assets-info" *ngIf="result.test_assets && result.test_assets.length > 0">
+                <p class="assets-hint">Ниже приведены файлы задания. Скачайте их для работы:</p>
+                <mat-list class="test-assets-list">
+                  <mat-list-item *ngFor="let asset of result.test_assets" class="asset-item">
+                    <mat-icon matListItemIcon>insert_drive_file</mat-icon>
+                    <div matListItemTitle class="asset-title">
+                      {{ asset.original_name }}
+                      <span class="asset-size">({{ (asset.size / 1024).toFixed(1) }} KB)</span>
+                    </div>
+                    <div matListItemLine class="asset-actions">
+                      <a mat-stroked-button color="primary" [href]="'/api/tests/' + result.test_id + '/assets/' + asset.id + '/download'" target="_blank">
+                        <mat-icon>download</mat-icon>
+                        Скачать
+                      </a>
+                    </div>
+                  </mat-list-item>
+                </mat-list>
+              </div>
               
               <div class="answer-section">
                 <div class="answer-label">Ваш ответ:</div>
@@ -145,6 +241,27 @@ import { ApiService } from '../../core/services/api.service';
           </mat-card>
         </div>
 
+        <div class="project-files-section" *ngIf="results.submission.files && results.submission.files.length > 0">
+          <h2 class="section-title">Прикрепленные файлы проекта</h2>
+          <mat-card class="files-card">
+            <mat-list>
+              <mat-list-item *ngFor="let file of results.submission.files" class="file-item">
+                <mat-icon matListItemIcon>insert_drive_file</mat-icon>
+                <div matListItemTitle class="file-title">
+                  {{ file.original_name }}
+                  <span class="file-size">({{ (file.size / 1024).toFixed(1) }} KB)</span>
+                </div>
+                <div matListItemLine class="file-actions">
+                  <a mat-stroked-button color="primary" [href]="'/api/submissions/' + results.submission.id + '/files/' + file.id + '/download'" target="_blank">
+                    <mat-icon>download</mat-icon>
+                    Скачать
+                  </a>
+                </div>
+              </mat-list-item>
+            </mat-list>
+          </mat-card>
+        </div>
+
         <div class="actions">
           <button mat-raised-button color="primary" routerLink="/tests" class="back-button">
             Вернуться к тестам
@@ -155,9 +272,7 @@ import { ApiService } from '../../core/services/api.service';
   `,
   styles: [`
     .results-container {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      padding: 24px;
+      min-height: 100%;
     }
 
     .results-content {
@@ -167,6 +282,40 @@ import { ApiService } from '../../core/services/api.service';
 
     .results-header {
       margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .header-main {
+      flex: 1;
+    }
+
+    .version-info {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .version-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #764ba2;
+      background: rgba(118, 75, 162, 0.1);
+      padding: 4px 12px;
+      border-radius: 12px;
+      text-transform: uppercase;
+    }
+
+    .version-field {
+      width: 200px;
+    }
+
+    ::ng-deep .version-field .mat-mdc-text-field-wrapper {
+      background-color: white !important;
     }
 
     .results-title {
@@ -176,16 +325,34 @@ import { ApiService } from '../../core/services/api.service';
       margin: 0;
     }
 
-    .summary-card {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 16px;
-      margin-bottom: 32px;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    }
+    .summary-card.approved { background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); }
+    .summary-card.rejected { background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%); }
+    .summary-card.pending { background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); }
 
     .summary-content {
       padding: 32px;
     }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+    .status-badge.approved { background: #c6f6d5; color: #22543d; }
+    .status-badge.rejected { background: #fed7d7; color: #822727; }
+    .status-badge.pending { background: #feebc8; color: #744210; }
+
+    .review-panel, .feedback-card {
+      margin-bottom: 32px;
+      border-radius: 12px;
+    }
+    .full-width { width: 100%; }
+    .feedback-text { font-style: italic; color: #4a5568; line-height: 1.6; }
+    .feedback-card mat-icon { margin-right: 8px; color: #4a90e2; }
 
     .summary-info {
       text-align: center;
@@ -212,6 +379,14 @@ import { ApiService } from '../../core/services/api.service';
     .score-value {
       font-size: 56px;
       font-weight: 700;
+      line-height: 1;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .score-value-pending {
+      font-size: 32px;
+      font-weight: 600;
       line-height: 1;
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
@@ -424,6 +599,26 @@ import { ApiService } from '../../core/services/api.service';
       color: white;
     }
 
+    .review-panel {
+      margin-top: 24px;
+      border-radius: 12px;
+      border: 1px solid #667eea;
+      background: #f0f4ff;
+    }
+    .score-field {
+      width: 100%;
+      max-width: 250px;
+    }
+    .full-width {
+      width: 100%;
+    }
+    .project-score-input {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+
     .materials-panel {
       margin-top: 16px;
     }
@@ -509,6 +704,41 @@ import { ApiService } from '../../core/services/api.service';
       padding: 24px;
     }
 
+    .project-files-section {
+      margin-bottom: 32px;
+    }
+
+    .files-card {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e0e0e0;
+    }
+
+    .file-item {
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .file-item:last-child {
+      border-bottom: none;
+    }
+
+    .file-title {
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .file-size {
+      font-size: 12px;
+      color: #9e9e9e;
+      font-weight: 400;
+    }
+
+    .file-actions {
+      margin-top: 4px;
+    }
+
     .actions {
       display: flex;
       justify-content: center;
@@ -557,23 +787,70 @@ export class SubmissionResultsComponent implements OnInit {
   isAiGenerated: boolean = false;
   materialIds: string[] = [];
   loadingFeedback: boolean[] = [];
+  isTeacher: boolean = false;
+  teacherFeedback: string = '';
+  projectScore: number = 0;
+  allVersions: any[] = [];
 
   constructor(
     private route: ActivatedRoute,
-    private apiService: ApiService
+    private router: Router,
+    private apiService: ApiService,
+    private auth: AuthService
   ) {}
 
   ngOnInit() {
+    this.isTeacher = this.auth.getCurrentUser()?.role === 'teacher';
     const submissionId = this.route.snapshot.paramMap.get('id');
     if (submissionId) {
       this.loadResults(submissionId);
     }
   }
 
+  getStatusLabel(status: string): string {
+    const labels: any = {
+      'pending': 'Ожидает проверки',
+      'approved': 'Одобрено',
+      'rejected': 'Отклонено'
+    };
+    return labels[status] || status;
+  }
+
+  approveSubmission() {
+    this.updateStatus('approved');
+  }
+
+  rejectSubmission() {
+    if (!this.teacherFeedback) {
+      alert('Пожалуйста, укажите причину отклонения в поле комментария.');
+      return;
+    }
+    this.updateStatus('rejected');
+  }
+
+  updateStatus(status: string) {
+    const submissionId = this.results.submission.id;
+    const isManualGraded = this.testType.toLowerCase() === 'project' || this.testType.toLowerCase() === 'keyword_based';
+    const score = isManualGraded ? this.projectScore : undefined;
+    
+    this.apiService.updateSubmissionStatus(submissionId, status, this.teacherFeedback, score).subscribe({
+      next: () => {
+        this.loadResults(submissionId);
+        alert(status === 'approved' ? 'Работа одобрена' : 'Работа отклонена');
+      },
+      error: (err) => console.error('Error updating status', err)
+    });
+  }
+
   loadResults(submissionId: string) {
     this.apiService.getSubmissionResults(submissionId).subscribe({
       next: (results) => {
         this.results = results;
+        // Initialize project score from existing value
+        if (results.submission) {
+          this.projectScore = results.submission.total_score || 0;
+          this.loadVersionHistory(results.submission.test_id, results.submission.user);
+        }
         // Extract test info
         if (results.submission && results.submission.test_id) {
           this.apiService.getTest(results.submission.test_id).subscribe({
@@ -601,6 +878,21 @@ export class SubmissionResultsComponent implements OnInit {
         alert('Ошибка загрузки результатов');
       }
     });
+  }
+
+  loadVersionHistory(testId: string, user: string) {
+    this.apiService.getSubmissions(testId, user).subscribe({
+      next: (submissions) => {
+        // Sort by version descending
+        this.allVersions = submissions.sort((a: any, b: any) => b.version - a.version);
+      },
+      error: (err) => console.error('Error loading version history', err)
+    });
+  }
+
+  switchVersion(submissionId: string) {
+    this.router.navigate(['/submissions', submissionId]);
+    this.loadResults(submissionId);
   }
 
   loadAiFeedback(index: number, result: any) {

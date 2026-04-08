@@ -6,6 +6,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTreeModule, MatTreeNestedDataSource } from '@angular/material/tree';
+import { MatNativeDateModule } from '@angular/material/core';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ApiService } from '../../core/services/api.service';
@@ -18,6 +19,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CreateGroupDialogComponent } from '../groups/groups.component';
 import { UploadMaterialDialogComponent } from './upload-material-dialog.component';
+import { MaterialViewerComponent } from './material-viewer.component';
 
 interface TreeNode {
   id: string;
@@ -50,7 +52,8 @@ interface TreeNode {
     FormsModule,
     ReactiveFormsModule,
     CreateGroupDialogComponent,
-    UploadMaterialDialogComponent
+    UploadMaterialDialogComponent,
+    MaterialViewerComponent
   ],
   template: `
     <div class="course-hub-container">
@@ -154,10 +157,23 @@ interface TreeNode {
                   <div *ngIf="isContentAllowed(selectedLesson.content.material_id, 'material')" class="resource-card">
                     <mat-icon class="resource-icon">description</mat-icon>
                     <div class="resource-info">
-                       <div class="resource-title">Материал для скачивания</div>
-                       <button mat-button color="primary" (click)="downloadMaterial(selectedLesson.content.material_id)">
-                         Скачать файл
-                       </button>
+                       <div class="resource-title">
+                         {{ getMaterialName(selectedLesson.content.material_id) || 'Материал для скачивания' }}
+                       </div>
+                       <div class="resource-actions">
+                         <button mat-button color="primary" (click)="viewMaterial(selectedLesson.content.material_id)">
+                           <mat-icon>visibility</mat-icon> Просмотр
+                         </button>
+                         <button mat-button (click)="downloadMaterial(selectedLesson.content.material_id)">
+                           <mat-icon>download</mat-icon>
+                         </button>
+                         <button mat-stroked-button color="accent" *ngIf="isLatex(selectedLesson.content.material_id)" (click)="viewMaterialAs(selectedLesson.content.material_id, 'pdf')">
+                           <mat-icon>picture_as_pdf</mat-icon> PDF
+                         </button>
+                         <button mat-stroked-button color="accent" *ngIf="isJupyter(selectedLesson.content.material_id)" (click)="viewMaterialAs(selectedLesson.content.material_id, 'html')">
+                           <mat-icon>html</mat-icon> HTML
+                         </button>
+                       </div>
                     </div>
                   </div>
                   <div *ngIf="!isContentAllowed(selectedLesson.content.material_id, 'material')" class="resource-card locked">
@@ -781,6 +797,12 @@ interface TreeNode {
     .resource-title {
         font-weight: 500;
         color: #424242;
+        margin-right: auto;
+    }
+
+    .resource-actions {
+        display: flex;
+        gap: 8px;
     }
 
     .test-card .resource-icon {
@@ -1204,6 +1226,58 @@ export class CourseViewComponent implements OnInit {
             alert('Ошибка при создании группы: ' + (err.error?.detail || err.message));
           }
         });
+      }
+    });
+  }
+
+  getMaterialName(materialId: string): string {
+    const m = this.materials.find(mat => mat.id === materialId);
+    return m ? (m.original_name || m.name) : '';
+  }
+
+  isLatex(materialId: string): boolean {
+    const m = this.materials.find(mat => mat.id === materialId);
+    if (!m) return false;
+    const name = (m.original_name || m.name || '').toLowerCase();
+    return name.endsWith('.tex') || m.mime_type === 'application/x-tex';
+  }
+
+  isJupyter(materialId: string): boolean {
+    const m = this.materials.find(mat => mat.id === materialId);
+    if (!m) return false;
+    const name = (m.original_name || m.name || '').toLowerCase();
+    return name.endsWith('.ipynb') || m.mime_type === 'application/x-ipynb+json';
+  }
+
+  viewMaterial(materialId: string) {
+    const m = this.materials.find(mat => mat.id === materialId);
+    if (!m) return;
+
+    this.dialog.open(MaterialViewerComponent, {
+      width: '90vw',
+      maxWidth: '1200px',
+      data: {
+        materialId: materialId,
+        url: `/api/materials/${materialId}/download?inline=true`,
+        title: m.original_name || m.name,
+        mimeType: m.mime_type || ''
+      }
+    });
+  }
+
+  viewMaterialAs(materialId: string, format: string) {
+    const m = this.materials.find(mat => mat.id === materialId);
+    if (!m) return;
+
+    this.dialog.open(MaterialViewerComponent, {
+      width: '90vw',
+      maxWidth: '1200px',
+      data: {
+        materialId: materialId,
+        format: format,
+        url: `/api/materials/${materialId}/download?format=${format}&inline=true`,
+        title: (m.original_name || m.name) + ` (${format.toUpperCase()})`,
+        mimeType: format === 'pdf' ? 'application/pdf' : 'text/html'
       }
     });
   }

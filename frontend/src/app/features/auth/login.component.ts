@@ -14,68 +14,99 @@ import { AuthService } from '../../core/services/auth.service';
   imports: [CommonModule, FormsModule, MatCardModule, MatButtonModule, MatInputModule, MatFormFieldModule, RouterModule],
   template: `
     <div class="auth-container">
-      <mat-card>
+      <mat-card class="auth-card">
         <mat-card-header>
-          <mat-card-title>Вход</mat-card-title>
+          <mat-card-title>Добро пожаловать в EduAI Hub</mat-card-title>
+          <mat-card-subtitle>Единая система авторизации ИТМО</mat-card-subtitle>
         </mat-card-header>
-        <mat-card-content>
-          <mat-form-field appearance="outline" style="width: 100%;">
-            <mat-label>Логин (имя)</mat-label>
-            <input matInput [(ngModel)]="name" (keyup.enter)="login()" />
-          </mat-form-field>
-          <div class="actions">
-            <button mat-raised-button color="primary" (click)="login()" [disabled]="!name.trim() || loading">
-              {{ loading ? 'Входим...' : 'Войти' }}
-            </button>
-            <button mat-button color="accent" routerLink="/register">Регистрация</button>
+        
+        <mat-card-content class="content">
+          <div class="logo-container">
+            <div class="ai-logo">AI</div>
           </div>
+          
+          <p class="description">
+            Для продолжения работы, пожалуйста, авторизуйтесь через университетскую учетную запись.
+          </p>
+
+          <button mat-raised-button color="primary" class="sso-button" (click)="login()" [disabled]="loading">
+            <span *ngIf="!loading">Войти через SSO ИТМО</span>
+            <span *ngIf="loading">Перенаправление...</span>
+          </button>
         </mat-card-content>
+        
+        <mat-card-footer>
+          <p class="footer-text">Входя в систему, вы соглашаетесь с правилами использования EduAI Hub</p>
+        </mat-card-footer>
       </mat-card>
     </div>
   `,
   styles: [`
     .auth-container {
-      max-width: 420px;
-      margin: 40px auto;
-      padding: 0 16px;
-    }
-    .actions {
       display: flex;
-      gap: 12px;
-      margin-top: 12px;
+      justify-content: center;
+      align-items: center;
+      min-height: 80vh;
+      padding: 20px;
+    }
+    .auth-card {
+      max-width: 450px;
+      width: 100%;
+      text-align: center;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      border-radius: 12px;
+    }
+    .logo-container {
+      margin: 32px 0;
+    }
+    .ai-logo {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #3f51b5, #00BCD4);
+      color: white;
+      font-size: 32px;
+      font-weight: bold;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 20px;
+      margin: 0 auto;
+      box-shadow: 0 5px 15px rgba(63, 81, 181, 0.4);
+    }
+    .content {
+      padding: 0 24px 24px;
+    }
+    .description {
+      color: #666;
+      margin-bottom: 32px;
+      line-height: 1.6;
+    }
+    .sso-button {
+      width: 100%;
+      height: 50px;
+      font-size: 16px;
+      font-weight: 500;
+      border-radius: 8px;
+    }
+    .footer-text {
+      font-size: 12px;
+      color: #999;
+      margin: 16px 0;
     }
   `]
 })
 export class LoginComponent {
-  name = '';
   loading = false;
 
   constructor(private auth: AuthService, private router: Router) { }
 
   login() {
-    const trimmed = this.name.trim();
-    if (!trimmed) return;
     this.loading = true;
-    this.auth.loginByName(trimmed).subscribe({
-      next: () => {
-        this.loading = false;
-        this.router.navigate(['/']);
-      },
-      error: (err) => {
-        this.loading = false;
-        let errorMessage = 'Ошибка при входе.';
-
-        if (err.status === 404) {
-          errorMessage = 'Пользователь не найден. Зарегистрируйтесь.';
-        } else if (err.status === 503) {
-          errorMessage = 'Сервис временно недоступен. Попробуйте позже.';
-        } else if (err.error?.detail) {
-          errorMessage = err.error.detail;
-        }
-
-        alert(errorMessage);
-        console.error('Login error:', err);
-      }
+    this.auth.login().catch(err => {
+      this.loading = false;
+      console.error('SSO Redirect error:', err);
+      alert('Не удалось перенаправить на систему входа. Проверьте соединение.');
     });
   }
 }

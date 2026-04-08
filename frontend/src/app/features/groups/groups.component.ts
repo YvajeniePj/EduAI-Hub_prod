@@ -46,8 +46,8 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
 
         <mat-tab-group>
-          <!-- Tab 1: Мои группы -->
-          <mat-tab label="Мои группы">
+          <!-- Tab 1: Мои группы (Teacher/Admin only) -->
+          <mat-tab label="Мои группы" *ngIf="currentUser?.role !== 'student'">
             <div class="tab-content">
               <mat-card class="filter-card">
                 <mat-card-content>
@@ -61,7 +61,7 @@ import { AuthService } from '../../core/services/auth.service';
                     </mat-select>
                   </mat-form-field>
 
-                  <button mat-raised-button color="primary" (click)="openCreateGroupDialog()" class="create-button">
+                  <button mat-raised-button color="primary" (click)="openCreateGroupDialog()" class="create-button" *ngIf="currentUser?.role !== 'student'">
                     <mat-icon>add</mat-icon>
                     Создать группу
                   </button>
@@ -251,9 +251,7 @@ import { AuthService } from '../../core/services/auth.service';
   `,
   styles: [`
     .groups-container {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      padding: 24px;
+      min-height: 100%;
     }
 
     .groups-content {

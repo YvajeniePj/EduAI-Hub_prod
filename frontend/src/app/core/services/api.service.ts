@@ -23,6 +23,10 @@ export class ApiService {
     return this.http.post<any>(`${API_URL}/users`, { name });
   }
 
+  deleteUser(id: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/users/${id}`);
+  }
+
   updateUser(id: string, userUpdate: any): Observable<any> {
     return this.http.put<any>(`${API_URL}/users/${id}`, userUpdate);
   }
@@ -38,6 +42,10 @@ export class ApiService {
 
   createSubject(name: string, description?: string): Observable<any> {
     return this.http.post<any>(`${API_URL}/subjects`, { name, description: description || null });
+  }
+
+  cloneSubject(id: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/subjects/${id}/clone`, {});
   }
 
   deleteSubject(id: string): Observable<any> {
@@ -73,6 +81,18 @@ export class ApiService {
     return this.http.delete<any>(`${API_URL}/tests/${id}`);
   }
 
+  getTestFiles(testId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/tests/${testId}/files`);
+  }
+
+  uploadTestFile(testId: string, formData: FormData): Observable<any> {
+    return this.http.post<any>(`${API_URL}/tests/${testId}/files`, formData);
+  }
+
+  deleteTestFile(testId: string, fileId: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/tests/${testId}/files/${fileId}`);
+  }
+
   // Submissions
   getSubmissions(testId?: string, user?: string): Observable<any[]> {
     let params = new HttpParams();
@@ -89,6 +109,10 @@ export class ApiService {
     return this.http.post<any>(`${API_URL}/submissions`, submission);
   }
 
+  createSubmissionVersion(id: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/submissions/${id}/new-version`, {});
+  }
+
   updateSubmission(id: string, submission: any): Observable<any> {
     return this.http.put<any>(`${API_URL}/submissions/${id}`, submission);
   }
@@ -99,6 +123,22 @@ export class ApiService {
 
   getSubmissionResults(id: string): Observable<any> {
     return this.http.get<any>(`${API_URL}/submissions/${id}/results`);
+  }
+
+  getSubmissionFiles(id: string): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/submissions/${id}/files`);
+  }
+
+  uploadSubmissionFile(id: string, formData: FormData): Observable<any> {
+    return this.http.post<any>(`${API_URL}/submissions/${id}/files`, formData);
+  }
+
+  updateSubmissionStatus(id: string, status: string, teacher_feedback?: string, total_score?: number) {
+    return this.http.patch(`${API_URL}/submissions/${id}/status`, { status, teacher_feedback, total_score });
+  }
+
+  deleteSubmissionFile(submissionId: string, fileId: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/submissions/${submissionId}/files/${fileId}`);
   }
 
   // Materials
@@ -120,6 +160,21 @@ export class ApiService {
 
   deleteMaterial(materialId: string): Observable<any> {
     return this.http.delete<any>(`${API_URL}/materials/${materialId}`);
+  }
+
+  getMaterialStatus(materialId: string, format?: string): Observable<any> {
+    let params = new HttpParams();
+    if (format) {
+      params = params.set('format', format);
+    }
+    return this.http.get<any>(`${API_URL}/materials/${materialId}/status`, { params });
+  }
+
+  downloadMaterialWithFormat(materialId: string, format: string): Observable<Blob> {
+    return this.http.get(`${API_URL}/materials/${materialId}/download`, {
+      params: new HttpParams().set('format', format),
+      responseType: 'blob'
+    });
   }
 
   // Videos

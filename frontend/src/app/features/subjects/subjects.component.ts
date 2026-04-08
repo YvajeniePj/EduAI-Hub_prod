@@ -11,7 +11,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatMenuModule } from '@angular/material/menu';
 import { RouterModule } from '@angular/router';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-generate-course-dialog',
@@ -212,7 +214,9 @@ export class CreateSubjectDialogComponent {
     MatTabsModule,
     MatMenuModule,
     RouterModule,
-    FormsModule
+    FormsModule,
+    MatSnackBarModule,
+    MatProgressSpinnerModule
   ],
   template: `
     <div class="page-container">
@@ -237,12 +241,12 @@ export class CreateSubjectDialogComponent {
 
                 <div class="spacer"></div>
 
-                <button mat-raised-button color="accent" (click)="openGenerateDialog()" class="ai-btn">
+                <button mat-raised-button color="accent" (click)="openGenerateDialog()" class="ai-btn" *ngIf="isAdmin">
                   <mat-icon>auto_awesome</mat-icon>
                   AI Генерация
                 </button>
                 
-                <button mat-raised-button color="primary" (click)="openCreateDialog()">
+                <button mat-raised-button color="primary" (click)="openCreateDialog()" *ngIf="isAdmin">
                   Создать курс
                 </button>
               </div>
@@ -260,9 +264,10 @@ export class CreateSubjectDialogComponent {
                     <div class="course-name">{{ subject.name }}</div>
                     <div class="course-description" *ngIf="subject.description">{{ subject.description | slice:0:60 }}{{ subject.description?.length > 60 ? '...' : '' }}</div>
                   </mat-card-content>
-                  <div class="course-actions">
-                    <button mat-icon-button class="more-btn" (click)="$event.stopPropagation();" [matMenuTriggerFor]="menu">
-                      <mat-icon>more_vert</mat-icon>
+                  <div class="course-actions" *ngIf="isAdmin">
+                    <button mat-icon-button class="more-btn" (click)="$event.stopPropagation();" [matMenuTriggerFor]="menu" [disabled]="cloningSubjectId === subject.id">
+                      <mat-icon *ngIf="cloningSubjectId !== subject.id">more_vert</mat-icon>
+                      <mat-spinner diameter="24" *ngIf="cloningSubjectId === subject.id"></mat-spinner>
                     </button>
                     <mat-menu #menu="matMenu">
                       <button mat-menu-item (click)="openCoverUpload(subject)">
@@ -272,6 +277,10 @@ export class CreateSubjectDialogComponent {
                       <button mat-menu-item [routerLink]="['/course-builder', subject.id]">
                         <mat-icon>edit</mat-icon>
                         <span>Редактировать</span>
+                      </button>
+                      <button mat-menu-item (click)="cloneSubject(subject)">
+                        <mat-icon>content_copy</mat-icon>
+                        <span>Дублировать курс</span>
                       </button>
                       <button mat-menu-item (click)="deleteSubject(subject.id)">
                         <mat-icon>delete</mat-icon>
@@ -284,7 +293,7 @@ export class CreateSubjectDialogComponent {
 
               <div *ngIf="subjects.length === 0" class="empty-state">
                 <p>Нет доступных курсов</p>
-                <div class="button-row">
+                <div class="button-row" *ngIf="isAdmin">
                   <button mat-raised-button color="accent" (click)="openGenerateDialog()">
                     <mat-icon>auto_awesome</mat-icon>
                     Сгенерировать с AI
@@ -300,7 +309,7 @@ export class CreateSubjectDialogComponent {
       </div>
 
       <!-- Floating Action Button for creating courses -->
-      <button mat-fab color="primary" class="fab-add" (click)="openCreateDialog()">
+      <button mat-fab color="primary" class="fab-add" (click)="openCreateDialog()" *ngIf="isAdmin">
         <mat-icon>add</mat-icon>
       </button>
     </div>
@@ -322,10 +331,12 @@ export class CreateSubjectDialogComponent {
 
     .live-dashboard-btn {
       font-weight: bold;
-      animation: pulse-red 2s infinite;
       height: 48px;
       padding: 0 24px;
       font-size: 16px;
+    }
+    .live-dashboard-btn.no-pulse {
+      animation: none;
     }
 
     @keyframes pulse-red {
@@ -514,11 +525,19 @@ export class SubjectsComponent implements OnInit {
   subjects: any[] = [];
   allSubjects: any[] = [];
   searchQuery: string = '';
+  cloningSubjectId: string | null = null;
+  loading: boolean = false;
+  isAdmin: boolean = false;
 
   constructor(
     private apiService: ApiService,
-    private dialog: MatDialog
-  ) { }
+    private authService: AuthService,
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar
+  ) { 
+    const user = this.authService.getCurrentUser();
+    this.isAdmin = user?.role === 'teacher' || user?.role === 'admin';
+  }
 
   ngOnInit() {
     this.loadSubjects();
@@ -578,6 +597,24 @@ export class SubjectsComponent implements OnInit {
         alert('Курс успешно создан AI!');
       }
     });
+  }
+  
+  cloneSubject(subject: any) {
+    if (confirm(`Создать копию курса "${subject.name}"? (Материалы будут скопированы, студенты - нет)`)) {
+      this.cloningSubjectId = subject.id;
+      this.apiService.cloneSubject(subject.id).subscribe({
+        next: () => {
+          this.cloningSubjectId = null;
+          this.loadSubjects();
+          this.snackBar.open('Курс успешно скопирован!', 'Закрыть', { duration: 3000 });
+        },
+        error: (err) => {
+          this.cloningSubjectId = null;
+          console.error('Error cloning subject:', err);
+          this.snackBar.open('Ошибка при клонировании курса: ' + (err.error?.detail || err.message), 'Закрыть', { duration: 5000 });
+        }
+      });
+    }
   }
 
   deleteSubject(id: string) {

@@ -8,7 +8,7 @@ import { SubmissionsComponent } from './features/submissions/submissions.compone
 import { SubmissionResultsComponent } from './features/submissions/submission-results.component';
 import { MaterialsComponent } from './features/materials/materials.component';
 import { LoginComponent } from './features/auth/login.component';
-import { RegisterComponent } from './features/auth/register.component';
+import { CallbackComponent } from './features/auth/callback.component';
 import { ProfileComponent } from './features/profile/profile.component';
 import { AdminDbComponent } from './features/admin/admin-db.component';
 import { HomeComponent } from './features/home/home.component';
@@ -26,7 +26,8 @@ import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
-  { path: 'register', component: RegisterComponent },
+  { path: 'callback', component: CallbackComponent },
+  { path: 'register', redirectTo: 'login' },
   { path: '', component: HomeComponent, canActivate: [authGuard] },
   { path: 'news/manage', component: NewsManageComponent, canActivate: [authGuard] },
   { path: 'subjects', component: SubjectsComponent, canActivate: [authGuard] },
@@ -37,9 +38,11 @@ export const routes: Routes = [
   { path: 'streaming', loadComponent: () => import('./features/streaming/stream-list.component').then(m => m.StreamListComponent), canActivate: [authGuard] },
   { path: 'tests', component: TestsComponent, canActivate: [authGuard] },
   { path: 'tests/create', component: TestCreateComponent, canActivate: [authGuard] },
+  { path: 'tests/edit/:id', component: TestCreateComponent, canActivate: [authGuard] },
   { path: 'tests/:id', component: TestDetailComponent, canActivate: [authGuard] },
   { path: 'tests/:id/take', component: TestTakeComponent, canActivate: [authGuard] },
   { path: 'submissions', component: SubmissionsComponent, canActivate: [authGuard] },
+  { path: 'submissions/:id', component: SubmissionResultsComponent, canActivate: [authGuard] },
   { path: 'submissions/:id/results', component: SubmissionResultsComponent, canActivate: [authGuard] },
   { path: 'materials', component: MaterialsComponent, canActivate: [authGuard] },
   { path: 'profile', component: ProfileComponent, canActivate: [authGuard] },

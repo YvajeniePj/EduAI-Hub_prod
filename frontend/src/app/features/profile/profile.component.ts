@@ -54,8 +54,8 @@ import { HttpEventType } from '@angular/common/http';
           <div class="user-info-section">
             <div class="name-edit-wrapper" *ngIf="!isEditingName">
               <h1>{{ user.name }}</h1>
-              <span class="role-badge" [class.teacher]="user.role === 'teacher'">
-                {{ user.role === 'teacher' ? 'Преподаватель' : 'Студент' }}
+              <span class="role-badge" [class.teacher]="user.role === 'teacher' || user.role === 'admin'">
+                {{ user.role === 'admin' ? 'Администратор' : (user.role === 'teacher' ? 'Преподаватель' : 'Студент') }}
               </span>
               <button mat-icon-button (click)="startEditName()" matTooltip="Изменить имя">
                 <mat-icon>edit</mat-icon>

@@ -56,7 +56,8 @@ async def grade_keyword_based(
     max_points: int,
     test_id: str,
     question_id: str,
-    question_title: str
+    question_title: str,
+    correct_answer: Optional[str] = None
 ) -> Tuple[int, int, List[str], Optional[Dict]]:
     """
     Grade a keyword-based question with AI feedback
@@ -79,6 +80,7 @@ async def grade_keyword_based(
                     "question_id": question_id,
                     "question_title": question_title,
                     "student_answer": answer,
+                    "correct_answer": correct_answer,
                     "keywords": keywords,
                     "max_points": max_points
                 }
@@ -87,11 +89,14 @@ async def grade_keyword_based(
                 feedback_data = response.json()
                 ai_feedback = feedback_data.get("feedback", {})
                 
-                # Use AI recommended score if available, otherwise use keyword score
+                # Use AI recommended score as the primary factor
                 if ai_feedback.get("recommended_score") is not None:
                     recommended_score = ai_feedback.get("recommended_score", 0)
-                    # Combine: 50% keyword score + 50% AI recommended score
-                    final_score = round((kw_score * 0.5) + (recommended_score * 0.5))
+                    # Combine: 10% keyword score + 90% AI recommended score
+                    # Key words are used as auxiliary points
+                    final_score = round((kw_score * 0.1) + (recommended_score * 0.9))
+                    # Ensure it doesn't exceed max points
+                    final_score = min(final_score, max_points)
                 else:
                     # If AI didn't provide score, use keyword score
                     final_score = kw_score

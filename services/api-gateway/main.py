@@ -4,14 +4,15 @@ Routes requests to appropriate microservices
 """
 from fastapi import FastAPI, HTTPException, Request, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import httpx
 import os
 from typing import Optional
 import logging
-import jwt
+from jose import jwt, JWTError
 from datetime import datetime, timedelta
+import time
 from urllib.parse import quote
 
 # Configure logging
@@ -50,14 +51,171 @@ FEEDBACK_SERVICE_URL = os.getenv("FEEDBACK_SERVICE_URL", "http://feedback-servic
 # HTTP client with timeout
 
 
-# JWT Configuration
-JWT_SECRET = os.getenv("JWT_SECRET", "eduai_hub_secret_key_2024_change_in_production")
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
+# Keycloak SSO Configuration
+KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "https://keycloak.aitalenthub.ru")
+KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "aith")
+JWKS_URI = os.getenv("JWKS_URI", f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs")
+ISSUER = f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}"
 
 security = HTTPBearer(auto_error=False)
 
+# Caching JWKS
+_jwks_cache = None
+_jwks_last_fetched = 0
 
+async def get_jwks():
+    global _jwks_cache, _jwks_last_fetched
+    now = time.time()
+    # Update JWKS every hour
+    if _jwks_cache is None or now - _jwks_last_fetched > 3600:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(JWKS_URI)
+                resp.raise_for_status()
+                _jwks_cache = resp.json()
+                _jwks_last_fetched = now
+                logger.info("Successfully fetched JWKS from Keycloak")
+        except Exception as e:
+            logger.error(f"Failed to fetch JWKS: {e}")
+            if _jwks_cache is None:
+                raise
+    return _jwks_cache
+
+async def verify_jwt_token_keycloak(token: str) -> Optional[dict]:
+    """Verify JWT token using Keycloak JWKS and return user data"""
+    try:
+        jwks = await get_jwks()
+        unverified_header = jwt.get_unverified_header(token)
+        
+        rsa_key = {}
+        for key in jwks["keys"]:
+            if key["kid"] == unverified_header.get("kid"):
+                rsa_key = {
+                    "kty": key["kty"],
+                    "kid": key["kid"],
+                    "use": key["use"],
+                    "n": key["n"],
+                    "e": key["e"]
+                }
+                break
+                
+        if not rsa_key:
+            logger.error("Unable to find appropriate key in JWKS for the token")
+            return None
+            
+        payload = jwt.decode(
+            token,
+            rsa_key,
+            algorithms=["RS256"],
+            issuer=ISSUER,
+            options={"verify_aud": False}
+        )
+        
+        return payload
+    except JWTError as e:
+        logger.error(f"JWT Validation Error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected token validation error: {e}")
+        return None
+
+# In-memory cache for Keycloak -> Local user mapping
+# Key: Keycloak sub (UUID), Value: Local user dict
+_user_mapping_cache = {}
+
+async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
+    """Get current user from JWT token and link with internal DB"""
+    if not credentials:
+        return None
+    
+    payload = await verify_jwt_token_keycloak(credentials.credentials)
+    if not payload:
+        return None
+        
+    external_id = payload.get("sub")
+    
+    # Check cache first
+    if external_id in _user_mapping_cache:
+        cached_user = _user_mapping_cache[external_id]
+        # Refresh cache if older than 5 minutes (optional, but good for role updates)
+        return cached_user
+        
+    # User not in cache, find or create in submission-service
+    username = payload.get("preferred_username") or payload.get("email")
+    email = payload.get("email")
+    
+    # Try finding by ID first (since we use Keycloak sub as ID now)
+    user_data, status, _ = await proxy_request(SUBMISSION_SERVICE_URL, f"/users/{external_id}", "GET")
+    
+    if status == 404:
+        # Not found by ID, try finding by name
+        user_data, status, _ = await proxy_request(SUBMISSION_SERVICE_URL, f"/users/by-name/{username}", "GET")
+        
+    if status == 404:
+        # Still not found, create it
+        # Extract role from token
+        roles = payload.get("realm_access", {}).get("roles", [])
+        role = "student"
+        if "admin" in roles or "Admin" in roles:
+            role = "admin"
+        elif "teacher" in roles or "Teacher" in roles:
+            role = "teacher"
+            
+        create_body = {
+            "id": external_id,
+            "name": username,
+            "role": role,
+            "avatar_url": None
+        }
+        user_data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, "/users", "POST", body=create_body)
+        if status not in [200, 201]:
+            logger.error(f"Failed to auto-create user: {status}, {error}")
+            # Fallback to token data if creation fails
+            return {
+                "user_id": external_id,
+                "username": username,
+                "role": "student"
+            }
+            
+    # Success finding or creating
+    internal_user = {
+        "user_id": str(user_data["id"]),
+        "username": user_data["name"],
+        "role": user_data["role"],
+        "avatar_url": user_data.get("avatar_url")
+    }
+    
+    # Cache it
+    _user_mapping_cache[external_id] = internal_user
+    return internal_user
+
+
+@app.get("/auth/me")
+async def get_current_user_info(current_user: Optional[dict] = Depends(get_current_user)):
+    """Get current user info from Keycloak token (linked to internal DB)"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return current_user
+
+
+
+async def get_current_teacher(current_user: dict = Depends(get_current_user)):
+    """Dependency to check if user is a teacher or admin"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    role = current_user.get("role")
+    if role not in ["teacher", "admin"]:
+        raise HTTPException(status_code=403, detail="Not authorized. Teacher or admin role required.")
+    return current_user
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "service": "api-gateway"}
+
+
+# Proxy request function (Moved below JWT auth)
 async def proxy_request(
     service_url: str,
     path: str,
@@ -69,6 +227,15 @@ async def proxy_request(
     """Proxy request to a microservice"""
     url = f"{service_url}{path}"
     
+    if headers:
+        headers = {k: v for k, v in headers.items() if v is not None}
+    else:
+        headers = {}
+        
+    # Inject user info if available from request context (FastAPI doesn't do this automatically, 
+    # so we might need to pass it explicitly or use contextvars. For now, we continue passing it explicitly where needed,
+    # but let's make proxy_request a bit smarter if we can).
+        
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             if method == "GET":
@@ -79,6 +246,8 @@ async def proxy_request(
                 response = await client.put(url, json=body, params=params, headers=headers)
             elif method == "DELETE":
                 response = await client.delete(url, params=params, headers=headers)
+            elif method == "PATCH":
+                response = await client.patch(url, json=body, params=params, headers=headers)
             else:
                 raise HTTPException(status_code=405, detail="Method not allowed")
             
@@ -109,144 +278,6 @@ async def proxy_request(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-def create_jwt_token(user_id: str, username: str, role: str = "student") -> str:
-    """Create JWT token for user"""
-    payload = {
-        "user_id": user_id,
-        "username": username,
-        "role": role,
-        "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
-        "iat": datetime.utcnow()
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-def verify_jwt_token(token: str) -> Optional[dict]:
-    """Verify JWT token and return user data"""
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return {
-            "user_id": payload.get("user_id"),
-            "username": payload.get("username"),
-            "role": payload.get("role", "student")
-        }
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
-    except Exception:
-        return None
-
-async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
-    """Get current user from JWT token"""
-    if not credentials:
-        return None
-    return verify_jwt_token(credentials.credentials)
-
-
-async def get_current_teacher(current_user: dict = Depends(get_current_user)):
-    """Dependency to check if user is a teacher"""
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    if current_user.get("role") != "teacher":
-        raise HTTPException(status_code=403, detail="Not authorized. Teacher role required.")
-    return current_user
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "api-gateway"}
-
-
-# Auth endpoints
-@app.post("/auth/login")
-async def login(request: Request):
-    """Login user and return JWT token"""
-    body = await request.json()
-    username = body.get("name") or body.get("username")
-    
-    if not username:
-        raise HTTPException(status_code=400, detail="Username is required")
-    
-    # Get user from submission service
-    data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, f"/users/by-name/{username}", "GET")
-    if status == 404:
-        raise HTTPException(status_code=404, detail="User not found")
-    elif status != 200:
-        # If service is unavailable (502, 503, etc.), return a more helpful error
-        logger.error(f"Submission service error during login: {status}, {error}")
-        raise HTTPException(
-            status_code=503, 
-            detail=f"Service unavailable. Please try again later. (Error: {error or 'Unknown error'})"
-        )
-    
-    user = data
-    role = user.get("role", "student")
-    # Create JWT token
-    token = create_jwt_token(str(user["id"]), user["name"], role)
-    
-    return {
-        "token": token,
-        "user": {
-            "id": user["id"],
-            "name": user["name"],
-            "avatar_url": user.get("avatar_url"),
-            "role": role
-        }
-    }
-
-
-@app.post("/auth/register")
-async def register(request: Request):
-    """Register new user and return JWT token"""
-    body = await request.json()
-    username = body.get("name") or body.get("username")
-    
-    if not username:
-        raise HTTPException(status_code=400, detail="Username is required")
-    
-    # First check if user already exists
-    check_data, check_status, check_error = await proxy_request(SUBMISSION_SERVICE_URL, f"/users/by-name/{username}", "GET")
-    if check_status == 200:
-        # User already exists
-        raise HTTPException(status_code=409, detail="Username already taken")
-    elif check_status not in [404, 503, 502]:
-        # Some other error (not "not found" and not service unavailable)
-        logger.error(f"Unexpected error checking user existence: {check_status}, {check_error}")
-        raise HTTPException(status_code=check_status, detail=check_error or "Failed to check user existence")
-    
-    # If we got 404, user doesn't exist, proceed with creation
-    # If we got 502/503, service is down, but we'll try to create anyway (might be transient)
-    
-    # Create user in submission service
-    role = body.get("role", "student")
-    data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, "/users", "POST", {"name": username, "role": role})
-    if status == 409 or (isinstance(error, dict) and error.get("detail") and "already exists" in str(error.get("detail")).lower()):
-        raise HTTPException(status_code=409, detail="Username already taken")
-    elif status not in [200, 201]:
-        logger.error(f"Submission service error during registration: {status}, {error}")
-        if status in [502, 503]:
-            raise HTTPException(
-                status_code=503,
-                detail=f"Service unavailable. Please try again later. (Error: {error or 'Unknown error'})"
-            )
-        raise HTTPException(status_code=status, detail=error or "Failed to create user")
-    
-    user = data
-    # Create JWT token
-    token = create_jwt_token(str(user["id"]), user["name"], role)
-    
-    return {
-        "token": token,
-        "user": {
-            "id": user["id"],
-            "name": user["name"],
-            "avatar_url": user.get("avatar_url"),
-            "role": role
-        }
-    }
-
-
 @app.get("/auth/me")
 async def get_current_user_info(current_user: Optional[dict] = Depends(get_current_user)):
     """Get current user info from JWT token"""
@@ -273,6 +304,17 @@ async def create_subject(request: Request, current_user: dict = Depends(get_curr
     data, status, error = await proxy_request(SUBJECT_SERVICE_URL, "/subjects", "POST", body, headers=headers)
     if status not in [200, 201]:
         raise HTTPException(status_code=status, detail=error or "Failed to create subject")
+    return data
+
+
+@app.post("/subjects/{subject_id}/clone")
+async def clone_subject(subject_id: str, current_user: dict = Depends(get_current_teacher)):
+    """Clone a subject"""
+    encoded_name = quote(current_user["username"])
+    headers = {"X-User-Name": encoded_name}
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}/clone", "POST", headers=headers)
+    if status not in [200, 201]:
+        raise HTTPException(status_code=status, detail=error or "Failed to clone subject")
     return data
 
 
@@ -532,6 +574,95 @@ async def delete_test(test_id: str, current_user: dict = Depends(get_current_tea
     return data
 
 
+@app.get("/tests/{test_id}/files")
+async def get_test_files(test_id: str):
+    data, status, error = await proxy_request(TEST_SERVICE_URL, f"/tests/{test_id}/files", "GET")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to fetch test files")
+    return data
+
+
+@app.post("/tests/{test_id}/files")
+async def upload_test_file(test_id: str, request: Request, current_user: dict = Depends(get_current_teacher)):
+    """Upload a file to a test - proxy multipart form data"""
+    form = await request.form()
+    files = {}
+    for key, value in form.items():
+        if hasattr(value, 'filename') and hasattr(value, 'read'):
+            file_content = await value.read()
+            files[key] = (value.filename, file_content, value.content_type or "application/octet-stream")
+    
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client_async:
+            response = await client_async.post(
+                f"{TEST_SERVICE_URL}/tests/{test_id}/files",
+                files=files
+            )
+            if response.status_code >= 400:
+                try:
+                    error_detail = response.json()
+                except:
+                    error_detail = response.text
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            return response.json()
+    except httpx.RequestError as e:
+        logger.error(f"Request error to test service: {e}")
+        raise HTTPException(status_code=503, detail="Test service unavailable")
+
+
+@app.get("/tests/{test_id}/files/{file_id}/download")
+async def download_test_file(test_id: str, file_id: str):
+    """Proxy file download from test service"""
+    try:
+        client = httpx.AsyncClient(timeout=60.0)
+        req = client.build_request("GET", f"{TEST_SERVICE_URL}/tests/{test_id}/files/{file_id}/download")
+        response = await client.send(req, stream=True)
+        
+        if response.status_code >= 400:
+            await response.aread()
+            try:
+                error_detail = response.json()
+            except:
+                error_detail = response.text
+            await client.aclose()
+            raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+        # Filter headers we want to forward
+        exclude_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
+        forward_headers = {
+            k: v for k, v in response.headers.items() 
+            if k.lower() not in exclude_headers
+        }
+        
+        # Ensure Content-Disposition is set if missing
+        if "content-disposition" not in [k.lower() for k in forward_headers]:
+            forward_headers["Content-Disposition"] = f"attachment; filename=test_file_{file_id}"
+
+        return StreamingResponse(
+            response.aiter_bytes(),
+            status_code=response.status_code,
+            media_type=response.headers.get("content-type"),
+            headers=forward_headers,
+            background=getattr(client, "aclose")
+        )
+    except httpx.RequestError as e:
+        logger.error(f"Request error to test service: {e}")
+        raise HTTPException(status_code=503, detail="Test service unavailable")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.delete("/tests/{test_id}/files/{file_id}")
+async def delete_test_file(test_id: str, file_id: str, current_user: dict = Depends(get_current_teacher)):
+    data, status, error = await proxy_request(TEST_SERVICE_URL, f"/tests/{test_id}/files/{file_id}", "DELETE")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to delete test file")
+    return data
+
+
 # Submission Service Routes
 @app.get("/submissions")
 async def get_submissions(test_id: Optional[str] = None, user: Optional[str] = None):
@@ -580,6 +711,59 @@ async def get_submission_results(submission_id: str):
         raise HTTPException(status_code=status, detail=error or "Failed to fetch results")
     return data
 
+
+@app.patch("/submissions/{submission_id}/status")
+async def update_submission_status(submission_id: str, request: Request, current_user: dict = Depends(get_current_teacher)):
+    body = await request.json()
+    data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, f"/submissions/{submission_id}/status", "PATCH", body)
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to update submission status")
+    return data
+
+
+@app.get("/submissions/{submission_id}/files")
+async def get_submission_files(submission_id: str):
+    data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, f"/submissions/{submission_id}/files", "GET")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to fetch submission files")
+    return data
+
+
+@app.post("/submissions/{submission_id}/files")
+async def upload_submission_file(submission_id: str, request: Request):
+    """Upload a file to a submission - proxy multipart form data"""
+    form = await request.form()
+    files = {}
+    for key, value in form.items():
+        if hasattr(value, 'filename') and hasattr(value, 'read'):
+            file_content = await value.read()
+            files[key] = (value.filename, file_content, value.content_type or "application/octet-stream")
+    
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client_async:
+            response = await client_async.post(
+                f"{SUBMISSION_SERVICE_URL}/submissions/{submission_id}/files",
+                files=files
+            )
+            if response.status_code >= 400:
+                try:
+                    error_detail = response.json()
+                except:
+                    error_detail = response.text
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            return response.json()
+    except httpx.RequestError as e:
+        logger.error(f"Request error to submission service: {e}")
+        raise HTTPException(status_code=503, detail="Submission service unavailable")
+
+
+@app.delete("/submissions/{submission_id}/files/{file_id}")
+async def delete_submission_file(submission_id: str, file_id: str):
+    data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, f"/submissions/{submission_id}/files/{file_id}", "DELETE")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to delete submission file")
+    return data
+
 # Users (handled in submission-service)
 @app.get("/users")
 async def get_users():
@@ -623,6 +807,24 @@ async def update_user(user_id: str, request: Request, current_user: Optional[dic
     data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, f"/users/{user_id}", "PUT", body)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to update user")
+    return data
+
+
+@app.delete("/users/{user_id}")
+async def delete_user(user_id: str, current_user: Optional[dict] = Depends(get_current_user)):
+    """Delete a user by ID - currently restricted to teachers or admins"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # We should ideally check if current_user is a teacher or the user themselves
+    # For now, allowing teachers as admins
+    role = current_user.get("role")
+    if role not in ["teacher", "admin"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, f"/users/{user_id}", "DELETE")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to delete user")
     return data
 
 
@@ -747,29 +949,56 @@ async def delete_material(material_id: str, current_user: dict = Depends(get_cur
     return data
 
 
+@app.get("/materials/{material_id}/status")
+async def get_material_status(material_id: str, format: Optional[str] = Query(None)):
+    data, status, error = await proxy_request(MATERIAL_SERVICE_URL, f"/materials/{material_id}/status", "GET", params={"format": format} if format else None)
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to fetch material status")
+    return data
+
+
 @app.get("/materials/{material_id}/download")
-async def download_material(material_id: str):
+async def download_material(material_id: str, request: Request):
     """Download a material file - proxy the file response"""
+    params = dict(request.query_params)
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(f"{MATERIAL_SERVICE_URL}/materials/{material_id}/download")
-            
-            if response.status_code >= 400:
-                try:
-                    error_detail = response.json()
-                except:
-                    error_detail = response.text
-                raise HTTPException(status_code=response.status_code, detail=error_detail)
-            
-            # Return streaming response with proper headers
-            from fastapi.responses import Response
-            return Response(
-                content=response.content,
-                media_type=response.headers.get("content-type", "application/octet-stream"),
-                headers={
-                    "Content-Disposition": response.headers.get("content-disposition", f"attachment; filename=material_{material_id}")
-                }
-            )
+        client = httpx.AsyncClient(timeout=60.0)
+        # Use stream=True to avoid loading large files into memory
+        req = client.build_request(
+            "GET", 
+            f"{MATERIAL_SERVICE_URL}/materials/{material_id}/download",
+            params=params
+        )
+        response = await client.send(req, stream=True)
+        
+        if response.status_code >= 400:
+            await response.aread()  # Consume body
+            try:
+                error_detail = response.json()
+            except:
+                error_detail = response.text
+            await client.aclose()
+            raise HTTPException(status_code=response.status_code, detail=error_detail)
+        
+        # Filter headers we want to forward
+        exclude_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
+        forward_headers = {
+            k: v for k, v in response.headers.items() 
+            if k.lower() not in exclude_headers
+        }
+        
+        # Case-insensitive check for Content-Disposition
+        has_disposition = any(k.lower() == "content-disposition" for k in forward_headers)
+        if not has_disposition:
+            forward_headers["Content-Disposition"] = f"attachment; filename=material_{material_id}"
+
+        return StreamingResponse(
+            response.aiter_bytes(),
+            status_code=response.status_code,
+            media_type=response.headers.get("content-type"),
+            headers=forward_headers,
+            background=getattr(client, "aclose")
+        )
     except httpx.RequestError as e:
         logger.error(f"Request error to material service: {e}")
         raise HTTPException(status_code=503, detail="Material service unavailable")
@@ -1321,7 +1550,7 @@ async def get_activity_stats(user_name: str, days: int = 30):
 
 @app.on_event("shutdown")
 async def shutdown():
-    await client.aclose()
+    logger.info("Gateway shutting down")
 
 
 if __name__ == "__main__":

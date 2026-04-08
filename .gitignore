@@ -33,16 +33,20 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Docker
+# Docker and Deployment
 *.log
+project.tar.gz
+deploy.bat
+nginx/
+certbot/
+infrastructure/
 
 # Database
 database/
 *.db
 *.sqlite
-
-# Certs
-certbot/
+postgres_data/
+redis_data/
 
 # Old project
 old_project/

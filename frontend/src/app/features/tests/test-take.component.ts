@@ -10,10 +10,12 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatIconModule } from '@angular/material/icon';
+import { MatListModule } from '@angular/material/list';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
-import { interval, Subscription } from 'rxjs';
+import { interval, Subscription, Subject } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
 
 @Component({
   selector: 'app-test-take',
@@ -30,6 +32,7 @@ import { interval, Subscription } from 'rxjs';
     MatCheckboxModule,
     MatProgressBarModule,
     MatIconModule,
+    MatListModule,
     RussianDatePipe
   ],
   template: `
@@ -50,6 +53,22 @@ import { interval, Subscription } from 'rxjs';
           <div class="header-info">
             <h1 class="test-title">{{ test.title }}</h1>
             <p class="test-description" *ngIf="test.description">{{ test.description }}</p>
+            
+            <!-- Reference Materials Section -->
+            <div class="test-assets-wrapper" *ngIf="testAssets.length > 0">
+              <h3 class="assets-header"><mat-icon>attachment</mat-icon> Материалы к тесту:</h3>
+              <mat-list class="test-assets-list">
+                <mat-list-item *ngFor="let asset of testAssets" class="test-asset-item">
+                  <div matListItemTitle class="asset-link-container">
+                    <a [href]="'/api/tests/' + test.id + '/files/' + asset.id + '/download'" target="_blank" [download]="asset.original_name" class="asset-download-link">
+                      <mat-icon>download</mat-icon>
+                      {{ asset.original_name }}
+                    </a>
+                    <span class="asset-size-badge">{{ (asset.size / 1024).toFixed(1) }} KB</span>
+                  </div>
+                </mat-list-item>
+              </mat-list>
+            </div>
           </div>
           <div class="timer-container" *ngIf="hasTimeLimit">
             <div class="timer" [class.timer-warning]="timeRemaining <= 300" [class.timer-critical]="timeRemaining <= 60">
@@ -62,7 +81,43 @@ import { interval, Subscription } from 'rxjs';
           </div>
         </div>
 
-        <div class="test-main-layout">
+        <!-- Buffer / Consent Screen -->
+        <div *ngIf="isPreStart" class="pre-start-container">
+          <mat-card class="buffer-card">
+            <mat-card-header>
+              <mat-card-title>Предупреждение перед началом</mat-card-title>
+            </mat-card-header>
+            <mat-card-content class="buffer-content">
+              <div class="warning-box">
+                <mat-icon>warning</mat-icon>
+                <p>После начала теста выполнение отменить нельзя.</p>
+              </div>
+              
+              <div class="test-pre-info">
+                <div class="pre-info-item">
+                  <mat-icon>help_outline</mat-icon>
+                  <div>
+                    <span class="label">Вопросов</span>
+                    <span class="value">{{ test.questions.length }}</span>
+                  </div>
+                </div>
+                <div class="pre-info-item" *ngIf="hasTimeLimit">
+                  <mat-icon>schedule</mat-icon>
+                  <div>
+                    <span class="label">Ограничение времени</span>
+                    <span class="value">{{ timeLimitMinutes }} мин.</span>
+                  </div>
+                </div>
+              </div>
+            </mat-card-content>
+            <mat-card-actions class="buffer-actions">
+              <button mat-button (click)="onCancel()" class="exit-btn">Выйти</button>
+              <button mat-raised-button color="primary" (click)="startTest()" class="start-btn">Начать</button>
+            </mat-card-actions>
+          </mat-card>
+        </div>
+
+        <div class="test-main-layout" *ngIf="!isPreStart">
           <form [formGroup]="answerForm" (ngSubmit)="onSubmit()" class="test-form">
             <div formArrayName="answers" class="questions-carousel">
               <div class="carousel-wrapper">
@@ -100,6 +155,49 @@ import { interval, Subscription } from 'rxjs';
                                     class="answer-textarea"
                                     (input)="onAnswerChange(i)"></textarea>
                         </mat-form-field>
+                      </div>
+
+                      <!-- Project / File Upload -->
+                      <div *ngIf="test.test_type === 'PROJECT' || test.test_type === 'project'" class="answer-section">
+                        <div class="project-info">
+                          <mat-icon>info</mat-icon>
+                          <span>Этот тест является проектом. Вы можете загрузить несколько файлов в качестве ответа и оставить текстовое описание.</span>
+                        </div>
+                        
+                        <div class="project-text-answer" style="margin-bottom: 24px;">
+                          <mat-form-field appearance="outline" class="answer-field">
+                            <mat-label>Описание проекта / Текстовый ответ</mat-label>
+                            <textarea matInput 
+                                      [formControlName]="i" 
+                                      rows="6" 
+                                      placeholder="Введите описание вашего решения или текстовый ответ..."
+                                      class="answer-textarea"
+                                      (input)="onAnswerChange(i)"></textarea>
+                          </mat-form-field>
+                        </div>
+                        
+                        <div class="file-upload-zone">
+                          <input type="file" #fileInput (change)="onFileSelected($event)" multiple style="display: none">
+                          <button mat-raised-button color="accent" type="button" (click)="fileInput.click()" [disabled]="submitting || !submissionId">
+                            <mat-icon>upload_file</mat-icon>
+                            Загрузить файлы
+                          </button>
+                          <p class="file-hint">Поддерживаются любые форматы (код, архивы, документы)</p>
+                        </div>
+
+                        <div class="uploaded-files-list" *ngIf="uploadedFiles.length > 0">
+                          <div class="list-header">Загруженные файлы ({{ uploadedFiles.length }}):</div>
+                          <div *ngFor="let file of uploadedFiles" class="file-row">
+                            <div class="file-details">
+                              <mat-icon>insert_drive_file</mat-icon>
+                              <span class="file-name">{{ file.original_name }}</span>
+                              <span class="file-size">({{ (file.size / 1024).toFixed(1) }} KB)</span>
+                            </div>
+                            <button mat-icon-button color="warn" type="button" (click)="deleteFile(file.id)" [disabled]="submitting">
+                              <mat-icon>delete</mat-icon>
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </mat-card-content>
                   </mat-card>
@@ -147,14 +245,17 @@ import { interval, Subscription } from 'rxjs';
                         type="submit" 
                         [disabled]="submitting || timeExpired"
                         class="submit-button">
-                  <span *ngIf="!submitting">Завершить тест</span>
+                  <mat-icon>check</mat-icon>
+                  <span *ngIf="!submitting">Завершить и отправить</span>
                   <span *ngIf="submitting">Отправка...</span>
                 </button>
                 <button mat-stroked-button 
                         type="button" 
-                        routerLink="/tests"
-                        class="cancel-button">
-                  Отмена
+                        (click)="onCancel()"
+                        class="cancel-button"
+                        *ngIf="test.test_type.toLowerCase() === 'project'">
+                  <mat-icon>close</mat-icon>
+                  Выйти без отправки
                 </button>
               </div>
             </div>
@@ -183,9 +284,7 @@ import { interval, Subscription } from 'rxjs';
   `,
   styles: [`
     .test-container {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      padding: 24px;
+      min-height: 100%;
     }
 
     .test-content {
@@ -228,6 +327,66 @@ import { interval, Subscription } from 'rxjs';
       color: #616161;
       margin: 0;
       line-height: 1.6;
+    }
+
+    .test-assets-wrapper {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #eee;
+    }
+
+    .assets-header {
+      font-size: 16px;
+      font-weight: 500;
+      color: #764ba2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .test-assets-list {
+      padding: 0;
+    }
+
+    .test-asset-item {
+      height: auto !important;
+      padding: 4px 0 !important;
+    }
+
+    .asset-link-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .asset-download-link {
+      color: #667eea;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .asset-download-link:hover {
+      color: #764ba2;
+      text-decoration: underline;
+    }
+
+    .asset-download-link mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .asset-size-badge {
+      font-size: 11px;
+      color: #9e9e9e;
+      background: #f5f5f5;
+      padding: 2px 6px;
+      border-radius: 4px;
     }
 
     .timer-container {
@@ -640,6 +799,75 @@ import { interval, Subscription } from 'rxjs';
       color: #4caf50;
     }
 
+    .project-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #e3f2fd;
+      padding: 12px;
+      border-radius: 8px;
+      color: #1976d2;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    .file-upload-zone {
+      border: 2px dashed #e0e0e0;
+      border-radius: 12px;
+      padding: 32px;
+      text-align: center;
+      background: #fafafa;
+      margin-bottom: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .file-upload-zone:hover {
+      border-color: #667eea;
+      background: #f3f4ff;
+    }
+
+    .file-hint {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #757575;
+    }
+
+    .uploaded-files-list {
+      margin-top: 16px;
+    }
+
+    .list-header {
+      font-weight: 500;
+      margin-bottom: 12px;
+      color: #424242;
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .file-details {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .file-name {
+      font-weight: 500;
+    }
+
+    .file-size {
+      font-size: 12px;
+      color: #9e9e9e;
+    }
+
     .submit-button {
       min-width: 180px;
       height: 48px;
@@ -771,6 +999,78 @@ import { interval, Subscription } from 'rxjs';
         width: 100%;
       }
     }
+
+    /* Buffer Screen */
+    .pre-start-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 400px;
+      padding: 20px;
+    }
+    .buffer-card {
+      max-width: 500px;
+      width: 100%;
+      border-radius: 24px;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.1);
+      padding: 24px;
+      background: white;
+    }
+    .buffer-content {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      margin-top: 24px;
+      text-align: center;
+    }
+    .warning-box {
+      background: #fff5f5;
+      padding: 20px;
+      border-radius: 16px;
+      color: #c53030;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      font-weight: 600;
+    }
+    .warning-box mat-icon { width: 40px; height: 40px; font-size: 40px; }
+    .test-pre-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .pre-info-item {
+      background: #f7fafc;
+      padding: 16px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-align: left;
+    }
+    .pre-info-item mat-icon { color: #6366f1; }
+    .pre-info-item .label { display: block; font-size: 11px; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
+    .pre-info-item .value { font-weight: 700; color: #2d3748; font-size: 16px; }
+    .buffer-actions {
+      margin-top: 32px;
+      display: flex;
+      gap: 16px;
+      padding: 0 !important;
+    }
+    .buffer-actions button {
+      flex: 1;
+      height: 52px;
+      border-radius: 16px;
+      font-weight: 600;
+    }
+    .start-btn {
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+      border: none;
+    }
+    .exit-btn { border: 2px solid #e2e8f0; background: white; color: #718096; }
   `]
 })
 export class TestTakeComponent implements OnInit, OnDestroy {
@@ -787,6 +1087,11 @@ export class TestTakeComponent implements OnInit, OnDestroy {
   startTime: Date | null = null;
   currentQuestionIndex: number = 0;
   answeredQuestions: Set<number> = new Set();
+  uploadedFiles: any[] = [];
+  testAssets: any[] = [];
+  source: string | null = null;
+  isPreStart: boolean = false;
+  private saveSubject = new Subject<void>();
 
   constructor(
     private route: ActivatedRoute,
@@ -798,9 +1103,18 @@ export class TestTakeComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     const testId = this.route.snapshot.paramMap.get('id');
+    this.source = this.route.snapshot.queryParamMap.get('source');
+    
     if (testId) {
       this.loadTest(testId);
     }
+
+    // Initialize debounced auto-save
+    this.saveSubject.pipe(
+      debounceTime(1000)
+    ).subscribe(() => {
+      this.performSave();
+    });
   }
 
   loadTest(testId: string) {
@@ -829,7 +1143,24 @@ export class TestTakeComponent implements OnInit, OnDestroy {
         }
 
         this.initForm();
-        this.startSubmission(testId);
+        this.loadTestAssets(testId);
+
+        const currentUser = this.auth.getCurrentUser();
+        if (currentUser && test.test_type.toLowerCase() !== 'project') {
+          this.apiService.getSubmissions(testId, currentUser.name).subscribe(subs => {
+            const activeSub = subs.find(sub => sub.is_finished === 'false' || sub.is_finished === false);
+            if (activeSub) {
+              // Already started, just resume
+              this.startSubmission(testId);
+            } else {
+              // Fresh start, show buffer
+              this.isPreStart = true;
+            }
+          });
+        } else {
+          // Projects or no user, standard flow
+          this.startSubmission(testId);
+        }
       },
       error: (err) => {
         console.error('Error loading test:', err);
@@ -865,6 +1196,13 @@ export class TestTakeComponent implements OnInit, OnDestroy {
     });
   }
 
+  startTest() {
+    this.isPreStart = false;
+    if (this.test) {
+      this.startSubmission(this.test.id);
+    }
+  }
+
   startSubmission(testId: string) {
     const currentUser = this.auth.getCurrentUser();
     if (!currentUser) {
@@ -884,10 +1222,25 @@ export class TestTakeComponent implements OnInit, OnDestroy {
     this.apiService.createSubmission(submissionData).subscribe({
       next: (submission) => {
         this.submissionId = submission.id;
-        // Используем текущее время клиента как время начала для таймера
-        // Это гарантирует правильную работу независимо от часовых поясов сервера
-        this.startTime = new Date();
-        console.log('Submission created:', submission.id, 'Timer started at:', this.startTime, 'Time limit:', this.timeLimitMinutes, 'minutes');
+        
+        // Populate existing answers if any (for drafts/resume)
+        if (submission.answers && submission.answers.length > 0) {
+          const answersArray = this.answerForm.get('answers') as FormArray;
+          submission.answers.forEach((ans: any) => {
+            const index = this.test.questions.findIndex((q: any) => q.question_id === ans.question_id);
+            if (index !== -1 && answersArray.at(index)) {
+              answersArray.at(index).patchValue(ans.answer);
+            }
+          });
+          this.checkAllAnswers();
+        }
+
+        // Используем время начала из базы данных (UTC)
+        // Если суффикса Z нет, добавляем его для корректного парсинга как UTC
+        const startedAtStr = submission.started_at.endsWith('Z') ? submission.started_at : submission.started_at + 'Z';
+        this.startTime = new Date(startedAtStr);
+        
+        console.log('Submission loaded/created:', submission.id, 'Timer started from:', this.startTime, 'Time limit:', this.timeLimitMinutes, 'minutes');
 
         // Track test start activity
         const currentUser = this.auth.getCurrentUser();
@@ -906,6 +1259,11 @@ export class TestTakeComponent implements OnInit, OnDestroy {
         // Запускаем таймер если есть ограничение по времени
         if (this.hasTimeLimit) {
           this.startTimer();
+        }
+
+        // Загружаем файлы если это проект
+        if (this.test.test_type === 'PROJECT' || this.test.test_type === 'project') {
+          this.loadSubmissionFiles();
         }
       },
       error: (err) => {
@@ -998,6 +1356,22 @@ export class TestTakeComponent implements OnInit, OnDestroy {
     } else {
       this.answeredQuestions.delete(index);
     }
+
+    // Trigger auto-save via subject correctly
+    this.saveSubject.next();
+  }
+
+  private performSave() {
+    if (this.submissionId && this.answerForm && !this.timeExpired && !this.submitting) {
+      const answers = this.answerForm.value.answers.map((answer: string, idx: number) => ({
+        question_id: this.test.questions[idx].question_id,
+        answer: answer || ''
+      }));
+
+      this.apiService.updateSubmission(this.submissionId, { answers }).subscribe({
+        error: (err) => console.error('Error auto-saving progress:', err)
+      });
+    }
   }
 
   getIndicatorsTransform(): string {
@@ -1077,6 +1451,36 @@ export class TestTakeComponent implements OnInit, OnDestroy {
       this.submitting = false;
     }
   }
+  onCancel() {
+    if (this.submitting) return;
+
+    // Save current answers as draft before leaving - ONLY for PROJECTS
+    const isProject = this.test?.test_type?.toLowerCase() === 'project';
+    
+    if (this.submissionId && this.answerForm && !this.timeExpired && isProject) {
+      const answers = this.answerForm.value.answers.map((answer: string, index: number) => ({
+        question_id: this.test.questions[index].question_id,
+        answer: answer || ''
+      }));
+
+      this.apiService.updateSubmission(this.submissionId, { answers }).subscribe({
+        next: () => this.navigateBack(),
+        error: () => this.navigateBack() // Navigate anyway even if save fails
+      });
+    } else {
+      this.navigateBack();
+    }
+  }
+
+  private navigateBack() {
+    if (this.source === 'tests') {
+      this.router.navigate(['/tests']);
+    } else if (this.test && this.test.subject_id) {
+      this.router.navigate(['/courses', this.test.subject_id]);
+    } else {
+      this.router.navigate(['/tests']);
+    }
+  }
 
   onSubmit() {
     if (!this.submissionId) {
@@ -1119,8 +1523,10 @@ export class TestTakeComponent implements OnInit, OnDestroy {
               });
             }
 
-            // Redirect to course page if subject_id is available
-            if (this.test && this.test.subject_id) {
+            // Redirect based on source
+            if (this.source === 'tests') {
+              this.router.navigate(['/tests']);
+            } else if (this.test && this.test.subject_id) {
               alert('Тест завершен! Ваш результат сохранен.');
               this.router.navigate(['/courses', this.test.subject_id]);
             } else {
@@ -1139,6 +1545,69 @@ export class TestTakeComponent implements OnInit, OnDestroy {
         alert('Ошибка при сохранении ответов: ' + (err.error?.detail || err.message || 'Неизвестная ошибка'));
         this.submitting = false;
       }
+    });
+  }
+
+  loadSubmissionFiles() {
+    if (!this.submissionId) return;
+    this.apiService.getSubmissionFiles(this.submissionId).subscribe({
+      next: (files) => this.uploadedFiles = files,
+      error: (err) => console.error('Error loading submission files:', err)
+    });
+  }
+
+  onFileSelected(event: any) {
+    const files: FileList = event.target.files;
+    if (!files || files.length === 0 || !this.submissionId) return;
+
+    this.submitting = true;
+    let uploadedCount = 0;
+    const totalToUpload = files.length;
+
+    for (let i = 0; i < totalToUpload; i++) {
+      const file = files[i];
+      const formData = new FormData();
+      formData.append('file', file);
+
+      this.apiService.uploadSubmissionFile(this.submissionId, formData).subscribe({
+        next: () => {
+          uploadedCount++;
+          if (uploadedCount === totalToUpload) {
+            this.submitting = false;
+            this.loadSubmissionFiles();
+            alert('Файлы успешно загружены');
+          }
+        },
+        error: (err) => {
+          console.error('Error uploading file:', err);
+          alert(`Ошибка при загрузке файла ${file.name}: ${err.error?.detail || err.message}`);
+          this.submitting = false;
+        }
+      });
+    }
+  }
+
+  deleteFile(fileId: string) {
+    if (!this.submissionId || !confirm('Удалить этот файл из ответа?')) return;
+    
+    this.submitting = true;
+    this.apiService.deleteSubmissionFile(this.submissionId, fileId).subscribe({
+      next: () => {
+        this.submitting = false;
+        this.loadSubmissionFiles();
+      },
+      error: (err) => {
+        console.error('Error deleting file:', err);
+        alert('Ошибка при удалении файла');
+        this.submitting = false;
+      }
+    });
+  }
+
+  loadTestAssets(testId: string) {
+    this.apiService.getTestFiles(testId).subscribe({
+      next: (assets) => this.testAssets = assets,
+      error: (err) => console.error('Error loading test assets:', err)
     });
   }
 

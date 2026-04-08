@@ -1,7 +1,8 @@
 """
 Test router - CRUD operations for tests
 """
-from fastapi import APIRouter, HTTPException, Depends, Query, Header
+from fastapi import APIRouter, HTTPException, Depends, Query, Header, File, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
@@ -9,12 +10,141 @@ from datetime import timezone, timedelta
 import httpx
 import logging
 import os
+import shutil
+from pathlib import Path
 
 from app.database import get_db
-from app.models import Test
-from app.schemas import TestCreate, TestUpdate, TestResponse
+from app.models import Test, TestFile
+from app.schemas import TestCreate, TestUpdate, TestResponse, TestFileResponse
 
 router = APIRouter()
+STORAGE_PATH = os.getenv("STORAGE_PATH", "/app/storage")
+
+def safe_filename(filename: str) -> str:
+    """Create a safe filename by removing/replacing unsafe characters"""
+    import re
+    safe = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    safe = safe.strip('. ')
+    return safe if safe else "file"
+
+
+@router.post("/{test_id}/files", response_model=TestFileResponse, status_code=201)
+async def upload_test_file(
+    test_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload a file to a test (assets like Jupyter notebooks)"""
+    test = db.query(Test).filter(Test.id == test_id).first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Test not found")
+        
+    # Ensure storage directory exists
+    os.makedirs(STORAGE_PATH, exist_ok=True)
+    
+    # Create test-specific directory
+    test_dir = os.path.join(STORAGE_PATH, "tests", str(test_id))
+    os.makedirs(test_dir, exist_ok=True)
+    
+    original_name = file.filename or "file"
+    safe_name = safe_filename(original_name)
+    
+    base, ext = os.path.splitext(safe_name)
+    file_path = os.path.join(test_dir, safe_name)
+    k = 1
+    while os.path.exists(file_path):
+        safe_name = f"{base}({k}){ext}"
+        file_path = os.path.join(test_dir, safe_name)
+        k += 1
+        
+    try:
+        with open(file_path, "wb") as out:
+            content = await file.read()
+            out.write(content)
+            
+        file_size = len(content)
+        mime_type = file.content_type or "application/octet-stream"
+        
+        db_file = TestFile(
+            test_id=test_id,
+            file_path=file_path,
+            original_name=original_name,
+            mime_type=mime_type,
+            size=file_size
+        )
+        db.add(db_file)
+        db.commit()
+        db.refresh(db_file)
+        
+        return db_file
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
+
+
+@router.get("/{test_id}/files", response_model=List[TestFileResponse])
+async def get_test_files(
+    test_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """List files attached to a test"""
+    test = db.query(Test).filter(Test.id == test_id).first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Test not found")
+        
+    return test.assets
+
+
+@router.get("/{test_id}/files/{file_id}/download")
+async def download_test_file(
+    test_id: UUID,
+    file_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Download a file from a test"""
+    file_record = db.query(TestFile).filter(
+        TestFile.id == file_id,
+        TestFile.test_id == test_id
+    ).first()
+    
+    if not file_record or not os.path.exists(file_record.file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    return FileResponse(
+        path=file_record.file_path,
+        filename=file_record.original_name,
+        media_type=file_record.mime_type
+    )
+
+
+@router.delete("/{test_id}/files/{file_id}", status_code=200)
+async def delete_test_file(
+    test_id: UUID,
+    file_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Delete a file attached to a test"""
+    file_record = db.query(TestFile).filter(
+        TestFile.id == file_id,
+        TestFile.test_id == test_id
+    ).first()
+    
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    # Delete from fs
+    if os.path.exists(file_record.file_path):
+        try:
+            os.remove(file_record.file_path)
+        except:
+            pass
+            
+    db.delete(file_record)
+    db.commit()
+    db.commit()
+    return {"message": "File deleted successfully"}
+
 logger = logging.getLogger(__name__)
 
 NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-service:8010")
@@ -207,14 +337,89 @@ async def update_test(
     return test
 
 
+SUBMISSION_SERVICE_URL = os.getenv("SUBMISSION_SERVICE_URL", "http://submission-service:8003")
+
 @router.delete("/{test_id}", status_code=200)
 async def delete_test(test_id: UUID, db: Session = Depends(get_db)):
-    """Delete a test"""
+    """Delete a test and all its submissions (cascading deletion)"""
     test = db.query(Test).filter(Test.id == test_id).first()
     if not test:
         raise HTTPException(status_code=404, detail="Test not found")
     
+    # Cascade delete submissions via submission-service
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.delete(f"{SUBMISSION_SERVICE_URL}/submissions/by-test/{test_id}")
+    except Exception as e:
+        logger.error(f"Failed to cascade delete submissions for test {test_id}: {e}")
+        # We continue even if submission deletion fails, or we could raise an error.
+        # Given the user's request, we should probably try our best.
+
+    # Delete test files from disk
+    test_dir = os.path.join(STORAGE_PATH, "tests", str(test_id))
+    if os.path.exists(test_dir):
+        try:
+            shutil.rmtree(test_dir)
+        except:
+            pass
+
     db.delete(test)
     db.commit()
-    return {"message": "Test deleted successfully"}
+    return {"message": "Test and all related submissions deleted successfully"}
+
+
+@router.post("/clone")
+async def clone_tests(data: dict, db: Session = Depends(get_db)):
+    """Clone all tests from one subject to another"""
+    from app.models import Question, Keyword
+    old_subject_id = data.get("old_subject_id")
+    new_subject_id = data.get("new_subject_id")
+    
+    if not old_subject_id or not new_subject_id:
+        raise HTTPException(status_code=400, detail="Missing subject IDs")
+        
+    tests = db.query(Test).filter(Test.subject_id == old_subject_id).all()
+    id_mapping = {}
+    
+    for test in tests:
+        new_test = Test(
+            subject_id=new_subject_id,
+            title=test.title,
+            description=test.description,
+            assignment_id=test.assignment_id,
+            test_type=test.test_type,
+            due_date=test.due_date,
+            available_until=test.available_until,
+            time_limit_minutes=test.time_limit_minutes,
+            ai_generated=test.ai_generated,
+            allowed_groups=test.allowed_groups
+        )
+        db.add(new_test)
+        db.flush()
+        
+        for q in test.questions:
+            new_q = Question(
+                test_id=new_test.id,
+                question_id=q.question_id,
+                title=q.title,
+                max_points=q.max_points,
+                test_type=q.test_type,
+                options=q.options,
+                correct_answer=q.correct_answer
+            )
+            db.add(new_q)
+            db.flush()
+            
+            for kw in q.keywords:
+                new_kw = Keyword(
+                    question_id=new_q.id,
+                    word=kw.word,
+                    points=kw.points
+                )
+                db.add(new_kw)
+                
+        id_mapping[str(test.id)] = str(new_test.id)
+        
+    db.commit()
+    return id_mapping
 

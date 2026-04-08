@@ -14,6 +14,7 @@ from app.database import Base
 class TestType(str, enum.Enum):
     MULTIPLE_CHOICE = "multiple_choice"
     KEYWORD_BASED = "keyword_based"
+    PROJECT = "project"
 
 
 class Test(Base):
@@ -35,6 +36,7 @@ class Test(Base):
 
     # Relationships
     questions = relationship("Question", back_populates="test", cascade="all, delete-orphan")
+    assets = relationship("TestFile", back_populates="test", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Test(id={self.id}, title={self.title}, type={self.test_type})>"
@@ -75,4 +77,22 @@ class Keyword(Base):
 
     def __repr__(self):
         return f"<Keyword(id={self.id}, word={self.word}, points={self.points})>"
+
+
+class TestFile(Base):
+    __tablename__ = "test_files"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    test_id = Column(UUID(as_uuid=True), ForeignKey("tests.id"), nullable=False)
+    file_path = Column(String, nullable=False)
+    original_name = Column(String, nullable=False)
+    mime_type = Column(String, nullable=False)
+    size = Column(Integer, nullable=False)
+    uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    test = relationship("Test", back_populates="assets")
+
+    def __repr__(self):
+        return f"<TestFile(id={self.id}, file_path={self.file_path})>"
 

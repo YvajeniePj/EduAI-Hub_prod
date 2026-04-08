@@ -9,6 +9,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-materials',
@@ -45,7 +46,7 @@ import { ApiService } from '../../core/services/api.service';
         </mat-card-content>
       </mat-card>
 
-      <mat-card class="upload-card">
+      <mat-card class="upload-card" *ngIf="isAdmin">
         <mat-card-header>
           <mat-card-title>
             <mat-icon>cloud_upload</mat-icon>
@@ -95,7 +96,7 @@ import { ApiService } from '../../core/services/api.service';
             
             <div class="material-actions">
               <button 
-                *ngIf="!hasAnnotation(material)"
+                *ngIf="!hasAnnotation(material) && isAdmin"
                 mat-raised-button 
                 color="primary" 
                 (click)="createAnnotation(material.id)" 
@@ -123,7 +124,7 @@ import { ApiService } from '../../core/services/api.service';
               </div>
             </div>
             
-            <div class="material-footer">
+            <div class="material-footer" *ngIf="isAdmin">
               <button mat-button color="warn" (click)="deleteMaterial(material.id)" class="delete-button">
                 <mat-icon>delete</mat-icon>
                 Удалить
@@ -142,9 +143,7 @@ import { ApiService } from '../../core/services/api.service';
   `,
   styles: [`
     .materials-container {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      padding: 24px;
+      min-height: 100%;
     }
 
     .materials-content {
@@ -301,10 +300,10 @@ import { ApiService } from '../../core/services/api.service';
     }
 
     .annotation-box {
-      padding: 20px;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      padding: 24px;
+      background: #f8f9fa;
       border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
     }
 
     .annotation-title {
@@ -375,8 +374,12 @@ export class MaterialsComponent implements OnInit {
   selectedFiles: File[] = [];
   uploadNote: string = '';
   loading = false;
+  isAdmin = false;
 
-  constructor(private apiService: ApiService) {}
+  constructor(private apiService: ApiService, private authService: AuthService) {
+    const user = this.authService.getCurrentUser();
+    this.isAdmin = user?.role === 'teacher' || user?.role === 'admin';
+  }
 
   ngOnInit() {
     this.loadSubjects();

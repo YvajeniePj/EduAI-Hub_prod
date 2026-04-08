@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
 from app.routers import notifications
+from app.scheduler import start_scheduler
 
 app = FastAPI(
     title="Notification Service",
@@ -28,8 +29,9 @@ app.include_router(notifications.router, prefix="/notifications", tags=["notific
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database on startup"""
+    """Initialize database and scheduler on startup"""
     init_db()
+    start_scheduler()
 
 
 @app.get("/health")
