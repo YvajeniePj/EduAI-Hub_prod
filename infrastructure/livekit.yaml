@@ -1,0 +1,12 @@
+port: 7881
+rtc:
+  node_ip: 77.234.204.110
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: false
+keys:
+  devkey: "this-is-a-very-long-and-secure-secret-for-livekit"
+logging:
+  json: false
+  level: info

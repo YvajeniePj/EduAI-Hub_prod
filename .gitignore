@@ -39,7 +39,6 @@ project.tar.gz
 deploy.bat
 nginx/
 certbot/
-infrastructure/
 
 # Database
 database/
