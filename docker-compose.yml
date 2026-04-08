@@ -373,12 +373,18 @@ services:
 
 volumes:
   postgres_data:
+    name: eduai-postgres-data
   redis_data:
+    name: eduai-redis-data
   material_storage:
+    name: eduai-material-data
   test_storage:
+    name: eduai-test-data
   static_storage:
+    name: eduai-static-data
 
 
 networks:
   eduai-network:
+    name: eduai-network
     driver: bridge
