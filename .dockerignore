@@ -1,9 +1,34 @@
-node_modules
-__pycache__
-*.pyc
-.env
+# Git
 .git
 .gitignore
-*.md
-old_project
 
+# Folders with data (CRITICAL: ignore these to keep build context small)
+database/
+postgres_data/
+redis_data/
+material_storage/
+test_storage/
+static_storage/
+old_project/
+
+# Development / IDE
+.vscode/
+.idea/
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.local
+
+# Logs and temp files
+*.log
+*.tar.gz
+*.zip
+*.bak
+
+# Scripts
+deploy.bat
+nginx/
+certbot/
