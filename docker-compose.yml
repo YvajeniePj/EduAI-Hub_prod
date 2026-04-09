@@ -42,9 +42,7 @@ services:
 
   # API Gateway
   api-gateway:
-    build:
-      context: ./services/api-gateway
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-api-gateway:latest
     container_name: eduai-api-gateway
     ports:
       - "10.10.0.1:8100:8000"
@@ -96,9 +94,7 @@ services:
 
   # Streaming Service
   streaming-service:
-    build:
-      context: ./services/streaming-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-streaming-service:latest
     container_name: eduai-streaming-service
     ports:
       - "8012:8012"
@@ -120,9 +116,7 @@ services:
 
   # Subject Service
   subject-service:
-    build:
-      context: ./services/subject-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-subject-service:latest
     container_name: eduai-subject-service
     # ports:
     #   - "8001:8001"
@@ -138,9 +132,7 @@ services:
 
   # Test Service
   test-service:
-    build:
-      context: ./services/test-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-test-service:latest
     container_name: eduai-test-service
     # ports:
     #   - "8002:8002"
@@ -159,9 +151,7 @@ services:
 
   # Submission Service
   submission-service:
-    build:
-      context: ./services/submission-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-submission-service:latest
     container_name: eduai-submission-service
     # ports:
     #   - "8003:8003"
@@ -185,9 +175,7 @@ services:
 
   # Material Service
   material-service:
-    build:
-      context: ./services/material-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-material-service:latest
     container_name: eduai-material-service
     # ports:
     #   - "8004:8004"
@@ -207,9 +195,7 @@ services:
 
   # Video Service
   video-service:
-    build:
-      context: ./services/video-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-video-service:latest
     container_name: eduai-video-service
     # ports:
     #   - "8005:8005"
@@ -225,9 +211,7 @@ services:
 
   # Peer Review Service
   peer-review-service:
-    build:
-      context: ./services/peer-review-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-peer-review-service:latest
     container_name: eduai-peer-review-service
     # ports:
     #   - "8006:8006"
@@ -245,9 +229,7 @@ services:
 
   # Gamification Service
   gamification-service:
-    build:
-      context: ./services/gamification-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-gamification-service:latest
     container_name: eduai-gamification-service
     # ports:
     #   - "8007:8007"
@@ -263,9 +245,7 @@ services:
 
   # AI Service
   ai-service:
-    build:
-      context: ./services/ai-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-ai-service:latest
     container_name: eduai-ai-service
     # ports:
     #   - "8008:8008"
@@ -278,9 +258,7 @@ services:
 
   # Analytics Service
   analytics-service:
-    build:
-      context: ./services/analytics-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-analytics-service:latest
     container_name: eduai-analytics-service
     # ports:
     #   - "8009:8009"
@@ -296,9 +274,7 @@ services:
 
   # Notification Service
   notification-service:
-    build:
-      context: ./services/notification-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-notification-service:latest
     container_name: eduai-notification-service
     # ports:
     #   - "8010:8010"
@@ -315,9 +291,7 @@ services:
 
   # Feedback Service
   feedback-service:
-    build:
-      context: ./services/feedback-service
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-feedback-service:latest
     container_name: eduai-feedback-service
     # ports:
     #   - "8011:8011"
@@ -333,9 +307,7 @@ services:
 
   # Frontend (Angular)
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: yvajeniepj12/eduai-frontend:latest
     container_name: eduai-frontend
     environment:
       - API_URL=http://api-gateway:8000
