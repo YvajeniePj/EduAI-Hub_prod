@@ -26,9 +26,16 @@ app = FastAPI(
 )
 
 # CORS middleware
+origins = [
+    "https://eduaihub.aitalenthub.ru",
+    "http://eduaihub.aitalenthub.ru",
+    "http://localhost:4200",
+    "http://localhost:8100",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
