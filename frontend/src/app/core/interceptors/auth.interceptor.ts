@@ -6,7 +6,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const token = authService.getToken();
 
-  if (token && req.url.startsWith('/api')) {
+  const isApiRequest = req.url.startsWith('/api') || req.url.includes('eduaihub.aitalenthub.ru/api');
+
+  if (token && isApiRequest) {
     const cloned = req.clone({
       setHeaders: {
         Authorization: `Bearer ${token}`
