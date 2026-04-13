@@ -612,7 +612,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.aiStatus = status;
       },
       error: (err) => {
-        console.error('Error checking AI status:', err);
+        // Мы скрыли console.error, чтобы он не засорял консоль красным до логина
         this.aiStatus = {
           available: false,
           message: 'Ошибка проверки статуса'
