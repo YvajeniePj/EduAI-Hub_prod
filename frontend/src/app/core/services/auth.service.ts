@@ -37,7 +37,7 @@ export class AuthService {
       redirect_uri: `${window.location.origin}/callback`,
       post_logout_redirect_uri: window.location.origin,
       response_type: 'code',
-      scope: 'openid profile email offline_access',
+      scope: 'openid profile email',
       automaticSilentRenew: true,
       filterProtocolClaims: true,
       loadUserInfo: true
