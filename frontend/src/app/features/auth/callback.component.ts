@@ -13,11 +13,16 @@ import { AuthService } from '../../core/services/auth.service';
   `
 })
 export class CallbackComponent implements OnInit {
+  private processed = false;
   constructor(private auth: AuthService, private router: Router) {}
 
   ngOnInit() {
+    if (this.processed) return;
+    this.processed = true;
+
     this.auth.completeLogin().subscribe({
       next: () => {
+        console.log('Login complete, navigating to home');
         this.router.navigate(['/']);
       },
       error: (err) => {

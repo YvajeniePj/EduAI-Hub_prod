@@ -44,15 +44,18 @@ export class AuthService {
     };
 
     this.userManager = new UserManager(settings);
+    console.log('OIDC Settings initialized:', settings);
     
     // Initialize from storage if exists
     this.userManager.getUser().then(user => {
       if (user && !user.expired) {
+        console.log('User loaded from storage:', user.profile.preferred_username);
         this.handleUser(user);
       }
     });
 
     this.userManager.events.addUserLoaded((user) => {
+      console.log('UserLoaded event fired');
       this.handleUser(user);
     });
 
@@ -62,11 +65,13 @@ export class AuthService {
   }
 
   private handleUser(user: User) {
+    console.log('Handling loaded user...');
     if (user && user.access_token) {
       this.tokenSubject.next(user.access_token);
       
       // In OIDC, profile info is in user.profile
       const profile = user.profile;
+      console.log('Token received, user profile:', profile.preferred_username);
       const currentUser: CurrentUser = {
         id: profile.sub,
         name: (profile.preferred_username as string) || (profile.name as string),
@@ -77,7 +82,13 @@ export class AuthService {
       this.currentUserSubject.next(currentUser);
       
       // Sync with our backend /auth/me for any specific user linking/roles
-      this.syncUserWithBackend().subscribe();
+      console.log('Syncing with backend...');
+      this.syncUserWithBackend().subscribe({
+        next: () => console.log('Backend sync successful'),
+        error: (err) => console.error('Backend sync failed:', err)
+      });
+    } else {
+      console.warn('HandleUser called but no access token present');
     }
   }
 
@@ -118,11 +129,17 @@ export class AuthService {
   }
 
   completeLogin(): Observable<void> {
+    console.log('Completing login from callback...');
     return from(this.userManager.signinRedirectCallback()).pipe(
       tap(user => {
+        console.log('signinRedirectCallback successful');
         this.handleUser(user);
       }),
-      map(() => void 0)
+      map(() => void 0),
+      catchError(err => {
+        console.error('signinRedirectCallback failed:', err);
+        return throwError(() => err);
+      })
     );
   }
 
