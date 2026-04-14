@@ -49,18 +49,23 @@ async def startup_event():
     # Consolidate SuperAdmin: promote user "508982" (The User)
     db = SessionLocal()
     try:
-        # 1. Promote/Fix user "508982"
-        the_user = db.query(User).filter(User.name == "508982").first()
+        # 1. Promote/Fix user "508982" (and variations from SSO)
+        target_ids = ["508982", "isu_508982"]
+        the_user = db.query(User).filter(User.name.in_(target_ids)).first()
+        
+        # If not found by ISU name, try finding by known display name or any other admin markers
+        if not the_user:
+            # Fallback to internal ID if we have it, or rely on Gateway injection for now
+            pass
+
         if the_user:
             the_user.role = "admin"
             the_user.is_hidden_admin = True
             db.add(the_user)
             db.commit()
-            print("User 508982 promoted to Hidden SuperAdmin.")
+            print(f"User {the_user.name} promoted to Hidden SuperAdmin.")
         else:
-            # If they don't exist yet (haven't logged in), they will be created by api-gateway
-            # But we can pre-create if necessary. For now, let's just wait for them or use the name sync.
-            print("User 508982 not found in DB yet. It will be promoted once they log in or exist.")
+            print("User 508982/isu_508982 not found in DB yet.")
 
         # 2. Cleanup legacy "SuperAdmin" user if exists
         legacy_admin = db.query(User).filter(User.name == "SuperAdmin").first()

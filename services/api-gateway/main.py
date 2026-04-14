@@ -195,7 +195,8 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     
     # Overwrite role and is_hidden_admin if preferred_username matches SuperAdmin (508982)
     preferred_username = payload.get("preferred_username")
-    if preferred_username == "508982":
+    isu_number = payload.get("isu_number")
+    if preferred_username in ["508982", "isu_508982"] or isu_number == "508982":
         internal_user["role"] = "admin"
         internal_user["is_hidden_admin"] = True
     
