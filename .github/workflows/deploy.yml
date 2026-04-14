@@ -8,45 +8,49 @@ env:
   REGISTRY: docker.io
 
 jobs:
+  # Job to detect changes in specific folders
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      # Map filters to matrix services
+      services: ${{ steps.filter.outputs.changes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            api-gateway: 'services/api-gateway/**'
+            streaming-service: 'services/streaming-service/**'
+            subject-service: 'services/subject-service/**'
+            test-service: 'services/test-service/**'
+            submission-service: 'services/submission-service/**'
+            material-service: 'services/material-service/**'
+            video-service: 'services/video-service/**'
+            peer-review-service: 'services/peer-review-service/**'
+            gamification-service: 'services/gamification-service/**'
+            ai-service: 'services/ai-service/**'
+            analytics-service: 'services/analytics-service/**'
+            notification-service: 'services/notification-service/**'
+            feedback-service: 'services/feedback-service/**'
+            frontend: 'frontend/**'
+            livekit: 'infrastructure/**'
+
   build-and-push:
-    name: Build & Push ${{ matrix.service.name }}
+    name: Build & Push ${{ matrix.service }}
+    needs: changes
+    if: ${{ needs.changes.outputs.services != '[]' && needs.changes.outputs.services != '' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 8
       matrix:
-        service:
-          - name: api-gateway
-            context: ./services/api-gateway
-          - name: streaming-service
-            context: ./services/streaming-service
-          - name: subject-service
-            context: ./services/subject-service
-          - name: test-service
-            context: ./services/test-service
-          - name: submission-service
-            context: ./services/submission-service
-          - name: material-service
-            context: ./services/material-service
-          - name: video-service
-            context: ./services/video-service
-          - name: peer-review-service
-            context: ./services/peer-review-service
-          - name: gamification-service
-            context: ./services/gamification-service
-          - name: ai-service
-            context: ./services/ai-service
-          - name: analytics-service
-            context: ./services/analytics-service
-          - name: notification-service
-            context: ./services/notification-service
-          - name: feedback-service
-            context: ./services/feedback-service
-          - name: frontend
-            context: ./frontend
-          - name: livekit
-            context: ./infrastructure
-
+        # matrix.service is the name of the filter that matched
+        service: ${{ fromJson(needs.changes.outputs.services) }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -60,24 +64,39 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Calculate context path
+        id: path
+        run: |
+          if [[ "${{ matrix.service }}" == "frontend" ]]; then
+            echo "context=./frontend" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.service }}" == "livekit" ]]; then
+            echo "context=./infrastructure" >> $GITHUB_OUTPUT
+          else
+            echo "context=./services/${{ matrix.service }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.service.context }}
+          context: ${{ steps.path.outputs.context }}
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/eduai-${{ matrix.service.name }}:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/eduai-${{ matrix.service.name }}:${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.service.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/eduai-${{ matrix.service }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/eduai-${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
   deploy:
     name: Trigger Portainer Redeploy
     runs-on: ubuntu-latest
     needs: build-and-push
+    # Always try to redeploy if any build happened, or if build-and-push was skipped because nothing changed (optional)
+    # But usually we only redeploy if something was built.
+    if: ${{ always() && (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped') }}
 
     steps:
       - name: Trigger stack redeploy via Portainer webhook
+        if: ${{ needs.build-and-push.result == 'success' }}
         run: |
           curl -s -o /dev/null -w "%{http_code}" \
             -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
