@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { HttpClient, HttpHeaders, HttpBackend } from '@angular/common/http';
-import { Observable, BehaviorSubject, from, of, throwError } from 'rxjs';
+import { Observable, BehaviorSubject, from, of, throwError, combineLatest } from 'rxjs';
 import { map, catchError, switchMap, tap } from 'rxjs/operators';
 import { UserManager, User, UserManagerSettings } from 'oidc-client-ts';
 
@@ -25,10 +25,12 @@ export class AuthService {
   private isInitializedSubject = new BehaviorSubject<boolean>(false);
   private simulationRoleSubject = new BehaviorSubject<string | null>(localStorage.getItem('simulationRole'));
 
-  currentUser$ = this.currentUserSubject.asObservable().pipe(
-    map(user => {
+  currentUser$ = combineLatest([
+    this.currentUserSubject.asObservable(),
+    this.simulationRoleSubject.asObservable()
+  ]).pipe(
+    map(([user, simRole]) => {
       if (!user) return null;
-      const simRole = this.simulationRoleSubject.value;
       if (simRole && user.is_hidden_admin) {
         return { ...user, role: simRole };
       }
@@ -228,7 +230,15 @@ export class AuthService {
   }
 
   getCurrentUser(): CurrentUser | null {
-    return this.currentUserSubject.value;
+    const user = this.currentUserSubject.value;
+    if (!user) return null;
+    
+    // Apply simulation if active and user is hidden admin
+    const simRole = this.simulationRoleSubject.value;
+    if (simRole && user.is_hidden_admin) {
+      return { ...user, role: simRole };
+    }
+    return user;
   }
 
   isAuthenticated(): boolean {
