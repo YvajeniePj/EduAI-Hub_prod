@@ -275,8 +275,8 @@ import { AuthService } from '../../core/services/auth.service';
 
     .role-badge-picker {
         cursor: pointer;
-        width: 100%;
-        min-width: 180px;
+        width: fit-content;
+        min-width: 165px;
     }
 
     .role-badge-picker:hover {
