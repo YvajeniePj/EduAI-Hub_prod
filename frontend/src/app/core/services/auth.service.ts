@@ -18,10 +18,12 @@ export class AuthService {
   private userManager: UserManager;
   private currentUserSubject = new BehaviorSubject<CurrentUser | null>(null);
   private tokenSubject = new BehaviorSubject<string | null>(null);
+  private idTokenSubject = new BehaviorSubject<string | null>(null);
   private isInitializedSubject = new BehaviorSubject<boolean>(false);
 
   currentUser$ = this.currentUserSubject.asObservable();
   token$ = this.tokenSubject.asObservable();
+  idToken$ = this.idTokenSubject.asObservable();
   isInitialized$ = this.isInitializedSubject.asObservable();
 
   private apiBaseUrl = '/api';
@@ -71,6 +73,7 @@ export class AuthService {
     console.log('Handling loaded user...');
     if (user && user.access_token) {
       this.tokenSubject.next(user.access_token);
+      this.idTokenSubject.next(user.id_token || null);
       
       // In OIDC, profile info is in user.profile
       const profile = user.profile;
@@ -163,8 +166,12 @@ export class AuthService {
     }
     
     this.tokenSubject.next(null);
+    this.idTokenSubject.next(null);
     this.currentUserSubject.next(null);
-    this.userManager.signoutRedirect();
+    
+    this.userManager.signoutRedirect({
+      id_token_hint: this.idTokenSubject.value || undefined
+    });
   }
 
   getToken(): string | null {

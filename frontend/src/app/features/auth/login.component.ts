@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -96,10 +96,24 @@ import { AuthService } from '../../core/services/auth.service';
     }
   `]
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   loading = false;
 
   constructor(private auth: AuthService, private router: Router) { }
+
+  ngOnInit() {
+    // If the user is already authenticated, don't show the login page
+    if (this.auth.isAuthenticated()) {
+      this.router.navigate(['/']);
+    }
+    
+    // Also subscribe to changes in case the user authenticates while on this page
+    this.auth.currentUser$.subscribe(user => {
+      if (user) {
+        this.router.navigate(['/']);
+      }
+    });
+  }
 
   login() {
     this.loading = true;
