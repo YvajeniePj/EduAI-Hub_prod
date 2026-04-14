@@ -81,7 +81,11 @@ export class AuthService {
       console.log('=== FULL KEYCLOAK PROFILE ===', JSON.stringify(profile, null, 2));
       
       const properName = profile.name ? (profile.name as string) : (profile.preferred_username as string);
-      const properAvatar = profile['picture'] ? (profile['picture'] as string) : (profile['avatar_url'] as string);
+      
+      // Robust avatar mapping: check picture, avatar, avatar_url in Keycloak profile
+      const properAvatar = (profile['picture'] || profile['avatar'] || profile['avatar_url']) as string | undefined;
+      
+      console.log('Properly mapped user data:', { name: properName, avatar: properAvatar });
       
       const currentUser: CurrentUser = {
         id: profile.sub,
@@ -169,8 +173,16 @@ export class AuthService {
     this.idTokenSubject.next(null);
     this.currentUserSubject.next(null);
     
+    const postLogoutUrl = window.location.origin.replace(/\/$/, ""); // Ensure no trailing slash
+    
+    // Some Keycloak versions use redirect_uri, some post_logout_redirect_uri.
+    // We pass both and id_token_hint for maximum compatibility.
     this.userManager.signoutRedirect({
-      id_token_hint: this.idTokenSubject.value || undefined
+      id_token_hint: this.idTokenSubject.value || undefined,
+      post_logout_redirect_uri: postLogoutUrl,
+      extraQueryParams: {
+        'redirect_uri': postLogoutUrl // Fallback for older Keycloak/OIDC configs
+      }
     });
   }
 

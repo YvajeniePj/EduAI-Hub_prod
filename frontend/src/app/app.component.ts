@@ -206,7 +206,7 @@ import { interval, Subscription } from 'rxjs';
           <button mat-button routerLink="/profile" class="profile-button">
             <div class="profile-content">
               <div class="avatar-container" *ngIf="currentUser.avatar_url">
-                <img [src]="currentUser.avatar_url" alt="avatar" class="toolbar-avatar">
+                <img [src]="currentUser.avatar_url" alt="avatar" class="toolbar-avatar" (error)="currentUser.avatar_url = undefined">
               </div>
               <mat-icon *ngIf="!currentUser.avatar_url" class="toolbar-avatar-icon">person</mat-icon>
               <span class="toolbar-user-name">{{ currentUser.name }}</span>

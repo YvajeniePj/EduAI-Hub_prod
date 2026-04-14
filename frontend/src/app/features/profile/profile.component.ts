@@ -41,7 +41,7 @@ import { HttpEventType } from '@angular/common/http';
         <div class="profile-header-content">
           <div class="avatar-section">
             <div class="profile-avatar-wrapper">
-              <img [src]="user.avatar_url || 'assets/default-avatar.png'" alt="avatar" class="profile-avatar" *ngIf="user.avatar_url">
+              <img [src]="user.avatar_url" alt="avatar" class="profile-avatar" *ngIf="user.avatar_url" (error)="user.avatar_url = undefined">
               <mat-icon class="profile-avatar-placeholder" *ngIf="!user.avatar_url">person</mat-icon>
               <div class="avatar-overlay" (click)="fileInput.click()">
                 <mat-icon>photo_camera</mat-icon>
