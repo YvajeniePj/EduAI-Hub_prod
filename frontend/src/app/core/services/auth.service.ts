@@ -132,7 +132,7 @@ export class AuthService {
     return 'student';
   }
 
-  private syncUserWithBackend(): Observable<any> {
+  public syncUserWithBackend(): Observable<any> {
     const token = this.getToken();
     if (!token) return of(null);
     
