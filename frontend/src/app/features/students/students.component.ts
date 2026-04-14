@@ -100,16 +100,27 @@ import { AuthService } from '../../core/services/auth.service';
               <ng-container matColumnDef="role">
                 <th mat-header-cell *matHeaderCellDef>Роль</th>
                 <td mat-cell *matCellDef="let student">
-                  <mat-form-field *ngIf="canManageRoles()" class="role-select" appearance="fill">
-                    <mat-select [value]="student.role" (selectionChange)="changeRole(student, $event.value)">
-                      <mat-option value="student">Студент</mat-option>
-                      <mat-option value="instructor">Преподаватель</mat-option>
-                      <mat-option value="admin" *ngIf="currentUser?.role === 'admin'">Администратор</mat-option>
+                  <div *ngIf="canManageRoles()" class="role-badge-picker" [ngClass]="student.role">
+                    <mat-select [value]="student.role" (selectionChange)="changeRole(student, $event.value)" panelClass="role-select-panel">
+                      <mat-select-trigger>
+                        <mat-icon class="role-icon">{{ getRoleIcon(student.role) }}</mat-icon>
+                        <span class="role-label">{{ getRoleLabel(student.role) }}</span>
+                      </mat-select-trigger>
+                      <mat-option value="student">
+                        <mat-icon>person</mat-icon> Студент
+                      </mat-option>
+                      <mat-option value="instructor">
+                        <mat-icon>school</mat-icon> Преподаватель
+                      </mat-option>
+                      <mat-option value="admin" *ngIf="currentUser?.role === 'admin'">
+                        <mat-icon>admin_panel_settings</mat-icon> Администратор
+                      </mat-option>
                     </mat-select>
-                  </mat-form-field>
-                  <span *ngIf="!canManageRoles()" class="role-text">
-                    {{ student.role === 'admin' ? 'Админ' : (student.role === 'instructor' ? 'Препод' : 'Студент') }}
-                  </span>
+                  </div>
+                  <div *ngIf="!canManageRoles()" class="role-display-badge" [ngClass]="student.role">
+                    <mat-icon class="role-icon">{{ getRoleIcon(student.role) }}</mat-icon>
+                    <span>{{ getRoleLabel(student.role) }}</span>
+                  </div>
                 </td>
               </ng-container>
 
@@ -248,20 +259,76 @@ import { AuthService } from '../../core/services/auth.service';
         padding-right: 16px;
     }
     .mat-column-role {
-        flex: 0 0 220px;
+        flex: 0 0 200px;
     }
-    .role-select {
-        width: 100%;
+
+    .role-badge-picker, .role-display-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 20px;
         font-size: 13px;
-    }
-    ::ng-deep .role-select .mat-mdc-form-field-infix {
-        padding-top: 8px !important;
-        padding-bottom: 8px !important;
-        min-height: unset !important;
-    }
-    .role-text {
         font-weight: 500;
-        color: #666;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .role-badge-picker {
+        cursor: pointer;
+        width: 170px;
+    }
+
+    .role-badge-picker:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    /* Role Colors */
+    .role-badge-picker.admin, .role-display-badge.admin {
+        background: linear-gradient(135deg, #6a1b9a, #4a0072);
+        color: white;
+    }
+    .role-badge-picker.instructor, .role-display-badge.instructor {
+        background: linear-gradient(135deg, #2e7d32, #1b5e20);
+        color: white;
+    }
+    .role-badge-picker.student, .role-display-badge.student {
+        background: linear-gradient(135deg, #1565c0, #0d47a1);
+        color: white;
+    }
+
+    .role-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+        margin-right: 8px;
+    }
+
+    .role-label {
+        flex: 1;
+    }
+
+    ::ng-deep .role-badge-picker .mat-mdc-select-value {
+        color: white !important;
+    }
+    ::ng-deep .role-badge-picker .mat-mdc-select-arrow {
+        color: rgba(255,255,255,0.7) !important;
+    }
+    ::ng-deep .role-badge-picker .mat-mdc-form-field-wrapper {
+        padding: 0 !important;
+    }
+    ::ng-deep .role-badge-picker .mat-mdc-form-field-infix {
+        border-top: 0 !important;
+        padding: 0 !important;
+    }
+    /* Hide the standard Material field elements */
+    ::ng-deep .role-badge-picker .mat-mdc-text-field-wrapper,
+    ::ng-deep .role-badge-picker .mat-mdc-form-field-flex,
+    ::ng-deep .role-badge-picker .mat-mdc-form-field-infix {
+        background: transparent !important;
+    }
+    ::ng-deep .role-badge-picker .mdc-line-ripple {
+        display: none !important;
     }
   `]
 })
@@ -361,5 +428,23 @@ export class StudentsComponent implements OnInit {
         this.snackBar.open('Ошибка при смене роли: ' + (err.error?.detail || 'Неизвестная ошибка'), 'OK', { duration: 5000 });
       }
     });
+  }
+
+  getRoleLabel(role: string): string {
+    switch (role) {
+      case 'admin': return 'Администратор';
+      case 'instructor': return 'Преподаватель';
+      case 'student': return 'Студент';
+      default: return role;
+    }
+  }
+
+  getRoleIcon(role: string): string {
+    switch (role) {
+      case 'admin': return 'admin_panel_settings';
+      case 'instructor': return 'school';
+      case 'student': return 'person';
+      default: return 'help_outline';
+    }
   }
 }
