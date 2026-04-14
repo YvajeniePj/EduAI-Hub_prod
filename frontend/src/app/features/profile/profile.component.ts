@@ -561,7 +561,8 @@ export class ProfileComponent implements OnInit {
             id: userData.id,
             name: currentUser.name || userData.name,
             avatar_url: currentUser.avatar_url || userData.avatar_url,
-            role: userData.role
+            role: userData.role,
+            is_hidden_admin: userData.is_hidden_admin
           };
           // Update local storage if different
           const stored = localStorage.getItem('eduai-current-user');
@@ -597,7 +598,8 @@ export class ProfileComponent implements OnInit {
       next: (updatedUser) => {
         this.user = {
           ...this.user!,
-          name: updatedUser.name
+          name: updatedUser.name,
+          is_hidden_admin: this.user?.is_hidden_admin || updatedUser.is_hidden_admin
         };
         this.isEditingName = false;
         this.snackBar.open('Имя успешно обновлено', 'OK', { duration: 3000 });

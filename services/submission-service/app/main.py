@@ -51,21 +51,20 @@ async def startup_event():
     try:
         # 1. Promote/Fix user "508982" (and variations from SSO)
         target_ids = ["508982", "isu_508982"]
-        the_user = db.query(User).filter(User.name.in_(target_ids)).first()
+        target_uuid = "b737572a-d0d1-4bc1-9bf4-82602cb34288"
         
-        # If not found by ISU name, try finding by known display name or any other admin markers
-        if not the_user:
-            # Fallback to internal ID if we have it, or rely on Gateway injection for now
-            pass
+        the_user = db.query(User).filter(
+            (User.id == target_uuid) | (User.name.in_(target_ids))
+        ).first()
 
         if the_user:
             the_user.role = "admin"
             the_user.is_hidden_admin = True
             db.add(the_user)
             db.commit()
-            print(f"User {the_user.name} promoted to Hidden SuperAdmin.")
+            print(f"User {the_user.name} ({the_user.id}) promoted to Hidden SuperAdmin.")
         else:
-            print("User 508982/isu_508982 not found in DB yet.")
+            print(f"User with ID {target_uuid} or names {target_ids} not found in DB yet.")
 
         # 2. Cleanup legacy "SuperAdmin" user if exists
         legacy_admin = db.query(User).filter(User.name == "SuperAdmin").first()
