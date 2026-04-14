@@ -259,7 +259,7 @@ import { AuthService } from '../../core/services/auth.service';
         padding-right: 16px;
     }
     .mat-column-role {
-        flex: 0 0 200px;
+        flex: 0 0 220px;
     }
 
     .role-badge-picker, .role-display-badge {
@@ -275,7 +275,8 @@ import { AuthService } from '../../core/services/auth.service';
 
     .role-badge-picker {
         cursor: pointer;
-        width: 170px;
+        width: 100%;
+        min-width: 180px;
     }
 
     .role-badge-picker:hover {
@@ -306,6 +307,9 @@ import { AuthService } from '../../core/services/auth.service';
 
     .role-label {
         flex: 1;
+        white-space: nowrap;
+        overflow: visible;
+        text-overflow: clip;
     }
 
     ::ng-deep .role-badge-picker .mat-mdc-select-value {
