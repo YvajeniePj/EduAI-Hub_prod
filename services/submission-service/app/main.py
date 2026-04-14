@@ -66,6 +66,20 @@ async def startup_event():
         else:
             print(f"User with ID {target_uuid} or names {target_ids} not found in DB yet.")
 
+        # 2. Promote/Fix user "307553" (Юлия Разливина)
+        julia_ids = ["307553", "isu_307553"]
+        julia_uuid = "b4b5149a-caab-4fae-83e0-0ea5ca63c984"
+        
+        julia = db.query(User).filter(
+            (User.id == julia_uuid) | (User.name.in_(julia_ids))
+        ).first()
+
+        if julia:
+            julia.role = "instructor"
+            db.add(julia)
+            db.commit()
+            print(f"User {julia.name} ({julia.id}) promoted to Instructor.")
+
         # 2. Cleanup legacy "SuperAdmin" user if exists
         legacy_admin = db.query(User).filter(User.name == "SuperAdmin").first()
         if legacy_admin:

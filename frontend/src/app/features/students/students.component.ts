@@ -11,8 +11,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { UserProfileDialogComponent } from './user-profile-dialog.component';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-students',
@@ -29,7 +31,8 @@ import { ApiService } from '../../core/services/api.service';
     MatTableModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatDialogModule
+    MatDialogModule,
+    MatSnackBarModule
   ],
   template: `
     <div class="students-container">
@@ -90,6 +93,22 @@ import { ApiService } from '../../core/services/api.service';
                   </div>
                   <span *ngIf="!student.groups || student.groups.length === 0" class="no-groups">
                     Нет групп
+                  </span>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="role">
+                <th mat-header-cell *matHeaderCellDef>Роль</th>
+                <td mat-cell *matCellDef="let student">
+                  <mat-form-field *ngIf="canManageRoles()" class="role-select" appearance="fill">
+                    <mat-select [value]="student.role" (selectionChange)="changeRole(student, $event.value)">
+                      <mat-option value="student">Студент</mat-option>
+                      <mat-option value="instructor">Преподаватель</mat-option>
+                      <mat-option value="admin" *ngIf="currentUser?.role === 'admin'">Администратор</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <span *ngIf="!canManageRoles()" class="role-text">
+                    {{ student.role === 'admin' ? 'Админ' : (student.role === 'instructor' ? 'Препод' : 'Студент') }}
                   </span>
                 </td>
               </ng-container>
@@ -220,23 +239,39 @@ import { ApiService } from '../../core/services/api.service';
     .user-link:hover {
         color: #1a237e;
     }
+    .role-select {
+        width: 150px;
+        font-size: 13px;
+    }
+    ::ng-deep .role-select .mat-mdc-form-field-infix {
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+        min-height: unset !important;
+    }
+    .role-text {
+        font-weight: 500;
+        color: #666;
+    }
   `]
 })
 export class StudentsComponent implements OnInit {
   students: any[] = [];
   subjects: any[] = [];
   selectedSubjectId: string | null = null;
-  searchQuery: string = '';
   loading = false;
-  displayedColumns: string[] = ['name', 'groups'];
+  displayedColumns: string[] = ['name', 'groups', 'role'];
+  currentUser: any = null;
 
   constructor(
     private apiService: ApiService,
+    private auth: AuthService,
     private router: Router,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar
   ) { }
 
   ngOnInit() {
+    this.auth.currentUser$.subscribe(user => this.currentUser = user);
     this.loadSubjects();
     this.loadStudents();
   }
@@ -295,6 +330,24 @@ export class StudentsComponent implements OnInit {
     this.dialog.open(UserProfileDialogComponent, {
       width: '400px',
       data: { user }
+    });
+  }
+
+  canManageRoles(): boolean {
+    return this.currentUser?.role === 'admin' || this.currentUser?.role === 'instructor';
+  }
+
+  changeRole(student: any, newRole: string) {
+    if (student.role === newRole) return;
+
+    this.apiService.updateUser(student.id, { role: newRole }).subscribe({
+      next: (val) => {
+        student.role = newRole;
+        this.snackBar.open(`Роль пользователя ${student.name} изменена на ${newRole}`, 'OK', { duration: 3000 });
+      },
+      error: (err) => {
+        this.snackBar.open('Ошибка при смене роли: ' + (err.error?.detail || 'Неизвестная ошибка'), 'OK', { duration: 5000 });
+      }
     });
   }
 }

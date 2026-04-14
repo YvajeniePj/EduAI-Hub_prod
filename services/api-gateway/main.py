@@ -185,9 +185,15 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
             }
             
     # Success finding or creating
+    # Prefer full name from token if DB name is an ISU-placeholder or missing
+    token_full_name = payload.get("name")
+    internal_name = user_data["name"]
+    if token_full_name and (internal_name.startswith("isu_") or not internal_name):
+        internal_name = token_full_name
+
     internal_user = {
         "user_id": str(user_data["id"]),
-        "username": user_data["name"],
+        "username": internal_name,
         "role": user_data["role"],
         "avatar_url": user_data.get("avatar_url"),
         "is_hidden_admin": user_data.get("is_hidden_admin", False)
@@ -196,9 +202,15 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     # Overwrite role and is_hidden_admin if preferred_username matches SuperAdmin (508982)
     preferred_username = payload.get("preferred_username")
     isu_number = payload.get("isu_number")
+    
+    # 1. Force Admin (508982)
     if preferred_username in ["508982", "isu_508982"] or isu_number == "508982":
         internal_user["role"] = "admin"
         internal_user["is_hidden_admin"] = True
+        
+    # 2. Force Instructor (307553 - Юлия Разливина)
+    if preferred_username in ["307553", "isu_307553"] or isu_number == "307553":
+        internal_user["role"] = "instructor"
     
     # Cache it
     _user_mapping_cache[external_id] = internal_user
