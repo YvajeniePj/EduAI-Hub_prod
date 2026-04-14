@@ -73,10 +73,14 @@ export class AuthService {
       const profile = user.profile;
       console.log('Token received, user profile:', profile.preferred_username);
       console.log('=== FULL KEYCLOAK PROFILE ===', JSON.stringify(profile, null, 2));
+      
+      const properName = profile.name ? (profile.name as string) : (profile.preferred_username as string);
+      const properAvatar = profile['picture'] ? (profile['picture'] as string) : (profile['avatar_url'] as string);
+      
       const currentUser: CurrentUser = {
         id: profile.sub,
-        name: (profile.preferred_username as string) || (profile.name as string),
-        avatar_url: profile['avatar_url'] as string,
+        name: properName,
+        avatar_url: properAvatar,
         role: this.mapRoles(profile)
       };
       
@@ -119,7 +123,7 @@ export class AuthService {
         }
       }),
       catchError(err => {
-        console.error('Error syncing user with backend:', err);
+        // Silenced: console.error('Error syncing user with backend:', err);
         return of(null);
       })
     );

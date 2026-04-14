@@ -285,14 +285,6 @@ async def proxy_request(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@app.get("/auth/me")
-async def get_current_user_info(current_user: Optional[dict] = Depends(get_current_user)):
-    """Get current user info from JWT token"""
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return current_user
-
-
 # Subject Service Routes
 @app.get("/subjects")
 async def get_subjects():

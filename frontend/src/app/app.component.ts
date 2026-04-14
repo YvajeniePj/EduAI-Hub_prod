@@ -500,7 +500,9 @@ export class AppComponent implements OnInit, OnDestroy {
       user_name: this.currentUser.name,
       action_type: 'session_start'
     }).subscribe({
-      error: (err) => console.error('Error tracking session start:', err)
+      error: (err) => {
+        // Silenced: console.error('Error tracking session start:', err)
+      }
     });
   }
 
@@ -526,7 +528,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.unreadCount = notifications.filter((n: any) => !n.is_read).length;
       },
       error: (err) => {
-        console.error('Error loading notifications:', err);
+        // Silenced: console.error('Error loading notifications:', err);
       }
     });
   }

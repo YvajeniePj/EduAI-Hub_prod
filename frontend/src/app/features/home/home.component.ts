@@ -290,7 +290,7 @@ export class HomeComponent implements OnInit {
         this.news = news;
       },
       error: (err) => {
-        console.error('Error loading news:', err);
+        // Silenced: console.error('Error loading news:', err);
         this.news = [];
       }
     });
@@ -313,7 +313,7 @@ export class HomeComponent implements OnInit {
         this.generateCalendar();
       },
       error: (err) => {
-        console.error('Error loading deadlines:', err);
+        // Silenced: console.error('Error loading deadlines:', err);
         this.deadlines = [];
         this.generateCalendar();
       }
@@ -482,7 +482,7 @@ export class HomeComponent implements OnInit {
         this.loadDeadlines();
       },
       error: (err) => {
-        console.error('Error loading subjects:', err);
+        // Silenced: console.error('Error loading subjects:', err);
         this.loadDeadlines(); // Загружаем дедлайны даже если предметы не загрузились
       }
     });
