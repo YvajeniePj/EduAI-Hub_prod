@@ -18,9 +18,11 @@ export class AuthService {
   private userManager: UserManager;
   private currentUserSubject = new BehaviorSubject<CurrentUser | null>(null);
   private tokenSubject = new BehaviorSubject<string | null>(null);
+  private isInitializedSubject = new BehaviorSubject<boolean>(false);
 
   currentUser$ = this.currentUserSubject.asObservable();
   token$ = this.tokenSubject.asObservable();
+  isInitialized$ = this.isInitializedSubject.asObservable();
 
   private apiBaseUrl = '/api';
   private httpWithoutInterceptor: HttpClient;
@@ -52,6 +54,7 @@ export class AuthService {
         console.log('User loaded from storage:', user.profile.preferred_username);
         this.handleUser(user);
       }
+      this.isInitializedSubject.next(true);
     });
 
     this.userManager.events.addUserLoaded((user) => {

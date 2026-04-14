@@ -477,14 +477,18 @@ export class ProfileComponent implements OnInit {
 
   ngOnInit(): void {
     this.refreshUser();
-    this.user = this.auth.getCurrentUser();
-    if (this.user) {
-      this.loadSubmissions();
-      this.loadSubjects();
-      this.loadAllTests();
-      this.loadMyReviews();
-      this.loadUserGroups();
-    }
+    
+    // Subscribe to current user to stay in sync with Keycloak
+    this.auth.currentUser$.subscribe(user => {
+      if (user) {
+        this.user = user;
+        this.loadSubmissions();
+        this.loadSubjects();
+        this.loadAllTests();
+        this.loadMyReviews();
+        this.loadUserGroups();
+      }
+    });
   }
 
   refreshUser(): void {
@@ -494,8 +498,8 @@ export class ProfileComponent implements OnInit {
         next: (userData) => {
           this.user = {
             id: userData.id,
-            name: userData.name,
-            avatar_url: userData.avatar_url,
+            name: currentUser.name || userData.name,
+            avatar_url: currentUser.avatar_url || userData.avatar_url,
             role: userData.role
           };
           // Update local storage if different

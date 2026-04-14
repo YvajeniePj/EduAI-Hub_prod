@@ -31,7 +31,15 @@ import { interval, Subscription } from 'rxjs';
     MatMenuModule
   ],
   template: `
-    <mat-sidenav-container class="sidenav-container" *ngIf="currentUser; else noAuth">
+    <div *ngIf="!isInitialized" class="initial-loader">
+      <div class="loader-content">
+        <mat-icon class="loader-icon">school</mat-icon>
+        <span class="loader-text">EduAI Hub</span>
+        <div class="spinner"></div>
+      </div>
+    </div>
+
+    <mat-sidenav-container class="sidenav-container" *ngIf="isInitialized && currentUser; else noAuth">
       <mat-sidenav #sidenav mode="over" class="app-sidenav">
         <div class="sidenav-header">
           <mat-icon class="sidenav-logo-icon">school</mat-icon>
@@ -222,6 +230,48 @@ import { interval, Subscription } from 'rxjs';
     </ng-template>
   `,
   styles: [`
+    .initial-loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #f8faff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .loader-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .loader-icon {
+      font-size: 64px;
+      height: 64px;
+      width: 64px;
+      color: #3f51b5;
+      margin-bottom: 8px;
+    }
+    .loader-text {
+      font-size: 24px;
+      font-weight: 500;
+      color: #1a237e;
+      letter-spacing: 1px;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(63, 81, 181, 0.1);
+      border-radius: 50%;
+      border-top-color: #3f51b5;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
     .spacer {
       flex: 1 1 auto;
     }
@@ -430,6 +480,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private statusCheckSubscription?: Subscription;
   private authSubscription?: Subscription;
   currentUser: CurrentUser | null = null;
+  isInitialized = false;
   notifications: any[] = [];
   unreadCount: number = 0;
   private notificationCheckInterval?: Subscription;
@@ -443,6 +494,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.currentUser = this.auth.getCurrentUser();
+
+    // Subscribe to initialization status
+    this.auth.isInitialized$.subscribe(initialized => {
+      this.isInitialized = initialized;
+    });
 
     // Подписываемся на изменения текущего пользователя
     this.authSubscription = this.auth.currentUser$.subscribe(user => {
