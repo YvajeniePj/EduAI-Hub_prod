@@ -27,7 +27,7 @@ export class AuthService {
     map(user => {
       if (!user) return null;
       const simRole = this.simulationRoleSubject.value;
-      if (simRole && (user.is_hidden_admin || user.name === '508982')) {
+      if (simRole && user.is_hidden_admin) {
         return { ...user, role: simRole };
       }
       return user;
@@ -199,7 +199,7 @@ export class AuthService {
 
   toggleSimulationRole() {
     const current = this.currentUserSubject.value;
-    if (!current || (!current.is_hidden_admin && current.name !== '508982')) return;
+    if (!current || !current.is_hidden_admin) return;
 
     const currentSim = this.simulationRoleSubject.value;
     const nextSim = currentSim === 'student' ? 'admin' : 'student';

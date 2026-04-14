@@ -57,7 +57,7 @@ import { HttpEventType } from '@angular/common/http';
               
               <!-- SuperAdmin Toggle Badge -->
               <span class="role-badge super-admin-badge clickable" 
-                    *ngIf="user.is_hidden_admin || user.name === '508982'" 
+                    *ngIf="user?.is_hidden_admin" 
                     (click)="toggleRole()"
                     matTooltip="Нажмите, чтобы переключить режим отображения (Админ/Студент)">
                 Администратор
@@ -66,7 +66,7 @@ import { HttpEventType } from '@angular/common/http';
               <!-- Regular Role Badge (hidden for SuperAdmin to avoid confusion) -->
               <span class="role-badge" 
                     [class.teacher]="user.role === 'teacher' || user.role === 'admin'"
-                    *ngIf="!(user.is_hidden_admin || user.name === '508982')">
+                    *ngIf="!user?.is_hidden_admin">
                 {{ user.role === 'admin' ? 'Администратор' : (user.role === 'teacher' ? 'Преподаватель' : 'Студент') }}
               </span>
 
@@ -76,7 +76,7 @@ import { HttpEventType } from '@angular/common/http';
             </div>
 
             <!-- Simulation Indicator -->
-            <div class="simulation-hint" *ngIf="(user.is_hidden_admin || user.name === '508982') && user.role === 'student'">
+            <div class="simulation-hint" *ngIf="user?.is_hidden_admin && user.role === 'student'">
               <mat-icon>visibility</mat-icon>
               <span>Включен режим просмотра от лица студента</span>
             </div>
@@ -381,14 +381,17 @@ import { HttpEventType } from '@angular/common/http';
     }
     
     .name-edit-wrapper h1 {
-      display: grid;
-      grid-template-columns: 1fr 300px;
-      gap: 32px;
+      margin: 0;
     }
     .profile-grid {
-      display: grid;
-      grid-template-columns: 1fr 300px;
+      display: flex;
       gap: 32px;
+    }
+    .main-column {
+      flex: 1;
+    }
+    .side-column {
+      width: 300px;
     }
     .section-header {
       display: flex;

