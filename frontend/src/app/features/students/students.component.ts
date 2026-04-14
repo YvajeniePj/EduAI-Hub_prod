@@ -239,8 +239,19 @@ import { AuthService } from '../../core/services/auth.service';
     .user-link:hover {
         color: #1a237e;
     }
+    .mat-column-name {
+        flex: 1;
+        padding-right: 16px;
+    }
+    .mat-column-groups {
+        flex: 3;
+        padding-right: 16px;
+    }
+    .mat-column-role {
+        flex: 0 0 220px;
+    }
     .role-select {
-        width: 150px;
+        width: 100%;
         font-size: 13px;
     }
     ::ng-deep .role-select .mat-mdc-form-field-infix {

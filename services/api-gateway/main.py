@@ -190,6 +190,9 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     internal_name = user_data["name"]
     if token_full_name and (internal_name.startswith("isu_") or not internal_name):
         internal_name = token_full_name
+        # Sync back to DB if name improved
+        if internal_name != user_data["name"]:
+            await proxy_request(SUBMISSION_SERVICE_URL, f"/users/{external_id}", "PUT", body={"name": internal_name})
 
     internal_user = {
         "user_id": str(user_data["id"]),
