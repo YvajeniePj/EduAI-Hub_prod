@@ -173,16 +173,13 @@ export class AuthService {
     this.idTokenSubject.next(null);
     this.currentUserSubject.next(null);
     
-    const postLogoutUrl = window.location.origin.replace(/\/$/, ""); // Ensure no trailing slash
+    const postLogoutUrl = window.location.origin; // Try standard origin
     
-    // Some Keycloak versions use redirect_uri, some post_logout_redirect_uri.
-    // We pass both and id_token_hint for maximum compatibility.
+    // We only pass the spec-standard parameters: id_token_hint and post_logout_redirect_uri.
+    // Removing extraQueryParams to avoid conflicting with strict redirect policies.
     this.userManager.signoutRedirect({
       id_token_hint: this.idTokenSubject.value || undefined,
-      post_logout_redirect_uri: postLogoutUrl,
-      extraQueryParams: {
-        'redirect_uri': postLogoutUrl // Fallback for older Keycloak/OIDC configs
-      }
+      post_logout_redirect_uri: postLogoutUrl
     });
   }
 
