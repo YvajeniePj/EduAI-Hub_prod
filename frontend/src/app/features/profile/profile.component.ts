@@ -555,20 +555,14 @@ export class ProfileComponent implements OnInit {
   refreshUser(): void {
     const currentUser = this.auth.getCurrentUser();
     if (currentUser) {
-      this.api.getUserById(currentUser.id).subscribe({
+      // Use central sync instead of manual assignment to avoid conflicts with role simulation
+      this.auth.syncUserWithBackend().subscribe({
         next: (userData) => {
-          this.user = {
-            id: userData.id,
-            name: currentUser.name || userData.name,
-            avatar_url: currentUser.avatar_url || userData.avatar_url,
-            role: userData.role,
-            is_hidden_admin: userData.is_hidden_admin
-          };
-          // Update local storage if different
+          // Update local storage if different (name/avatar)
           const stored = localStorage.getItem('eduai-current-user');
           if (stored) {
             const storedUser = JSON.parse(stored);
-            if (storedUser.name !== userData.name || storedUser.avatar_url !== userData.avatar_url) {
+            if (storedUser.name !== userData.username || storedUser.avatar_url !== userData.avatar_url) {
               this.refreshAuthUser();
             }
           }
@@ -596,14 +590,12 @@ export class ProfileComponent implements OnInit {
 
     this.api.updateUser(this.user.id, { name: this.newName.trim() }).subscribe({
       next: (updatedUser) => {
-        this.user = {
-          ...this.user!,
-          name: updatedUser.name,
-          is_hidden_admin: this.user?.is_hidden_admin || updatedUser.is_hidden_admin
-        };
         this.isEditingName = false;
         this.snackBar.open('Имя успешно обновлено', 'OK', { duration: 3000 });
-        this.refreshAuthUser();
+        // Sync global state to reflect change across app
+        this.auth.syncUserWithBackend().subscribe(() => {
+          this.refreshAuthUser();
+        });
       },
       error: (err) => {
         this.snackBar.open('Ошибка при обновлении имени: ' + (err.error?.detail || 'Неизвестная ошибка'), 'OK', { duration: 5000 });
@@ -620,12 +612,13 @@ export class ProfileComponent implements OnInit {
       this.uploading = true;
       this.uploadProgress = 0;
       this.api.uploadAvatar(this.user!.id, formData).subscribe({
-        next: (response) => {
+        next: (response: any) => {
           this.uploading = false;
-          if (this.user) {
-            this.user.avatar_url = response.avatar_url;
-          }
-          this.refreshAuthUser();
+          this.snackBar.open('Аватар успешно обновлен', 'OK', { duration: 3000 });
+          // Sync global state to reflect change
+          this.auth.syncUserWithBackend().subscribe(() => {
+            this.refreshAuthUser();
+          });
         },
         error: (err) => {
           this.uploading = false;

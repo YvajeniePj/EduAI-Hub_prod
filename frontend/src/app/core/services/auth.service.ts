@@ -1,4 +1,6 @@
 import { Injectable } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
 import { HttpClient, HttpHeaders, HttpBackend } from '@angular/common/http';
 import { Observable, BehaviorSubject, from, of, throwError } from 'rxjs';
 import { map, catchError, switchMap, tap } from 'rxjs/operators';
@@ -43,7 +45,9 @@ export class AuthService {
 
   constructor(
     private http: HttpClient,
-    private handler: HttpBackend
+    private handler: HttpBackend,
+    private router: Router,
+    private snackBar: MatSnackBar
   ) {
     this.httpWithoutInterceptor = new HttpClient(handler);
     
@@ -202,10 +206,17 @@ export class AuthService {
     if (!current || !current.is_hidden_admin) return;
 
     const currentSim = this.simulationRoleSubject.value;
-    const nextSim = currentSim === 'student' ? 'admin' : 'student';
     
-    this.simulationRoleSubject.next(nextSim);
-    localStorage.setItem('simulationRole', nextSim);
+    // Toggle
+    if (currentSim) {
+      this.simulationRoleSubject.next(null);
+      localStorage.removeItem('simulationRole');
+      this.snackBar.open('Режим администратора восстановлен', 'OK', { duration: 3000 });
+    } else {
+      this.simulationRoleSubject.next('student');
+      localStorage.setItem('simulationRole', 'student');
+      this.snackBar.open('Режим студента включен', 'OK', { duration: 3000 });
+    }
   }
 
   getSimulationRole(): string | null {
