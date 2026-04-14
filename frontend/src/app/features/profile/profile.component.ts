@@ -630,6 +630,14 @@ export class ProfileComponent implements OnInit {
     }
   }
 
+  toggleRole() {
+    this.auth.toggleSimulationRole();
+  }
+
+  get isSimulationActive(): boolean {
+    return this.auth.getSimulationRole() === 'student';
+  }
+
   private refreshAuthUser(): void {
     if (this.user) {
       localStorage.setItem('eduai-current-user', JSON.stringify(this.user));
