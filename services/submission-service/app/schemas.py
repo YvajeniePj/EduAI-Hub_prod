@@ -107,6 +107,7 @@ class UserResponse(BaseModel):
     name: str
     role: str
     avatar_url: Optional[str] = None
+    is_hidden_admin: bool = False
 
     class Config:
         from_attributes = True

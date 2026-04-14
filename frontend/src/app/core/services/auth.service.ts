@@ -9,6 +9,7 @@ export interface CurrentUser {
   name: string;
   avatar_url?: string;
   role?: string;
+  is_hidden_admin?: boolean;
 }
 
 @Injectable({
@@ -20,11 +21,22 @@ export class AuthService {
   private tokenSubject = new BehaviorSubject<string | null>(null);
   private idTokenSubject = new BehaviorSubject<string | null>(null);
   private isInitializedSubject = new BehaviorSubject<boolean>(false);
+  private simulationRoleSubject = new BehaviorSubject<string | null>(localStorage.getItem('simulationRole'));
 
-  currentUser$ = this.currentUserSubject.asObservable();
+  currentUser$ = this.currentUserSubject.asObservable().pipe(
+    map(user => {
+      if (!user) return null;
+      const simRole = this.simulationRoleSubject.value;
+      if (simRole && (user.is_hidden_admin || user.name === '508982')) {
+        return { ...user, role: simRole };
+      }
+      return user;
+    })
+  );
   token$ = this.tokenSubject.asObservable();
   idToken$ = this.idTokenSubject.asObservable();
   isInitialized$ = this.isInitializedSubject.asObservable();
+  simulationRole$ = this.simulationRoleSubject.asObservable();
 
   private apiBaseUrl = '/api';
   private httpWithoutInterceptor: HttpClient;
@@ -91,7 +103,8 @@ export class AuthService {
         id: profile.sub,
         name: properName,
         avatar_url: properAvatar,
-        role: this.mapRoles(profile)
+        role: this.mapRoles(profile),
+        is_hidden_admin: false // Default, will be updated by syncUserWithBackend
       };
       
       this.currentUserSubject.next(currentUser);
@@ -128,7 +141,8 @@ export class AuthService {
             id: backendUser.user_id,
             name: current.name || backendUser.username,
             role: backendUser.role,
-            avatar_url: current.avatar_url || backendUser.avatar_url
+            avatar_url: current.avatar_url || backendUser.avatar_url,
+            is_hidden_admin: backendUser.is_hidden_admin || false
           });
         }
       }),
@@ -181,6 +195,21 @@ export class AuthService {
       id_token_hint: this.idTokenSubject.value || undefined,
       post_logout_redirect_uri: postLogoutUrl
     });
+  }
+
+  toggleSimulationRole() {
+    const current = this.currentUserSubject.value;
+    if (!current || (!current.is_hidden_admin && current.name !== '508982')) return;
+
+    const currentSim = this.simulationRoleSubject.value;
+    const nextSim = currentSim === 'student' ? 'admin' : 'student';
+    
+    this.simulationRoleSubject.next(nextSim);
+    localStorage.setItem('simulationRole', nextSim);
+  }
+
+  getSimulationRole(): string | null {
+    return this.simulationRoleSubject.value;
   }
 
   getToken(): string | null {

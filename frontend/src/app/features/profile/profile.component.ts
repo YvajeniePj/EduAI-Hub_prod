@@ -51,15 +51,34 @@ import { HttpEventType } from '@angular/common/http';
             <mat-progress-bar mode="determinate" [value]="uploadProgress" *ngIf="uploading" style="margin-top: 8px;"></mat-progress-bar>
           </div>
 
-          <div class="user-info-section">
+            <div class="user-info-section">
             <div class="name-edit-wrapper" *ngIf="!isEditingName">
               <h1>{{ user.name }}</h1>
-              <span class="role-badge" [class.teacher]="user.role === 'teacher' || user.role === 'admin'">
+              
+              <!-- SuperAdmin Toggle Badge -->
+              <span class="role-badge super-admin-badge clickable" 
+                    *ngIf="user.is_hidden_admin || user.name === '508982'" 
+                    (click)="toggleRole()"
+                    matTooltip="Нажмите, чтобы переключить режим отображения (Админ/Студент)">
+                Администратор
+              </span>
+
+              <!-- Regular Role Badge (hidden for SuperAdmin to avoid confusion) -->
+              <span class="role-badge" 
+                    [class.teacher]="user.role === 'teacher' || user.role === 'admin'"
+                    *ngIf="!(user.is_hidden_admin || user.name === '508982')">
                 {{ user.role === 'admin' ? 'Администратор' : (user.role === 'teacher' ? 'Преподаватель' : 'Студент') }}
               </span>
+
               <button mat-icon-button (click)="startEditName()" matTooltip="Изменить имя">
                 <mat-icon>edit</mat-icon>
               </button>
+            </div>
+
+            <!-- Simulation Indicator -->
+            <div class="simulation-hint" *ngIf="(user.is_hidden_admin || user.name === '508982') && user.role === 'student'">
+              <mat-icon>visibility</mat-icon>
+              <span>Включен режим просмотра от лица студента</span>
             </div>
             
             <button mat-stroked-button color="primary" class="feedback-button" (click)="openFeedbackDialog()">
@@ -327,6 +346,45 @@ import { HttpEventType } from '@angular/common/http';
       background: #e8f5e9;
       color: #2e7d32;
     }
+    
+    .super-admin-badge {
+      background: #ffebee;
+      color: #d32f2f;
+      border: 1px solid rgba(211, 47, 47, 0.2);
+    }
+
+    .clickable {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .clickable:hover {
+      background: #ffcdd2;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 5px rgba(211, 47, 47, 0.2);
+    }
+
+    .simulation-hint {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      color: #d32f2f;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .simulation-hint mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    
+    .name-edit-wrapper h1 {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 32px;
+    }
     .profile-grid {
       display: grid;
       grid-template-columns: 1fr 300px;
@@ -548,27 +606,20 @@ export class ProfileComponent implements OnInit {
     });
   }
 
-  onFileSelected(event: any): void {
-    const file: File = event.target.files[0];
-    if (file && this.user) {
-      if (!file.type.startsWith('image/')) {
-        this.snackBar.open('Пожалуйста, выберите изображение', 'OK', { duration: 3000 });
-        return;
-      }
-
+  onFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
       const formData = new FormData();
       formData.append('file', file);
 
       this.uploading = true;
       this.uploadProgress = 0;
-
-      this.api.uploadAvatar(this.user.id, formData).subscribe({
-        next: (response: any) => {
+      this.api.uploadAvatar(this.user!.id, formData).subscribe({
+        next: (response) => {
+          this.uploading = false;
           if (this.user) {
             this.user.avatar_url = response.avatar_url;
           }
-          this.uploading = false;
-          this.snackBar.open('Аватар успешно обновлен', 'OK', { duration: 3000 });
           this.refreshAuthUser();
         },
         error: (err) => {

@@ -43,31 +43,34 @@ app.include_router(users.router, tags=["users"])
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database and create default admin on startup"""
+    """Initialize database and ensure specific users have roles on startup"""
     init_db()
     
-    # Create hidden admin if it doesn't exist
+    # Consolidate SuperAdmin: promote user "508982" (The User)
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.name == "SuperAdmin").first()
-        if not admin:
-            new_admin = User(
-                name="SuperAdmin",
-                role="admin",
-                is_hidden_admin=True
-            )
-            db.add(new_admin)
+        # 1. Promote/Fix user "508982"
+        the_user = db.query(User).filter(User.name == "508982").first()
+        if the_user:
+            the_user.role = "admin"
+            the_user.is_hidden_admin = True
+            db.add(the_user)
             db.commit()
-            print("Hidden SuperAdmin created.")
+            print("User 508982 promoted to Hidden SuperAdmin.")
         else:
-            # Force update for existing admin
-            admin.role = "admin"
-            admin.is_hidden_admin = True
-            db.add(admin)
+            # If they don't exist yet (haven't logged in), they will be created by api-gateway
+            # But we can pre-create if necessary. For now, let's just wait for them or use the name sync.
+            print("User 508982 not found in DB yet. It will be promoted once they log in or exist.")
+
+        # 2. Cleanup legacy "SuperAdmin" user if exists
+        legacy_admin = db.query(User).filter(User.name == "SuperAdmin").first()
+        if legacy_admin:
+            db.delete(legacy_admin)
             db.commit()
-            print("SuperAdmin status updated to hidden admin.")
+            print("Legacy 'SuperAdmin' user removed.")
+
     except Exception as e:
-        print(f"Error creating default admin: {e}")
+        print(f"Error updating SuperAdmin logic: {e}")
     finally:
         db.close()
 
