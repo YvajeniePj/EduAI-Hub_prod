@@ -452,10 +452,6 @@ export class ApiService {
     return this.http.get<any[]>(`${API_URL}/users`, { params });
   }
 
-  updateUser(userId: string, data: any): Observable<any> {
-    return this.http.put<any>(`${API_URL}/users/${userId}`, data);
-  }
-
   // Group Requests
   createGroupRequest(groupId: string, userName: string): Observable<any> {
     return this.http.post<any>(`${API_URL}/groups/${groupId}/requests`, { user_name: userName });

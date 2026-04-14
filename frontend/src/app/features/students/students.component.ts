@@ -258,6 +258,7 @@ export class StudentsComponent implements OnInit {
   students: any[] = [];
   subjects: any[] = [];
   selectedSubjectId: string | null = null;
+  searchQuery: string = '';
   loading = false;
   displayedColumns: string[] = ['name', 'groups', 'role'];
   currentUser: any = null;
