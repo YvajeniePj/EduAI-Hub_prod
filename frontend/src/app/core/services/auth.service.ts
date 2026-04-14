@@ -72,6 +72,7 @@ export class AuthService {
       // In OIDC, profile info is in user.profile
       const profile = user.profile;
       console.log('Token received, user profile:', profile.preferred_username);
+      console.log('=== FULL KEYCLOAK PROFILE ===', JSON.stringify(profile, null, 2));
       const currentUser: CurrentUser = {
         id: profile.sub,
         name: (profile.preferred_username as string) || (profile.name as string),
