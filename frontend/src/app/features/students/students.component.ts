@@ -112,9 +112,6 @@ import { AuthService } from '../../core/services/auth.service';
                       <mat-option value="instructor">
                         <mat-icon>school</mat-icon> Преподаватель
                       </mat-option>
-                      <mat-option value="admin" *ngIf="currentUser?.role === 'admin'">
-                        <mat-icon>admin_panel_settings</mat-icon> Администратор
-                      </mat-option>
                     </mat-select>
                   </div>
                   <div *ngIf="!canManageRoles()" class="role-display-badge" [ngClass]="student.role">
@@ -259,7 +256,7 @@ import { AuthService } from '../../core/services/auth.service';
         padding-right: 16px;
     }
     .mat-column-role {
-        flex: 0 0 220px;
+        flex: 0 0 190px;
     }
 
     .role-badge-picker, .role-display-badge {
@@ -276,7 +273,7 @@ import { AuthService } from '../../core/services/auth.service';
     .role-badge-picker {
         cursor: pointer;
         width: fit-content;
-        min-width: 165px;
+        min-width: 160px;
     }
 
     .role-badge-picker:hover {
@@ -333,6 +330,11 @@ import { AuthService } from '../../core/services/auth.service';
     }
     ::ng-deep .role-badge-picker .mdc-line-ripple {
         display: none !important;
+    }
+    ::ng-deep .role-select-panel .mat-mdc-option .mdc-list-item__primary-text {
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
     }
   `]
 })

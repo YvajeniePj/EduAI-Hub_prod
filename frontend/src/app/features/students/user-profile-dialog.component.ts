@@ -12,7 +12,8 @@ import { MatChipsModule } from '@angular/material/chips';
     template: `
     <div class="profile-dialog-header">
       <div class="avatar-container">
-        <img [src]="data.user.avatar_url || 'assets/default-avatar.png'" alt="avatar" class="avatar">
+        <img *ngIf="data.user.avatar_url" [src]="data.user.avatar_url" alt="avatar" class="avatar" (error)="data.user.avatar_url = undefined">
+        <mat-icon *ngIf="!data.user.avatar_url" style="font-size: 64px; width: 64px; height: 64px; color: #999;">person</mat-icon>
       </div>
       <h2>{{ data.user.name }}</h2>
       <span class="role-badge" [class.teacher]="data.user.role === 'teacher'">
