@@ -141,6 +141,10 @@ export class ApiService {
     return this.http.delete<any>(`${API_URL}/submissions/${submissionId}/files/${fileId}`);
   }
 
+  deleteSubmission(id: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/submissions/${id}`);
+  }
+
   // Materials
   getMaterials(subjectId?: string): Observable<any[]> {
     let params = new HttpParams();
@@ -238,6 +242,10 @@ export class ApiService {
       params = params.set('submission_id', submissionId);
     }
     return this.http.get<any[]>(`${API_URL}/reviews`, { params });
+  }
+
+  deleteReview(id: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/reviews/${id}`);
   }
 
   // Gamification

@@ -151,3 +151,15 @@ async def create_review(review: ReviewCreate, db: Session = Depends(get_db)):
     
     return db_review
 
+
+@router.delete("/{review_id}", status_code=200)
+async def delete_review(review_id: UUID, db: Session = Depends(get_db)):
+    """Delete a review by ID"""
+    review = db.query(Review).filter(Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+        
+    db.delete(review)
+    db.commit()
+    return {"message": "Review deleted successfully"}
+

@@ -786,6 +786,14 @@ async def delete_submission_file(submission_id: str, file_id: str):
         raise HTTPException(status_code=status, detail=error or "Failed to delete submission file")
     return data
 
+
+@app.delete("/submissions/{submission_id}")
+async def delete_submission(submission_id: str, current_user: dict = Depends(get_current_teacher)):
+    data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, f"/submissions/{submission_id}", "DELETE")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to delete submission")
+    return data
+
 # Users (handled in submission-service)
 @app.get("/users")
 async def get_users():
@@ -1160,6 +1168,14 @@ async def create_review(request: Request):
     data, status, error = await proxy_request(PEER_REVIEW_SERVICE_URL, "/reviews", "POST", body)
     if status not in [200, 201]:
         raise HTTPException(status_code=status, detail=error or "Failed to create review")
+    return data
+
+
+@app.delete("/reviews/{review_id}")
+async def delete_review(review_id: str, current_user: dict = Depends(get_current_teacher)):
+    data, status, error = await proxy_request(PEER_REVIEW_SERVICE_URL, f"/reviews/{review_id}", "DELETE")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to delete review")
     return data
 
 

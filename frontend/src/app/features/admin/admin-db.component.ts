@@ -286,8 +286,16 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
                     {{ s.finished_at ? (s.finished_at | russianDate:'datetime') : '—' }}
                   </td>
                 </ng-container>
-                <tr mat-header-row *matHeaderRowDef="['id', 'user', 'test_id', 'score', 'points_awarded', 'is_finished', 'started_at', 'finished_at']"></tr>
-                <tr mat-row *matRowDef="let row; columns: ['id', 'user', 'test_id', 'score', 'points_awarded', 'is_finished', 'started_at', 'finished_at'];"></tr>
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef>Действия</th>
+                  <td mat-cell *matCellDef="let s" class="actions-cell">
+                    <button mat-icon-button color="warn" (click)="deleteSubmission(s.id)" matTooltip="Удалить сдачу">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
+                <tr mat-header-row *matHeaderRowDef="['id', 'user', 'test_id', 'score', 'points_awarded', 'is_finished', 'started_at', 'finished_at', 'actions']"></tr>
+                <tr mat-row *matRowDef="let row; columns: ['id', 'user', 'test_id', 'score', 'points_awarded', 'is_finished', 'started_at', 'finished_at', 'actions'];"></tr>
               </table>
             </mat-card>
           </div>
@@ -329,8 +337,16 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
                   <th mat-header-cell *matHeaderCellDef>Создан</th>
                   <td mat-cell *matCellDef="let r" class="date-cell">{{ r.created_at | russianDate:'datetime' }}</td>
                 </ng-container>
-                <tr mat-header-row *matHeaderRowDef="['id', 'submission_id', 'reviewer', 'avg_score', 'scores', 'created_at']"></tr>
-                <tr mat-row *matRowDef="let row; columns: ['id', 'submission_id', 'reviewer', 'avg_score', 'scores', 'created_at'];"></tr>
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef>Действия</th>
+                  <td mat-cell *matCellDef="let r" class="actions-cell">
+                    <button mat-icon-button color="warn" (click)="deleteReview(r.id)" matTooltip="Удалить отзыв">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
+                <tr mat-header-row *matHeaderRowDef="['id', 'submission_id', 'reviewer', 'avg_score', 'scores', 'created_at', 'actions']"></tr>
+                <tr mat-row *matRowDef="let row; columns: ['id', 'submission_id', 'reviewer', 'avg_score', 'scores', 'created_at', 'actions'];"></tr>
               </table>
             </mat-card>
           </div>
@@ -702,6 +718,28 @@ export class AdminDbComponent implements OnInit {
           this.videos = this.videos.filter(v => v.id !== id);
         },
         error: (err) => alert(err.error?.detail || 'Ошибка при удалении видео')
+      });
+    }
+  }
+
+  deleteSubmission(id: string) {
+    if (confirm('Удалить сдачу теста? Все связанные данные и файлы будут удалены.')) {
+      this.api.deleteSubmission(id).subscribe({
+        next: () => {
+          this.submissions = this.submissions.filter(s => s.id !== id);
+        },
+        error: (err) => alert(err.error?.detail || 'Ошибка при удалении сдачи')
+      });
+    }
+  }
+
+  deleteReview(id: string) {
+    if (confirm('Удалить отзыв?')) {
+      this.api.deleteReview(id).subscribe({
+        next: () => {
+          this.reviews = this.reviews.filter(r => r.id !== id);
+        },
+        error: (err) => alert(err.error?.detail || 'Ошибка при удалении отзыва')
       });
     }
   }

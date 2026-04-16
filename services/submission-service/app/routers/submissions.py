@@ -586,6 +586,26 @@ async def get_submission_results(
     )
 
 
+@router.delete("/{submission_id}", status_code=200)
+async def delete_submission(submission_id: UUID, db: Session = Depends(get_db)):
+    """Delete a submission and its associated files"""
+    submission = db.query(Submission).filter(Submission.id == submission_id).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+        
+    # Delete files from disk
+    sub_dir = os.path.join(STORAGE_PATH, "submissions", str(submission_id))
+    if os.path.exists(sub_dir):
+        try:
+            shutil.rmtree(sub_dir)
+        except Exception as e:
+            print(f"Warning: Failed to delete directory {sub_dir}: {e}")
+            
+    db.delete(submission)
+    db.commit()
+    return {"message": "Submission deleted successfully"}
+
+
 @router.delete("/by-test/{test_id}")
 async def delete_submissions_by_test(test_id: UUID, db: Session = Depends(get_db)):
     """Delete all submissions associated with a test (cascading deletion)"""
