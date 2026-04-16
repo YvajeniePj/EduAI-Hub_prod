@@ -83,6 +83,7 @@ services:
     image: yvajeniepj12/eduai-livekit:latest
     container_name: eduai-livekit
     ports:
+      - "7881:7881"
       - "50000-50100:50000-50100/udp"
     networks:
       - eduai-network
