@@ -87,14 +87,15 @@ import { AuthService } from '../../core/services/auth.service';
               <mat-card-subtitle *ngIf="video.note">{{ video.note }}</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <div *ngIf="video.video_info?.type === 'youtube' && video.video_info?.embed_url" class="video-embed">
+              <div *ngIf="video.video_info?.embed_url" class="video-embed">
                 <iframe 
                   [src]="getSafeUrl(video.video_info.embed_url)" 
                   frameborder="0" 
-                  allowfullscreen>
+                  allowfullscreen
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
                 </iframe>
               </div>
-              <div *ngIf="video.video_info?.type !== 'youtube'" class="video-link">
+              <div *ngIf="!video.video_info?.embed_url" class="video-link">
                 <a [href]="video.url" target="_blank" class="external-link">
                   <mat-icon>open_in_new</mat-icon>
                   {{ video.url }}

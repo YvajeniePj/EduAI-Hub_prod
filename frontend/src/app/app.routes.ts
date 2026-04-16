@@ -5,6 +5,7 @@ import { TestDetailComponent } from './features/tests/test-detail.component';
 import { TestCreateComponent } from './features/tests/test-create.component';
 import { TestTakeComponent } from './features/tests/test-take.component';
 import { SubmissionsComponent } from './features/submissions/submissions.component';
+import { SubmissionsManagementComponent } from './features/submissions/submissions-management.component';
 import { SubmissionResultsComponent } from './features/submissions/submission-results.component';
 import { MaterialsComponent } from './features/materials/materials.component';
 import { LoginComponent } from './features/auth/login.component';
@@ -42,6 +43,7 @@ export const routes: Routes = [
   { path: 'tests/:id', component: TestDetailComponent, canActivate: [authGuard] },
   { path: 'tests/:id/take', component: TestTakeComponent, canActivate: [authGuard] },
   { path: 'submissions', component: SubmissionsComponent, canActivate: [authGuard] },
+  { path: 'submissions-management', component: SubmissionsManagementComponent, canActivate: [authGuard] },
   { path: 'submissions/:id', component: SubmissionResultsComponent, canActivate: [authGuard] },
   { path: 'submissions/:id/results', component: SubmissionResultsComponent, canActivate: [authGuard] },
   { path: 'materials', component: MaterialsComponent, canActivate: [authGuard] },

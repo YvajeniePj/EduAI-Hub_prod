@@ -76,11 +76,12 @@ async def get_access_token() -> Optional[str]:
                     return None
             else:
                 error_text = response.text
+                error_status = response.status_code
                 try:
                     error_json = response.json()
-                    logger.error(f"GigaChat OAuth error: {response.status_code} - {error_json}")
+                    logger.error(f"GigaChat OAuth error {error_status}: {error_json}. RqUID: {headers['RqUID']}")
                 except:
-                    logger.error(f"GigaChat OAuth error: {response.status_code} - {error_text}")
+                    logger.error(f"GigaChat OAuth error {error_status}: {error_text}. RqUID: {headers['RqUID']}")
                 return None
     except Exception as e:
         logger.error(f"GigaChat OAuth request error: {e}")
@@ -128,6 +129,7 @@ async def chat_completion(
                     global _access_token, _token_expires_at
                     _access_token = None
                     _token_expires_at = None
+                    logger.warning("GigaChat 401 Unauthorized - clearing token cache")
                 return None
     except Exception as e:
         logger.error(f"GigaChat request error: {e}")

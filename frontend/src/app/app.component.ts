@@ -116,6 +116,10 @@ import { interval, Subscription } from 'rxjs';
             <mat-icon matListItemIcon>visibility</mat-icon>
             <span matListItemTitle>Мониторинг</span>
           </a>
+          <a mat-list-item routerLink="/submissions-management" (click)="sidenav.close()" routerLinkActive="active-link">
+            <mat-icon matListItemIcon>assignment_turned_in</mat-icon>
+            <span matListItemTitle>Проверка работ</span>
+          </a>
           <a mat-list-item routerLink="/feedback-results" (click)="sidenav.close()" routerLinkActive="active-link">
             <mat-icon matListItemIcon>reviews</mat-icon>
             <span matListItemTitle>Отзывы</span>

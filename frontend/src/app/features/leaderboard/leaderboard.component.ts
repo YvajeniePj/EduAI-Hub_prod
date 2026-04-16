@@ -103,7 +103,9 @@ export class LeaderboardComponent implements OnInit {
   loadLeaderboard() {
     this.apiService.getLeaderboard().subscribe({
       next: (leaderboard) => {
-        this.leaderboard = leaderboard;
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        this.leaderboard = leaderboard.filter((item: any) => item.user !== currentUser.name);
+        // Recalculate ranks if needed, but usually leaderboard comes ranked
       },
       error: (err) => {
         console.error('Error loading leaderboard:', err);

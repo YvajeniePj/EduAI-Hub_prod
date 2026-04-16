@@ -46,6 +46,27 @@ async def get_test_from_service(test_id: UUID) -> dict:
         return response.json()
 
 
+NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-service:8010")
+
+async def create_notification(user_name: Optional[str], title: str, message: str, type: str = "info", related_type: str = None, related_id: str = None):
+    """Send a notification to notification service"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                f"{NOTIFICATION_SERVICE_URL}/notifications",
+                json={
+                    "user_name": user_name,
+                    "title": title,
+                    "message": message,
+                    "type": type,
+                    "related_type": related_type,
+                    "related_id": related_id
+                }
+            )
+    except Exception as e:
+        print(f"Failed to send notification: {e}")
+
+
 async def award_points(user: str, points: int):
     """Award points to user via gamification service"""
     try:
@@ -471,6 +492,18 @@ async def finish_submission(
     
     db.commit()
     db.refresh(submission)
+
+    # Notify teachers about new submission if it's not auto-approved multiple choice
+    if test_type.lower() != "multiple_choice":
+        await create_notification(
+            user_name=None, # Broadcast to all teachers/admins
+            title="Новая работа на проверку",
+            message=f"Студент {submission.user} сдал работу по тесту '{test_data.get('title')}'",
+            type="info",
+            related_type="submission",
+            related_id=str(submission.id)
+        )
+
     return submission
 
 
@@ -503,6 +536,18 @@ async def update_submission_status(
     
     db.commit()
     db.refresh(submission)
+
+    # Notify student about status update
+    status_label = "одобрена" if submission.status == "approved" else "отклонена"
+    await create_notification(
+        user_name=submission.user,
+        title=f"Работа {status_label}",
+        message=f"Ваша работа по тесту была {status_label} преподавателем.",
+        type="success" if submission.status == "approved" else "warning",
+        related_type="submission",
+        related_id=str(submission.id)
+    )
+
     return submission
 
 

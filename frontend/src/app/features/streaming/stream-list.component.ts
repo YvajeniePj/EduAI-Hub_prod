@@ -29,12 +29,8 @@ import { ApiService } from '../../core/services/api.service';
   ],
   template: `
     <div class="page-container">
-      <div class="header">
-        <h1>Прямые эфиры</h1>
-        <button mat-raised-button color="primary" (click)="openStartStreamDialog()">
-          <mat-icon>add_circle</mat-icon>
-            Начать трансляцию
-        </button>
+      <div class="header-centered">
+        <h1>Онлайн уроки</h1>
       </div>
 
       <div class="content">
@@ -76,6 +72,11 @@ import { ApiService } from '../../core/services/api.service';
         </div>
       </div>
     </div>
+
+    <!-- Start Stream Button as FAB for Teachers/Admins -->
+    <button mat-fab color="primary" class="fab-start-stream" (click)="openStartStreamDialog()" *ngIf="isTeacher" matTooltip="Начать новый урок">
+      <mat-icon>add</mat-icon>
+    </button>
   `,
   styles: [`
     .page-container {
@@ -84,11 +85,9 @@ import { ApiService } from '../../core/services/api.service';
       background: #f5f5f5;
     }
 
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 32px;
+    .header-centered {
+      text-align: center;
+      margin-bottom: 48px;
     }
 
     h1 {
@@ -190,8 +189,11 @@ import { ApiService } from '../../core/services/api.service';
       padding: 16px !important;
     }
 
-    button {
-      width: 100%;
+    .fab-start-stream {
+      position: fixed;
+      right: 32px;
+      bottom: 32px;
+      z-index: 1000;
     }
   `]
 })
@@ -200,11 +202,17 @@ export class StreamListComponent implements OnInit {
   subjects: any[] = [];
   loading = true;
 
+  isTeacher = false;
+
   constructor(
     private apiService: ApiService,
+    private auth: AuthService,
     private dialog: MatDialog,
     private router: Router
-  ) { }
+  ) {
+    const user = this.auth.getCurrentUser();
+    this.isTeacher = user?.role === 'teacher' || user?.role === 'admin';
+  }
 
   ngOnInit() {
     this.refresh();

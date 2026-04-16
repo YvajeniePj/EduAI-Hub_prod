@@ -101,7 +101,7 @@ import { AuthService } from '../../core/services/auth.service';
                 <th mat-header-cell *matHeaderCellDef>Роль</th>
                 <td mat-cell *matCellDef="let student">
                   <div *ngIf="canManageRoles()" class="role-badge-picker" [ngClass]="student.role">
-                    <mat-select [value]="student.role" (selectionChange)="changeRole(student, $event.value)" panelClass="role-select-panel">
+                    <mat-select [(ngModel)]="student.role" (selectionChange)="changeRole(student, $event.value)" panelClass="role-select-panel">
                       <mat-select-trigger>
                         <mat-icon class="role-icon">{{ getRoleIcon(student.role) }}</mat-icon>
                         <span class="role-label">{{ getRoleLabel(student.role) }}</span>

@@ -28,11 +28,33 @@ async def get_video_info(url: str) -> Optional[Dict]:
                     "embed_url": f"https://www.youtube.com/embed/{video_id}",
                     "title": video_title
                 }
+        elif "rutube.ru" in url:
+            # Extract video ID from Rutube URL
+            # Format: https://rutube.ru/video/XXXX/ or https://rutube.ru/play/embed/XXXX
+            video_id = None
+            if "/video/" in url:
+                video_id = url.split("/video/")[1].split("/")[0]
+            elif "/play/embed/" in url:
+                video_id = url.split("/play/embed/")[1].split("/")[0]
+            
+            if video_id:
+                return {
+                    "type": "rutube",
+                    "video_id": video_id,
+                    "embed_url": f"https://rutube.ru/play/embed/{video_id}/",
+                    "title": "Rutube видео"
+                }
         elif "vk.com" in url:
+            # VK videos often have format vk.com/video-OID_ID
+            video_id = None
+            if "video" in url:
+                video_id = url.split("video")[-1].split("?")[0].strip("-")
+            
             return {
                 "type": "vk",
+                "video_id": video_id,
                 "url": url,
-                "title": "VK видео"
+                "title": "VK видео " + (video_id if video_id else "")
             }
         else:
             return {

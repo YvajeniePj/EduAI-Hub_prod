@@ -40,151 +40,15 @@ import { MatBadgeModule } from '@angular/material/badge';
       <div class="tests-content">
         <div class="page-header">
           <h1 class="page-title">Тесты</h1>
-          <p class="page-subtitle">
-            <ng-container *ngIf="isTeacher">Управление сдачами студентов</ng-container>
-          </p>
+          <p class="page-subtitle">Доступные учебные тесты и задания</p>
         </div>
-      
-      <!-- Teacher View: Submissions & Management -->
-      <div *ngIf="isTeacher" class="teacher-dashboard">
-        <div class="dashboard-controls">
-          <mat-button-toggle-group [(ngModel)]="viewMode" color="primary">
-            <mat-button-toggle value="submissions">
-              <mat-icon>assessment</mat-icon> Сдачи
-              <span class="badge" *ngIf="getPendingCount() > 0">{{ getPendingCount() }}</span>
-            </mat-button-toggle>
-            <mat-button-toggle value="management">
-              <mat-icon>settings</mat-icon> Управление тестами
-            </mat-button-toggle>
-          </mat-button-toggle-group>
 
-          <button mat-raised-button color="primary" (click)="createTest()" *ngIf="viewMode === 'management'">
+        <div class="controls-row" *ngIf="isTeacher">
+          <button mat-raised-button color="primary" (click)="createTest()">
             <mat-icon>add</mat-icon> Создать тест
           </button>
         </div>
 
-        <!-- Submissions Tab -->
-        <div *ngIf="viewMode === 'submissions'">
-          <div class="archive-toggle-container">
-            <mat-button-toggle-group [(ngModel)]="submissionFilter" (change)="applyFilters()" class="filter-toggle">
-              <mat-button-toggle value="pending">Ожидают проверки</mat-button-toggle>
-              <mat-button-toggle value="archive">Архив (Проверено)</mat-button-toggle>
-            </mat-button-toggle-group>
-          </div>
-
-          <!-- Filters -->
-          <div class="filters-panel">
-            <mat-form-field appearance="outline">
-              <mat-label>Курс</mat-label>
-              <mat-select [(ngModel)]="filter.subjectId" (selectionChange)="applyFilters()">
-                <mat-option [value]="undefined">Все курсы</mat-option>
-                <mat-option *ngFor="let s of subjects" [value]="s.id">{{ s.name }}</mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Тип</mat-label>
-              <mat-select [(ngModel)]="filter.type" (selectionChange)="applyFilters()">
-                <mat-option [value]="undefined">Любой тип</mat-option>
-                <mat-option value="multiple_choice">С вариантами ответов</mat-option>
-                <mat-option value="keyword_based">Развернутый ответ</mat-option>
-                <mat-option value="project">Проект</mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Имя студента</mat-label>
-              <input matInput [(ngModel)]="filter.studentName" (input)="applyFilters()" placeholder="Поиск...">
-              <mat-icon matSuffix>search</mat-icon>
-            </mat-form-field>
-          </div>
-
-          <div *ngIf="filteredSubmissions.length === 0" class="empty-state">
-            <mat-icon>inbox</mat-icon>
-            <p>Нет сдач, соответствующих фильтрам</p>
-          </div>
-
-          <div class="submissions-grid">
-            <mat-card *ngFor="let sub of filteredSubmissions" class="submission-card" [class]="sub.status">
-              <mat-card-header>
-                <div class="student-avatar" mat-card-avatar>
-                  {{ sub.user[0].toUpperCase() }}
-                </div>
-                <mat-card-title>{{ sub.user }}</mat-card-title>
-                <mat-card-subtitle>{{ getSubjectName(getTestSubjectId(sub.test_id)!) }}</mat-card-subtitle>
-              </mat-card-header>
-              <mat-card-content>
-                <div class="submission-details">
-                  <div class="detail-row">
-                    <mat-icon>quiz</mat-icon>
-                    <strong>{{ getTestTitle(sub.test_id) }}</strong>
-                  </div>
-                  <div class="detail-row">
-                    <mat-icon>event</mat-icon>
-                    <span>{{ sub.finished_at | russianDate:'datetime' }}</span>
-                  </div>
-                  <div class="version-badge" *ngIf="sub.version > 1">Версия {{ sub.version }}</div>
-                </div>
-                <div class="test-type-badge small" [ngClass]="getTestType(sub.test_id)">
-                  {{ getTestTypeLabel(getTestType(sub.test_id)) }}
-                </div>
-                
-                <div class="status-label" [class]="sub.status">
-                  <strong>Статус:</strong> {{ getStatusLabel(sub.status) }}
-                </div>
-              </mat-card-content>
-              <mat-card-actions class="card-actions">
-                <button mat-button color="primary" (click)="viewSubmission(sub.id)">
-                  <mat-icon>visibility</mat-icon> Проверить
-                </button>
-                <div class="quick-actions" *ngIf="sub.status === 'pending'">
-                  <button mat-icon-button color="primary" matTooltip="Одобрить" (click)="approveSubmission(sub.id)" *ngIf="getTestType(sub.test_id) !== 'project'">
-                    <mat-icon>check</mat-icon>
-                  </button>
-                  <button mat-icon-button color="warn" matTooltip="Отклонить" (click)="rejectSubmission(sub.id)">
-                    <mat-icon>close</mat-icon>
-                  </button>
-                </div>
-              </mat-card-actions>
-            </mat-card>
-          </div>
-        </div>
-
-        <!-- Management Tab -->
-        <div *ngIf="viewMode === 'management'" class="management-grid">
-          <mat-card *ngFor="let test of tests" class="test-management-card">
-            <mat-card-header>
-              <mat-card-title>{{ test.title }}</mat-card-title>
-              <mat-card-subtitle>{{ getSubjectName(test.subject_id) }}</mat-card-subtitle>
-              <div class="type-badge" [ngClass]="test.test_type">{{ getTestTypeLabel(test.test_type) }}</div>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="test-stats">
-                <div class="stat">
-                  <span class="stat-value">{{ test.questions?.length || 0 }}</span>
-                  <span class="stat-label">Вопросов</span>
-                </div>
-                <div class="stat">
-                  <span class="stat-value">{{ getSubmissionCount(test.id) }}</span>
-                  <span class="stat-label">Сдач</span>
-                </div>
-              </div>
-              <p class="test-description">{{ test.description || 'Нет описания' }}</p>
-            </mat-card-content>
-            <mat-card-actions class="management-actions">
-              <button mat-button color="primary" (click)="editTest(test.id)">
-                <mat-icon>edit</mat-icon> Редактировать
-              </button>
-              <button mat-button color="warn" (click)="deleteTest(test.id)">
-                <mat-icon>delete</mat-icon> Удалить
-              </button>
-            </mat-card-actions>
-          </mat-card>
-        </div>
-      </div>
-
-      <!-- Student View: List of Tests to Take -->
-      <div *ngIf="!isTeacher" class="student-dashboard">
         <div *ngIf="tests.length === 0" class="empty-state">
           <mat-icon>quiz</mat-icon>
           <p>Нет доступных тестов</p>
@@ -197,7 +61,7 @@ import { MatBadgeModule } from '@angular/material/badge';
                 {{ getTestTypeLabel(test.test_type) }}
               </div>
               <mat-card-title>{{ test.title }}</mat-card-title>
-              <mat-card-subtitle>{{ getSubjectName(test.subject_id) }}</mat-card-subtitle>
+              <mat-card-subtitle>Курс: {{ getSubjectName(test.subject_id) }}</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
               <p class="test-description">{{ test.description }}</p>
@@ -233,53 +97,63 @@ import { MatBadgeModule } from '@angular/material/badge';
                 </ng-container>
               </div>
             </mat-card-content>
-            <mat-card-actions class="test-actions" *ngIf="getSubmissionForTest(test.id) as sub; else noSub">
-              <!-- Case 1: Active Draft -->
-              <button 
-                *ngIf="sub.is_finished === 'false' || sub.is_finished === false"
-                mat-button 
-                [routerLink]="['/tests', test.id]" 
-                [queryParams]="{source: 'tests'}"
-                class="action-btn main-action">
-                <mat-icon>play_arrow</mat-icon>
-                Пройти тест
-              </button>
+            <mat-card-actions class="test-actions">
+              <!-- Actions for everyone -->
+              <ng-container *ngIf="getSubmissionForTest(test.id) as sub; else noSub">
+                <button 
+                  *ngIf="sub.is_finished === 'false' || sub.is_finished === false"
+                  mat-button 
+                  [routerLink]="['/tests', test.id]" 
+                  [queryParams]="{source: 'tests'}"
+                  [disabled]="isTestExpired(test)"
+                  class="action-btn main-action">
+                  <mat-icon>{{ isTestExpired(test) ? 'timer_off' : 'play_arrow' }}</mat-icon>
+                  {{ isTestExpired(test) ? 'Дедлайн прошел' : 'Пройти тест' }}
+                </button>
 
-              <!-- Case 2: Rejected (Needs Retake/Fix) -->
-              <button 
-                *ngIf="(sub.is_finished === 'true' || sub.is_finished === true) && sub.status === 'rejected'"
-                mat-button 
-                [routerLink]="['/tests', test.id]" 
-                [queryParams]="{source: 'tests'}"
-                class="action-btn main-action">
-                <mat-icon>refresh</mat-icon>
-                Исправить
-              </button>
+                <button 
+                  *ngIf="(sub.is_finished === 'true' || sub.is_finished === true) && sub.status === 'rejected'"
+                  mat-button 
+                  [routerLink]="['/tests', test.id]" 
+                  [queryParams]="{source: 'tests'}"
+                  [disabled]="isTestExpired(test)"
+                  class="action-btn main-action">
+                  <mat-icon>refresh</mat-icon>
+                  Исправить
+                </button>
 
-              <!-- Case 3: Completed (Approved or Pending) -->
-              <button 
-                *ngIf="(sub.is_finished === 'true' || sub.is_finished === true) && sub.status !== 'rejected'"
-                mat-stroked-button 
-                [routerLink]="['/submissions', sub.id, 'results']" 
-                class="action-btn secondary-action">
-                <mat-icon>visibility</mat-icon>
-                Просмотреть
-              </button>
-            </mat-card-actions>
+                <button 
+                  *ngIf="(sub.is_finished === 'true' || sub.is_finished === true) && sub.status !== 'rejected'"
+                  mat-stroked-button 
+                  [routerLink]="['/submissions', sub.id, 'results']" 
+                  class="action-btn secondary-action">
+                  <mat-icon>visibility</mat-icon>
+                  Просмотреть
+                </button>
+              </ng-container>
 
-            <!-- Case 4: No submission at all -->
-            <ng-template #noSub>
-              <mat-card-actions class="test-actions">
+              <ng-template #noSub>
                 <button 
                   mat-button 
                   [routerLink]="['/tests', test.id]" 
                   [queryParams]="{source: 'tests'}"
+                  [disabled]="isTestExpired(test)"
                   class="action-btn main-action">
-                  <mat-icon>play_arrow</mat-icon>
-                  Пройти тест
+                  <mat-icon>{{ isTestExpired(test) ? 'timer_off' : 'play_arrow' }}</mat-icon>
+                  {{ isTestExpired(test) ? 'Дедлайн прошел' : 'Пройти тест' }}
                 </button>
-              </mat-card-actions>
-            </ng-template>
+              </ng-template>
+
+              <!-- Additional actions for teachers -->
+              <div class="teacher-actions" *ngIf="isTeacher">
+                <button mat-icon-button color="primary" (click)="editTest(test.id)" matTooltip="Редактировать">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn" (click)="deleteTest(test.id)" matTooltip="Удалить">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </mat-card-actions>
           </mat-card>
         </div>
       </div>

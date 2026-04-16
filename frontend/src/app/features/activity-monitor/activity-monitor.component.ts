@@ -311,7 +311,8 @@ export class ActivityMonitorComponent implements OnInit {
   loadUsers() {
     this.apiService.getUsers().subscribe({
       next: (users) => {
-        this.users = users;
+        const currentUser = this.authService.getCurrentUser();
+        this.users = users.filter(u => u.name !== currentUser?.name);
       },
       error: (err) => console.error('Error loading users:', err)
     });

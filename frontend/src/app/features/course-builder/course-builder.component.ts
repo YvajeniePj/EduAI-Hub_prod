@@ -167,11 +167,24 @@ interface TreeNode {
 
                   <!-- Видео -->
                   <div *ngIf="editForm.get('lessonType')?.value === 'video'" class="content-section">
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>URL видео (YouTube/Rutube)</mat-label>
-                      <input matInput formControlName="videoUrl" placeholder="https://www.youtube.com/watch?v=... или https://rutube.ru/video/...">
-                      <mat-hint>Вставьте ссылку на видео с YouTube или Rutube</mat-hint>
-                    </mat-form-field>
+                    <div class="video-selector">
+                      <h4>Выберите существующее видео или добавьте ссылку:</h4>
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Существующие видео предмета</mat-label>
+                        <mat-select (selectionChange)="onVideoSelect($event.value)">
+                          <mat-option *ngFor="let video of availableVideos" [value]="video.url">
+                            {{ video.title }} <span *ngIf="video.note">({{ video.note }})</span>
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>URL видео (YouTube/Rutube)</mat-label>
+                        <input matInput formControlName="videoUrl" placeholder="https://www.youtube.com/watch?v=... или https://rutube.ru/video/...">
+                        <mat-hint>Вставьте ссылку на видео с YouTube или Rutube</mat-hint>
+                      </mat-form-field>
+                    </div>
+                    
                     <div *ngIf="editForm.get('videoUrl')?.value" class="video-preview">
                       <iframe 
                         [src]="getVideoEmbedUrl(editForm.get('videoUrl')?.value)" 
@@ -613,11 +626,14 @@ export class CourseBuilderComponent implements OnInit {
     });
   }
 
+  availableVideos: any[] = [];
+
   ngOnInit() {
     this.subjectId = this.route.snapshot.params['id'];
     this.loadCourse();
     this.loadMaterials();
     this.loadTests();
+    this.loadVideos();
   }
 
   loadCourse() {
@@ -943,7 +959,11 @@ export class CourseBuilderComponent implements OnInit {
   }
 
   viewTest(testId: string) {
-    this.router.navigate(['/tests', testId]);
+    return this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
+  }
+
+  onVideoSelect(url: string) {
+    this.editForm.patchValue({ videoUrl: url });
   }
 }
 
