@@ -1163,8 +1163,14 @@ export class CourseViewComponent implements OnInit {
   loadMyRequests() {
     if (!this.currentUser) return;
     this.apiService.getMyGroupRequests(this.currentUser.name, 'pending').subscribe({
-      next: (requests) => this.myRequests = requests,
-      error: (err) => console.error('Error loading my requests', err)
+      next: (requests) => {
+        this.myRequests = requests;
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error loading my requests', err);
+        this.cdr.markForCheck();
+      }
     });
   }
 
@@ -1197,8 +1203,12 @@ export class CourseViewComponent implements OnInit {
       next: () => {
         alert('Заявка отправлена!');
         this.loadMyRequests();
+        this.cdr.markForCheck();
       },
-      error: (err) => alert('Ошибка при отправке заявки: ' + (err.error?.detail || err.message))
+      error: (err) => {
+        alert('Ошибка при отправке заявки: ' + (err.error?.detail || err.message));
+        this.cdr.markForCheck();
+      }
     });
   }
 
@@ -1217,8 +1227,14 @@ export class CourseViewComponent implements OnInit {
   deleteTest(testId: string) {
     if (confirm('Удалить тест?')) {
       this.apiService.deleteTest(testId).subscribe({
-        next: () => this.loadTests(),
-        error: (err) => alert('Ошибка при удалении')
+        next: () => {
+          this.loadTests();
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          alert('Ошибка при удалении');
+          this.cdr.markForCheck();
+        }
       });
     }
   }
@@ -1226,8 +1242,14 @@ export class CourseViewComponent implements OnInit {
   deleteMaterial(materialId: string) {
     if (confirm('Удалить материал?')) {
       this.apiService.deleteMaterial(materialId).subscribe({
-        next: () => this.loadMaterials(),
-        error: (err) => alert('Ошибка при удалении')
+        next: () => {
+          this.loadMaterials();
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          alert('Ошибка при удалении');
+          this.cdr.markForCheck();
+        }
       });
     }
   }
@@ -1235,8 +1257,14 @@ export class CourseViewComponent implements OnInit {
   deleteGroup(groupId: string) {
     if (confirm('Удалить группу?')) {
       this.apiService.deleteGroup(groupId).subscribe({
-        next: () => this.loadGroups(),
-        error: (err) => alert('Ошибка при удалении')
+        next: () => {
+          this.loadGroups();
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          alert('Ошибка при удалении');
+          this.cdr.markForCheck();
+        }
       });
     }
   }

@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -10,6 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 @Component({
   selector: 'app-videos',
@@ -23,7 +24,8 @@ import { AuthService } from '../../core/services/auth.service';
     MatInputModule,
     MatSelectModule,
     MatListModule,
-    MatIconModule
+    MatIconModule,
+    MatProgressSpinnerModule
   ],
   template: `
     <div class="videos-container">
@@ -76,7 +78,7 @@ import { AuthService } from '../../core/services/auth.service';
         </mat-card-content>
       </mat-card>
 
-      <div *ngIf="videos.length > 0" class="videos-section">
+      <div *ngIf="videos.length > 0 && !loading" class="videos-section">
         <h2 class="section-title">Видео материалы</h2>
         <div class="videos-grid">
           <mat-card *ngFor="let video of videos" class="video-card">
@@ -114,9 +116,19 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
       </div>
 
-      <div *ngIf="videos.length === 0 && selectedSubjectId" class="empty-state">
+      <div *ngIf="loading" class="loading-state">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Загрузка видео...</p>
+      </div>
+
+      <div *ngIf="!loading && videos.length === 0 && selectedSubjectId" class="empty-state">
         <mat-icon>videocam_off</mat-icon>
         <p>Нет добавленных видео</p>
+      </div>
+
+      <div *ngIf="!loading && subjects.length === 0" class="empty-state">
+        <mat-icon>subject</mat-icon>
+        <p>Для вас нет доступных предметов</p>
       </div>
     </div>
   `,
@@ -274,6 +286,16 @@ import { AuthService } from '../../core/services/auth.service';
       font-size: 18px;
       margin: 0;
     }
+
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: #666;
+      gap: 16px;
+    }
   `]
 })
 export class VideosComponent implements OnInit {
@@ -282,6 +304,7 @@ export class VideosComponent implements OnInit {
   selectedSubjectId: string = '';
   videoUrl: string = '';
   videoNote: string = '';
+  loading: boolean = false;
   private safeUrlCache = new Map<string, SafeResourceUrl>();
   private rawUrlCache = new Map<string, string>();
 
@@ -290,7 +313,8 @@ export class VideosComponent implements OnInit {
   constructor(
     private apiService: ApiService,
     private authService: AuthService,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private cdr: ChangeDetectorRef
   ) {
     const user = this.authService.getCurrentUser();
     this.isAdmin = user?.role === 'teacher' || user?.role === 'admin';
@@ -301,6 +325,8 @@ export class VideosComponent implements OnInit {
   }
 
   loadSubjects() {
+    this.loading = true;
+    this.cdr.markForCheck();
     this.apiService.getSubjects().subscribe({
       next: (subjects) => {
         this.subjects = subjects;
@@ -308,41 +334,58 @@ export class VideosComponent implements OnInit {
           this.selectedSubjectId = subjects[0].id;
           this.loadVideos();
         }
+        this.loading = false;
+        this.cdr.markForCheck();
       },
-      error: (err) => console.error('Error loading subjects:', err)
+      error: (err) => {
+        console.error('Error loading subjects:', err);
+        this.loading = false;
+        this.cdr.markForCheck();
+      }
     });
   }
 
   loadVideos() {
     if (!this.selectedSubjectId) return;
+    this.loading = true;
+    this.cdr.markForCheck();
     
     this.apiService.getVideos(this.selectedSubjectId).subscribe({
       next: (videos) => {
         this.videos = videos;
+        this.loading = false;
+        this.cdr.markForCheck();
       },
-      error: (err) => console.error('Error loading videos:', err)
+      error: (err) => {
+        console.error('Error loading videos:', err);
+        this.loading = false;
+        this.cdr.markForCheck();
+      }
     });
   }
 
   addVideo() {
     if (!this.selectedSubjectId || !this.videoUrl) return;
 
+    const user = this.authService.getCurrentUser();
     this.apiService.createVideo({
       subject_id: this.selectedSubjectId,
       url: this.videoUrl,
-      title: 'Загрузка...', // Will be updated by backend
+      title: 'Загрузка...', 
       note: this.videoNote,
-      uploader: 'current_user' // TODO: get from auth
+      uploader: user?.name || 'anonymous'
     }).subscribe({
       next: () => {
         this.videoUrl = '';
         this.videoNote = '';
         this.loadVideos();
         alert('Видео добавлено!');
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Error adding video:', err);
         alert('Ошибка при добавлении видео: ' + (err.error?.detail || err.message));
+        this.cdr.markForCheck();
       }
     });
   }
@@ -353,10 +396,12 @@ export class VideosComponent implements OnInit {
     this.apiService.deleteVideo(videoId).subscribe({
       next: () => {
         this.loadVideos();
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Error deleting video:', err);
         alert('Ошибка при удалении: ' + (err.error?.detail || err.message));
+        this.cdr.markForCheck();
       }
     });
   }
