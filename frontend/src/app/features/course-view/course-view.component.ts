@@ -143,7 +143,8 @@ interface TreeNode {
                 <h3>Видеоматериал</h3>
                 <div class="video-container">
                     <iframe
-                    [src]="getVideoEmbedUrl(selectedLesson.content.video_url)"
+                    *ngIf="safeVideoUrl"
+                    [src]="safeVideoUrl"
                     frameborder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen
@@ -858,6 +859,8 @@ export class CourseViewComponent implements OnInit {
   courseName: string = '';
   structure: any = null;
   selectedLesson: TreeNode | null = null;
+  saving = false;
+  safeVideoUrl: SafeResourceUrl | null = null;
   loading = false;
   isStreamActive = false;
   currentUser: any;
@@ -974,19 +977,22 @@ export class CourseViewComponent implements OnInit {
 
   hasChild = (_: number, node: TreeNode) => !!node.children && node.children.length > 0;
 
-  selectLesson(lesson: TreeNode) {
-    if (lesson.type !== 'lesson') return;
-    this.selectedLesson = lesson;
+  selectLesson(node: TreeNode) {
+    this.selectedLesson = node;
+    this.updateSafeVideoUrl(node.content?.video_url);
+    
+    // Check if stream is active for this subject
+    this.checkActiveStream();
 
     // Track video view if lesson has video
-    if (lesson.content?.video_url) {
+    if (node.content?.video_url) {
       const currentUser = this.auth.getCurrentUser();
       if (currentUser) {
         this.apiService.createActivity({
           user_name: currentUser.name,
           action_type: 'video_view',
           resource_type: 'video',
-          resource_id: lesson.id // Using lesson id as resource id for simplicity
+          resource_id: node.id // Using node id as resource id for simplicity
         }).subscribe();
       }
     }
@@ -1015,6 +1021,29 @@ export class CourseViewComponent implements OnInit {
     }
 
     return this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
+  }
+
+  updateSafeVideoUrl(url: string) {
+    if (!url) {
+      this.safeVideoUrl = null;
+      return;
+    }
+    let embedUrl = '';
+    // YouTube
+    if (url.includes('youtube.com/watch')) {
+      const videoId = url.split('v=')[1]?.split('&')[0];
+      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    } else if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    } else if (url.includes('rutube.ru/video/')) {
+      const videoId = url.split('rutube.ru/video/')[1]?.split('/')[0];
+      embedUrl = `https://rutube.ru/play/embed/${videoId}`;
+    } else {
+      embedUrl = url;
+    }
+    
+    this.safeVideoUrl = this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
   }
 
   downloadMaterial(materialId: string) {

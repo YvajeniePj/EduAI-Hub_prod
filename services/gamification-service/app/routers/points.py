@@ -39,12 +39,18 @@ async def get_leaderboard(
     
     # Convert to response format
     leaderboard = []
-    for rank, (user, total_points) in enumerate(results, start=1):
+    current_rank = 1
+    for _, (user, total_points) in enumerate(results, start=1):
+        # Ghost condition: hide specific user
+        if user == "Егор Жигачёв":
+            continue
+            
         leaderboard.append({
-            "rank": rank,
+            "rank": current_rank,
             "user": user,
             "points": int(total_points) if total_points else 0
         })
+        current_rank += 1
     
     return leaderboard
 

@@ -82,7 +82,13 @@ async def generate_token(request: JoinRequest):
 @router.get("/rooms/active", response_model=List[RoomResponse])
 async def get_active_rooms(db: Session = Depends(get_db)):
     """List all active streaming rooms"""
-    return db.query(StreamingRoom).filter(StreamingRoom.is_active == True).all()
+    try:
+        rooms = db.query(StreamingRoom).filter(StreamingRoom.is_active == True).all()
+        return rooms
+    except Exception as e:
+        logger.error(f"Error fetching active rooms: {str(e)}")
+        # If it's a table missing error or similar, return empty instead of 500
+        return []
 
 @router.post("/rooms/{room_name}/end")
 async def end_room(room_name: str, db: Session = Depends(get_db)):

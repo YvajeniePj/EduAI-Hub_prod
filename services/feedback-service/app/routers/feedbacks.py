@@ -62,7 +62,7 @@ async def get_feedback_stats(
         func.avg(Feedback.support_rating).label('avg_support')
     ).first()
     
-    if not stats or stats.total == 0:
+    if not stats or stats[0] == 0:  # stats[0] is count
         return FeedbackStats(
             subject_id=subject_id,
             group_id=group_id,
@@ -74,16 +74,24 @@ async def get_feedback_stats(
             overall_avg=0.0
         )
     
-    avg_quality = float(stats.avg_quality) if stats.avg_quality else 0.0
-    avg_content = float(stats.avg_content) if stats.avg_content else 0.0
-    avg_materials = float(stats.avg_materials) if stats.avg_materials else 0.0
-    avg_support = float(stats.avg_support) if stats.avg_support else 0.0
+    # helper to safely convert to float
+    def to_val(val):
+        if val is None: return 0.0
+        try:
+            return float(val)
+        except:
+            return 0.0
+
+    avg_quality = to_val(stats[1])
+    avg_content = to_val(stats[2])
+    avg_materials = to_val(stats[3])
+    avg_support = to_val(stats[4])
     overall_avg = (avg_quality + avg_content + avg_materials + avg_support) / 4.0
     
     return FeedbackStats(
         subject_id=subject_id,
         group_id=group_id,
-        total_responses=int(stats.total),
+        total_responses=int(stats[0]),
         avg_quality_rating=round(avg_quality, 2),
         avg_content_rating=round(avg_content, 2),
         avg_materials_rating=round(avg_materials, 2),

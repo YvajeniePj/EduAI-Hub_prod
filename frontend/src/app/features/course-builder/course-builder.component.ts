@@ -188,7 +188,8 @@ interface TreeNode {
                     
                     <div *ngIf="editForm.get('videoUrl')?.value" class="video-preview">
                       <iframe 
-                        [src]="getVideoEmbedUrl(editForm.get('videoUrl')?.value)" 
+                        *ngIf="safeVideoUrl"
+                        [src]="safeVideoUrl" 
                         frameborder="0" 
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                         allowfullscreen
@@ -629,6 +630,7 @@ export class CourseBuilderComponent implements OnInit {
   }
 
   availableVideos: any[] = [];
+  safeVideoUrl: SafeResourceUrl | null = null;
 
   ngOnInit() {
     this.subjectId = this.route.snapshot.params['id'];
@@ -713,8 +715,34 @@ export class CourseBuilderComponent implements OnInit {
       textContent: node.content?.text_content || '',
       videoUrl: node.content?.video_url || '',
       materialId: node.content?.material_id || '',
+      materialId: node.content?.material_id || '',
       testId: node.content?.test_id || ''
     });
+    this.updateSafeVideoUrl(node.content?.video_url);
+  }
+
+  updateSafeVideoUrl(url: string) {
+    if (!url) {
+      this.safeVideoUrl = null;
+      return;
+    }
+    let embedUrl = '';
+    // YouTube
+    if (url.includes('youtube.com/watch?v=')) {
+      const videoId = url.split('v=')[1]?.split('&')[0];
+      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    }
+    else if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    }
+    // Rutube
+    else if (url.includes('rutube.ru/video/')) {
+      const videoId = url.split('rutube.ru/video/')[1]?.split('/')[0];
+      embedUrl = `https://rutube.ru/play/embed/${videoId}`;
+    }
+    
+    this.safeVideoUrl = embedUrl ? this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl) : null;
   }
 
   addModule() {
@@ -980,6 +1008,7 @@ export class CourseBuilderComponent implements OnInit {
 
   onVideoSelect(url: string) {
     this.editForm.patchValue({ videoUrl: url });
+    this.updateSafeVideoUrl(url);
   }
 }
 
