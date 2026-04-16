@@ -6,11 +6,24 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import ai
 
+import os
+import logging
+
 app = FastAPI(
     title="AI Service",
     description="Service for AI functions using GigaChat",
     version="1.0.0"
 )
+
+# Startup logging
+@app.on_event("startup")
+async def startup_event():
+    logger = logging.getLogger("uvicorn")
+    api_key = os.getenv("GIGACHAT_API_KEY")
+    if not api_key:
+        logger.error("!!! GIGACHAT_API_KEY is not set. AI features will fail. !!!")
+    else:
+        logger.info(f"GIGACHAT_API_KEY found (length: {len(api_key)})")
 
 # CORS middleware
 app.add_middleware(

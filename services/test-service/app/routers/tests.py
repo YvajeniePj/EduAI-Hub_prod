@@ -12,6 +12,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
+from urllib.parse import unquote
 
 from app.database import get_db
 from app.models import Test, TestFile
@@ -183,10 +184,13 @@ async def get_tests(
     # Добавляем московский timezone к датам перед возвратом
     moscow_tz = timezone(timedelta(hours=3))
     for test in tests:
-        if test.due_date and test.due_date.tzinfo is None:
-            test.due_date = test.due_date.replace(tzinfo=timezone.utc).astimezone(moscow_tz)
-        if test.available_until and test.available_until.tzinfo is None:
-            test.available_until = test.available_until.replace(tzinfo=timezone.utc).astimezone(moscow_tz)
+        try:
+            if test.due_date and test.due_date.tzinfo is None:
+                test.due_date = test.due_date.replace(tzinfo=timezone.utc).astimezone(moscow_tz)
+            if test.available_until and test.available_until.tzinfo is None:
+                test.available_until = test.available_until.replace(tzinfo=timezone.utc).astimezone(moscow_tz)
+        except Exception as e:
+            logging.error(f"Error converting timezone for test {test.id}: {e}")
     
     return tests
 
@@ -199,11 +203,14 @@ async def get_test(test_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Test not found")
     
     # Добавляем московский timezone к датам перед возвратом
-    moscow_tz = timezone(timedelta(hours=3))
-    if test.due_date and test.due_date.tzinfo is None:
-        test.due_date = test.due_date.replace(tzinfo=timezone.utc).astimezone(moscow_tz)
-    if test.available_until and test.available_until.tzinfo is None:
-        test.available_until = test.available_until.replace(tzinfo=timezone.utc).astimezone(moscow_tz)
+    try:
+        moscow_tz = timezone(timedelta(hours=3))
+        if test.due_date and test.due_date.tzinfo is None:
+            test.due_date = test.due_date.replace(tzinfo=timezone.utc).astimezone(moscow_tz)
+        if test.available_until and test.available_until.tzinfo is None:
+            test.available_until = test.available_until.replace(tzinfo=timezone.utc).astimezone(moscow_tz)
+    except Exception as e:
+        print(f"Error converting timezone: {e}")
     
     return test
 

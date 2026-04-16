@@ -3,7 +3,7 @@ Points router - Manages points and leaderboard
 """
 from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 from typing import List, Optional
 from uuid import UUID
 import csv
@@ -35,7 +35,7 @@ async def get_leaderboard(
             func.sum(Points.points).label('total_points')
         ).group_by(Points.user)
     
-    results = query.order_by(func.sum(Points.points).desc()).limit(limit).all()
+    results = query.order_by(text('total_points DESC')).limit(limit).all()
     
     # Convert to response format
     leaderboard = []
