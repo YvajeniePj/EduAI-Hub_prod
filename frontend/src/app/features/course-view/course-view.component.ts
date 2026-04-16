@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -7,6 +7,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTreeModule, MatTreeNestedDataSource } from '@angular/material/tree';
 import { MatNativeDateModule } from '@angular/material/core';
+import { MatInputModule } from '@angular/material/input';
+import { MatListModule } from '@angular/material/list';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ApiService } from '../../core/services/api.service';
@@ -1020,7 +1022,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
 
     // Track video view if lesson has video
     if (node.content?.video_url) {
-      const currentUser = this.auth.getCurrentUser();
+      const currentUser = this.authService.getCurrentUser();
       if (currentUser) {
         this.apiService.createActivity({
           user_name: currentUser.name,
@@ -1102,7 +1104,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
 
   downloadMaterial(materialId: string) {
     // Track material view activity
-    const currentUser = this.auth.getCurrentUser();
+    const currentUser = this.authService.getCurrentUser();
     if (currentUser) {
       this.apiService.createActivity({
         user_name: currentUser.name,

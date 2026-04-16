@@ -548,6 +548,7 @@ export class TestsComponent implements OnInit, OnDestroy {
     studentName: '',
     status: 'all' as string
   };
+  private destroy$ = new Subject<void>();
 
   constructor(
     private apiService: ApiService,
@@ -684,7 +685,7 @@ export class TestsComponent implements OnInit, OnDestroy {
   }
 
   loadUserSubmissions() {
-    const user = this.auth.getCurrentUser();
+    const user = this.authService.getCurrentUser();
     if (!user) return;
     this.apiService.getSubmissions(undefined, user.name).subscribe({
       next: (subs) => {
