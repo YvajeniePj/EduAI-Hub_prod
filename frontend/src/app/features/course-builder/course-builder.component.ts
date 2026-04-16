@@ -198,6 +198,7 @@ interface TreeNode {
                         *ngIf="safeVideoUrl"
                         [src]="safeVideoUrl" 
                         frameborder="0" 
+                        loading="lazy"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                         allowfullscreen
                         style="width: 100%; height: 400px; border-radius: 8px;">
@@ -743,11 +744,11 @@ export class CourseBuilderComponent implements OnInit {
     // YouTube
     if (url.includes('youtube.com/watch?v=')) {
       const videoId = url.split('v=')[1]?.split('&')[0];
-      embedUrl = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
+      embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
     }
     else if (url.includes('youtu.be/')) {
       const videoId = url.split('youtu.be/')[1]?.split('?')[0];
-      embedUrl = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
+      embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
     }
     // Rutube
     else if (url.includes('rutube.ru/video/')) {

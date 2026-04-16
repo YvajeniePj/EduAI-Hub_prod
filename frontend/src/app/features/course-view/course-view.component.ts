@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -36,6 +36,7 @@ interface TreeNode {
 @Component({
   selector: 'app-course-view',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     RouterModule,
@@ -104,13 +105,13 @@ interface TreeNode {
       <!-- Main Content -->
       <div class="main-content">
         <!-- Breadcrumbs -->
-        <div class="breadcrumbs" *ngIf="selectedLesson">
-           <span>{{ courseName }}</span>
-           <mat-icon class="separator">chevron_right</mat-icon>
-           <span>{{ getModuleName(selectedLesson.moduleId) }}</span>
-           <mat-icon class="separator">chevron_right</mat-icon>
-           <span class="current">{{ selectedLesson.title }}</span>
-        </div>
+         <div class="breadcrumbs" *ngIf="selectedLesson">
+            <span>{{ courseName }}</span>
+            <mat-icon class="separator">chevron_right</mat-icon>
+            <span>{{ lessonMetadata.moduleName }}</span>
+            <mat-icon class="separator">chevron_right</mat-icon>
+            <span class="current">{{ selectedLesson.title }}</span>
+         </div>
 
         <div *ngIf="loading" class="loading-container">
           <mat-spinner diameter="40"></mat-spinner>
@@ -142,10 +143,11 @@ interface TreeNode {
               <div *ngIf="selectedLesson.content?.video_url" class="video-section">
                 <h3>Видеоматериал</h3>
                 <div class="video-container">
-                    <iframe
+                     <iframe
                     *ngIf="safeVideoUrl"
                     [src]="safeVideoUrl"
                     frameborder="0"
+                    loading="lazy"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen
                     class="video-iframe">
@@ -155,11 +157,11 @@ interface TreeNode {
 
                <!-- Material link -->
               <ng-container *ngIf="selectedLesson.content?.material_id">
-                  <div *ngIf="isContentAllowed(selectedLesson.content.material_id, 'material')" class="resource-card">
+                  <div *ngIf="lessonMetadata.materialAllowed" class="resource-card">
                     <mat-icon class="resource-icon">description</mat-icon>
                     <div class="resource-info">
                        <div class="resource-title">
-                         {{ getMaterialName(selectedLesson.content.material_id) || 'Материал для скачивания' }}
+                         {{ lessonMetadata.materialName }}
                        </div>
                        <div class="resource-actions">
                          <button mat-button color="primary" (click)="viewMaterial(selectedLesson.content.material_id)">
@@ -168,16 +170,16 @@ interface TreeNode {
                          <button mat-button (click)="downloadMaterial(selectedLesson.content.material_id)">
                            <mat-icon>download</mat-icon>
                          </button>
-                         <button mat-stroked-button color="accent" *ngIf="isLatex(selectedLesson.content.material_id)" (click)="viewMaterialAs(selectedLesson.content.material_id, 'pdf')">
+                         <button mat-stroked-button color="accent" *ngIf="lessonMetadata.isLatex" (click)="viewMaterialAs(selectedLesson.content.material_id, 'pdf')">
                            <mat-icon>picture_as_pdf</mat-icon> PDF
                          </button>
-                         <button mat-stroked-button color="accent" *ngIf="isJupyter(selectedLesson.content.material_id)" (click)="viewMaterialAs(selectedLesson.content.material_id, 'html')">
+                         <button mat-stroked-button color="accent" *ngIf="lessonMetadata.isJupyter" (click)="viewMaterialAs(selectedLesson.content.material_id, 'html')">
                            <mat-icon>html</mat-icon> HTML
                          </button>
                        </div>
                     </div>
                   </div>
-                  <div *ngIf="!isContentAllowed(selectedLesson.content.material_id, 'material')" class="resource-card locked">
+                  <div *ngIf="!lessonMetadata.materialAllowed" class="resource-card locked">
                       <mat-icon class="resource-icon">lock</mat-icon>
                       <div class="resource-info">
                           <div class="resource-title">Материал недоступен для вашей группы</div>
@@ -187,7 +189,7 @@ interface TreeNode {
 
               <!-- Test link -->
               <ng-container *ngIf="selectedLesson.content?.test_id">
-                  <div *ngIf="isContentAllowed(selectedLesson.content.test_id, 'test')" class="resource-card test-card">
+                  <div *ngIf="lessonMetadata.testAllowed" class="resource-card test-card">
                     <mat-icon class="resource-icon">quiz</mat-icon>
                     <div class="resource-info">
                        <div class="resource-title">Проверочное тестирование</div>
@@ -196,7 +198,7 @@ interface TreeNode {
                        </button>
                     </div>
                   </div>
-                  <div *ngIf="!isContentAllowed(selectedLesson.content.test_id, 'test')" class="resource-card locked">
+                  <div *ngIf="!lessonMetadata.testAllowed" class="resource-card locked">
                       <mat-icon class="resource-icon">lock</mat-icon>
                       <div class="resource-info">
                           <div class="resource-title">Тест недоступен для вашей группы</div>
@@ -866,6 +868,16 @@ export class CourseViewComponent implements OnInit {
   isStreamActive = false;
   currentUser: any;
 
+  // New state object to stabilize template
+  lessonMetadata = {
+    moduleName: '',
+    materialName: '',
+    materialAllowed: false,
+    testAllowed: false,
+    isLatex: false,
+    isJupyter: false
+  };
+
   // Data for tabs
   materials: any[] = [];
   tests: any[] = [];
@@ -882,7 +894,8 @@ export class CourseViewComponent implements OnInit {
     private auth: AuthService,
     private sanitizer: DomSanitizer,
     private router: Router,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private cdr: ChangeDetectorRef
   ) { }
 
   ngOnInit() {
@@ -908,6 +921,7 @@ export class CourseViewComponent implements OnInit {
     this.apiService.getActiveStreamingRooms().subscribe({
       next: (rooms) => {
         this.isStreamActive = (rooms || []).some((r: any) => r && r.subject_id === this.subjectId);
+        this.cdr.markForCheck();
       }
     });
   }
@@ -937,10 +951,12 @@ export class CourseViewComponent implements OnInit {
             this.selectLesson(firstModule.children[0]);
           }
         }
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Error loading course structure:', err);
         this.loading = false;
+        this.cdr.markForCheck();
       }
     });
   }
@@ -980,10 +996,12 @@ export class CourseViewComponent implements OnInit {
 
   selectLesson(node: TreeNode) {
     this.selectedLesson = node;
+    this.updateLessonMetadata(node);
     this.updateSafeVideoUrl(node.content?.video_url);
     
     // Check if stream is active for this subject
     this.checkActiveStream();
+    this.cdr.markForCheck();
 
     // Track video view if lesson has video
     if (node.content?.video_url) {
@@ -1034,12 +1052,17 @@ export class CourseViewComponent implements OnInit {
     
     let embedUrl = '';
     // YouTube
-    if (url.includes('youtube.com/watch')) {
-      const videoId = url.split('v=')[1]?.split('&')[0];
-      embedUrl = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
+    if (url.includes('youtube.com/watch') || url.includes('youtube.com/embed/')) {
+        let videoId = '';
+        if (url.includes('v=')) {
+          videoId = url.split('v=')[1]?.split('&')[0];
+        } else {
+          videoId = url.split('embed/')[1]?.split('?')[0];
+        }
+        embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
     } else if (url.includes('youtu.be/')) {
       const videoId = url.split('youtu.be/')[1]?.split('?')[0];
-      embedUrl = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
+      embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
     } else if (url.includes('rutube.ru/video/')) {
       const videoId = url.split('rutube.ru/video/')[1]?.split('/')[0];
       embedUrl = `https://rutube.ru/play/embed/${videoId}`;
@@ -1048,6 +1071,18 @@ export class CourseViewComponent implements OnInit {
     }
     
     this.safeVideoUrl = this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
+    this.cdr.markForCheck();
+  }
+
+  updateLessonMetadata(node: TreeNode) {
+    this.lessonMetadata = {
+      moduleName: this.getModuleName(node.moduleId),
+      materialName: node.content?.material_id ? (this.getMaterialName(node.content.material_id) || 'Материал для скачивания') : '',
+      materialAllowed: node.content?.material_id ? this.isContentAllowed(node.content.material_id, 'material') : false,
+      testAllowed: node.content?.test_id ? this.isContentAllowed(node.content.test_id, 'test') : false,
+      isLatex: node.content?.material_id ? this.isLatex(node.content.material_id) : false,
+      isJupyter: node.content?.material_id ? this.isJupyter(node.content.material_id) : false
+    };
   }
 
   downloadMaterial(materialId: string) {
@@ -1119,19 +1154,8 @@ export class CourseViewComponent implements OnInit {
       return true;
     }
 
-    // Log for debugging
-    console.log(`[AccessControl] Checking ${type} "${item.title || item.name}":`, {
-      allowed: item.allowed_groups,
-      userGroups: this.myGroups.map(g => g.id),
-      userName: this.currentUser?.name
-    });
-
     // Check intersection: does student have ANY group that is in allowed_groups?
     const hasAccess = this.myGroups.some(g => item.allowed_groups.includes(g.id));
-
-    if (!hasAccess) {
-      console.warn(`[AccessControl] Access DENIED for ${type} "${item.title || item.name}"`);
-    }
 
     return hasAccess;
   }

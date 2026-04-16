@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -14,6 +14,7 @@ import { AuthService } from '../../core/services/auth.service';
 @Component({
   selector: 'app-videos',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     FormsModule,
@@ -89,9 +90,10 @@ import { AuthService } from '../../core/services/auth.service';
             <mat-card-content>
               <div *ngIf="video.video_info?.embed_url" class="video-embed">
                 <iframe 
-                  [src]="getSafeUrl(video.video_info.embed_url)" 
+                  [src]="getSafeUrl(video.id, video.video_info.embed_url)" 
                   frameborder="0" 
                   allowfullscreen
+                  loading="lazy"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
                 </iframe>
               </div>
@@ -280,6 +282,8 @@ export class VideosComponent implements OnInit {
   selectedSubjectId: string = '';
   videoUrl: string = '';
   videoNote: string = '';
+  private safeUrlCache = new Map<string, SafeResourceUrl>();
+  private rawUrlCache = new Map<string, string>();
 
   isAdmin = false;
 
@@ -357,8 +361,26 @@ export class VideosComponent implements OnInit {
     });
   }
 
-  getSafeUrl(url: string): SafeResourceUrl {
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  getSafeUrl(videoId: string, url: string): SafeResourceUrl {
+    // Return cached value if it exists and raw URL hasn't changed
+    if (this.safeUrlCache.has(videoId) && this.rawUrlCache.get(videoId) === url) {
+      return this.safeUrlCache.get(videoId)!;
+    }
+
+    let processedUrl = url;
+    if (url.includes('youtube.com/embed/')) {
+      processedUrl = url.replace('youtube.com/embed/', 'youtube-nocookie.com/embed/');
+      if (!processedUrl.includes('?')) {
+        processedUrl += '?rel=0&modestbranding=1';
+      } else if (!processedUrl.includes('rel=0')) {
+        processedUrl += '&rel=0&modestbranding=1';
+      }
+    }
+
+    const safe = this.sanitizer.bypassSecurityTrustResourceUrl(processedUrl);
+    this.safeUrlCache.set(videoId, safe);
+    this.rawUrlCache.set(videoId, url);
+    return safe;
   }
 }
 
