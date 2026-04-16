@@ -158,7 +158,6 @@ import { MatBadgeModule } from '@angular/material/badge';
         </div>
       </div>
     </div>
-  </div>
   `,
   styles: [`
     .tests-container {

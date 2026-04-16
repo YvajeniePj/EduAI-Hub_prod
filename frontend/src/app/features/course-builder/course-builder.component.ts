@@ -1,4 +1,5 @@
 import { Component, OnInit, Inject } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -613,7 +614,8 @@ export class CourseBuilderComponent implements OnInit {
     private apiService: ApiService,
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private sanitizer: DomSanitizer
   ) {
     this.editForm = this.fb.group({
       title: ['', Validators.required],
@@ -916,23 +918,37 @@ export class CourseBuilderComponent implements OnInit {
     return test ? test.title : '';
   }
 
-  getVideoEmbedUrl(url: string): string {
+  loadVideos() {
+    if (!this.subjectId) return;
+    this.apiService.getVideos(this.subjectId).subscribe({
+      next: (videos) => {
+        this.availableVideos = videos;
+      },
+      error: (err) => {
+        console.error('Error loading videos:', err);
+      }
+    });
+  }
+
+  getVideoEmbedUrl(url: string): SafeResourceUrl {
     if (!url) return '';
+    let embedUrl = '';
     // YouTube
     if (url.includes('youtube.com/watch?v=')) {
       const videoId = url.split('v=')[1]?.split('&')[0];
-      return `https://www.youtube.com/embed/${videoId}`;
+      embedUrl = `https://www.youtube.com/embed/${videoId}`;
     }
-    if (url.includes('youtu.be/')) {
+    else if (url.includes('youtu.be/')) {
       const videoId = url.split('youtu.be/')[1]?.split('?')[0];
-      return `https://www.youtube.com/embed/${videoId}`;
+      embedUrl = `https://www.youtube.com/embed/${videoId}`;
     }
     // Rutube
-    if (url.includes('rutube.ru/video/')) {
+    else if (url.includes('rutube.ru/video/')) {
       const videoId = url.split('rutube.ru/video/')[1]?.split('/')[0];
-      return `https://rutube.ru/play/embed/${videoId}`;
+      embedUrl = `https://rutube.ru/play/embed/${videoId}`;
     }
-    return '';
+    
+    return embedUrl ? this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl) : '';
   }
 
   openMaterialUploadDialog() {
@@ -959,7 +975,7 @@ export class CourseBuilderComponent implements OnInit {
   }
 
   viewTest(testId: string) {
-    return this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
+    this.router.navigate(['/tests'], { queryParams: { testId: testId } });
   }
 
   onVideoSelect(url: string) {
