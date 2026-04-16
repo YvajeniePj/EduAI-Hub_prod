@@ -1011,6 +1011,8 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  hasChild = (_: number, node: TreeNode) => !!node.children && node.children.length > 0;
+
   selectLesson(node: TreeNode) {
     this.selectedLesson = node;
     this.updateLessonMetadata(node);
