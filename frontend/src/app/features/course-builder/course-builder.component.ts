@@ -18,6 +18,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { MatTreeNestedDataSource } from '@angular/material/tree';
 
@@ -619,6 +620,7 @@ export class CourseBuilderComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private apiService: ApiService,
+    private auth: AuthService,
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
     private dialog: MatDialog,
@@ -892,7 +894,7 @@ export class CourseBuilderComponent implements OnInit {
               subject_id: this.subjectId,
               url: formValue.videoUrl,
               title: formValue.videoTitle || 'Видео',
-              uploader: this.apiService.getCurrentUserName() || 'Teacher'
+              uploader: this.auth.getCurrentUser()?.name || 'Teacher'
             }).subscribe();
           }
           if (formValue.materialId) contentData.material_id = formValue.materialId;
