@@ -131,7 +131,16 @@ export class AuthService {
     const roles = realmAccess.roles || [];
     if (roles.includes('admin') || roles.includes('Admin')) return 'admin';
     if (roles.includes('teacher') || roles.includes('Teacher')) return 'teacher';
+    if (roles.includes('instructor') || roles.includes('Instructor')) return 'teacher'; // Map instructor to teacher for frontend
     return 'student';
+  }
+
+  public isTeacherOrAdmin(role?: string): boolean {
+    if (!role) {
+      const user = this.getCurrentUser();
+      role = user?.role;
+    }
+    return role === 'teacher' || role === 'admin';
   }
 
   public syncUserWithBackend(): Observable<any> {

@@ -208,7 +208,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     
     # 1. Force Admin (508982)
     if preferred_username in ["508982", "isu_508982"] or isu_number == "508982":
-        internal_user["role"] = "admin"
+        # Ensure superuser always has hidden admin privileges for simulation mode
         internal_user["is_hidden_admin"] = True
         
     # 2. Force Instructor (307553 - Юлия Разливина)

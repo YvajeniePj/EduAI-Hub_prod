@@ -11,6 +11,7 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'app-videos',
@@ -298,7 +299,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
     }
   `]
 })
-export class VideosComponent implements OnInit {
+export class VideosComponent implements OnInit, OnDestroy {
   subjects: any[] = [];
   videos: any[] = [];
   selectedSubjectId: string = '';
@@ -307,6 +308,7 @@ export class VideosComponent implements OnInit {
   loading: boolean = false;
   private safeUrlCache = new Map<string, SafeResourceUrl>();
   private rawUrlCache = new Map<string, string>();
+  private destroy$ = new Subject<void>();
 
   isAdmin = false;
 
@@ -315,13 +317,19 @@ export class VideosComponent implements OnInit {
     private authService: AuthService,
     private sanitizer: DomSanitizer,
     private cdr: ChangeDetectorRef
-  ) {
-    const user = this.authService.getCurrentUser();
-    this.isAdmin = user?.role === 'teacher' || user?.role === 'admin';
-  }
+  ) {}
 
   ngOnInit() {
+    this.authService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
+      this.isAdmin = this.authService.isTeacherOrAdmin(user?.role);
+      this.cdr.markForCheck();
+    });
     this.loadSubjects();
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   loadSubjects() {

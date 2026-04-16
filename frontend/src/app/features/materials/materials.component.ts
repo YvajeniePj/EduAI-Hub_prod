@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -10,6 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'app-materials',
@@ -367,7 +368,7 @@ import { AuthService } from '../../core/services/auth.service';
     }
   `]
 })
-export class MaterialsComponent implements OnInit {
+export class MaterialsComponent implements OnInit, OnDestroy {
   subjects: any[] = [];
   materials: any[] = [];
   selectedSubjectId: string = '';
@@ -375,14 +376,25 @@ export class MaterialsComponent implements OnInit {
   uploadNote: string = '';
   loading = false;
   isAdmin = false;
+  private destroy$ = new Subject<void>();
 
-  constructor(private apiService: ApiService, private authService: AuthService) {
-    const user = this.authService.getCurrentUser();
-    this.isAdmin = user?.role === 'teacher' || user?.role === 'admin';
-  }
+  constructor(
+    private apiService: ApiService, 
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit() {
+    this.authService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
+      this.isAdmin = this.authService.isTeacherOrAdmin(user?.role);
+      this.cdr.markForCheck();
+    });
     this.loadSubjects();
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   loadSubjects() {
@@ -393,8 +405,12 @@ export class MaterialsComponent implements OnInit {
           this.selectedSubjectId = subjects[0].id;
           this.loadMaterials();
         }
+        this.cdr.markForCheck();
       },
-      error: (err) => console.error('Error loading subjects:', err)
+      error: (err) => {
+        console.error('Error loading subjects:', err);
+        this.cdr.markForCheck();
+      }
     });
   }
 
@@ -415,8 +431,12 @@ export class MaterialsComponent implements OnInit {
           }
           return m;
         });
+        this.cdr.markForCheck();
       },
-      error: (err) => console.error('Error loading materials:', err)
+      error: (err) => {
+        console.error('Error loading materials:', err);
+        this.cdr.markForCheck();
+      }
     });
   }
 
@@ -442,11 +462,12 @@ export class MaterialsComponent implements OnInit {
 
     // Upload files one by one
     let uploadCount = 0;
+    const user = this.authService.getCurrentUser();
     this.selectedFiles.forEach((file) => {
       const fileFormData = new FormData();
       fileFormData.append('file', file);
       fileFormData.append('subject_id', this.selectedSubjectId);
-      fileFormData.append('uploader', 'current_user');
+      fileFormData.append('uploader', user?.name || 'anonymous');
       if (this.uploadNote) {
         fileFormData.append('note', this.uploadNote);
       }

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { Subject, takeUntil } from 'rxjs';
 import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
 import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
@@ -551,16 +552,21 @@ export class TestsComponent implements OnInit, OnDestroy {
   constructor(
     private apiService: ApiService,
     private router: Router,
-    private auth: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
-    this.isTeacher = this.auth.getCurrentUser()?.role === 'teacher';
+    this.authService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
+      this.isTeacher = this.authService.isTeacherOrAdmin(user?.role);
+      if (this.isTeacher) {
+        this.loadAllSubmissions();
+      }
+      this.cdr.markForCheck();
+    });
+
     this.loadTests();
     this.loadSubjects(); // Load subjects for everyone to see course names
-    if (this.isTeacher) {
-      this.loadAllSubmissions();
-    }
     this.startCardsTimer();
   }
 
@@ -568,6 +574,8 @@ export class TestsComponent implements OnInit, OnDestroy {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
     }
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   loadTests() {
@@ -577,8 +585,12 @@ export class TestsComponent implements OnInit, OnDestroy {
         if (!this.isTeacher) {
           this.loadUserSubmissions();
         }
+        this.cdr.markForCheck();
       },
-      error: (err) => console.error('Error loading tests:', err)
+      error: (err) => {
+        console.error('Error loading tests:', err);
+        this.cdr.markForCheck();
+      }
     });
   }
 

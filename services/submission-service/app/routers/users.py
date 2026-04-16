@@ -1,7 +1,7 @@
 """
 Users router - Get list of users for group management
 """
-from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile
+from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
@@ -9,9 +9,10 @@ from pathlib import Path
 import shutil
 import time
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models import User
 from app.schemas import UserCreate, UserUpdate, UserResponse
+from app.services.avatar_service import cache_external_avatar
 
 router = APIRouter()
 
@@ -46,7 +47,7 @@ async def get_user_by_name(name: str, db: Session = Depends(get_db)):
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)
-async def create_user(user: UserCreate, db: Session = Depends(get_db)):
+async def create_user(user: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Create a new user"""
     existing = db.query(User).filter(User.name == user.name).first()
     if existing:
@@ -66,11 +67,18 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+
+    # Cache external avatar if provided
+    if user.avatar_url and user.avatar_url.startswith("http"):
+        # We need a fresh session for the background task
+        bg_db = SessionLocal()
+        background_tasks.add_task(cache_external_avatar, db_user.id, user.avatar_url, bg_db)
+
     return db_user
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
-async def update_user(user_id: UUID, user_update: UserUpdate, db: Session = Depends(get_db)):
+async def update_user(user_id: UUID, user_update: UserUpdate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Update user"""
     db_user = db.query(User).filter(User.id == user_id).first()
     if not db_user:
@@ -85,6 +93,10 @@ async def update_user(user_id: UUID, user_update: UserUpdate, db: Session = Depe
     
     if user_update.avatar_url is not None:
         db_user.avatar_url = user_update.avatar_url
+        # If new avatar is external, cache it
+        if user_update.avatar_url.startswith("http"):
+            bg_db = SessionLocal()
+            background_tasks.add_task(cache_external_avatar, db_user.id, user_update.avatar_url, bg_db)
 
     if user_update.role is not None:
         db_user.role = user_update.role

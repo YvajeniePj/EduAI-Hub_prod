@@ -17,6 +17,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSelectModule } from '@angular/material/select';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { Subject, takeUntil } from 'rxjs';
 import { CreateGroupDialogComponent } from '../groups/groups.component';
 import { UploadMaterialDialogComponent } from './upload-material-dialog.component';
 import { MaterialViewerComponent } from './material-viewer.component';
@@ -50,6 +51,8 @@ interface TreeNode {
     MatTableModule,
     MatDialogModule,
     MatSelectModule,
+    MatInputModule,
+    MatListModule,
     FormsModule,
     ReactiveFormsModule,
     CreateGroupDialogComponent,
@@ -856,9 +859,9 @@ interface TreeNode {
     }
   `]
 })
-export class CourseViewComponent implements OnInit {
+export class CourseViewComponent implements OnInit, OnDestroy {
   subjectId: string = '';
-  courseName: string = '';
+  courseName: string = 'Загрузка...';
   structure: any = null;
   selectedLesson: TreeNode | null = null;
   saving = false;
@@ -867,6 +870,7 @@ export class CourseViewComponent implements OnInit {
   loading = false;
   isStreamActive = false;
   currentUser: any;
+  private destroy$ = new Subject<void>();
 
   // New state object to stabilize template
   lessonMetadata = {
@@ -891,7 +895,7 @@ export class CourseViewComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private apiService: ApiService,
-    private auth: AuthService,
+    private authService: AuthService,
     private sanitizer: DomSanitizer,
     private router: Router,
     private dialog: MatDialog,
@@ -899,9 +903,17 @@ export class CourseViewComponent implements OnInit {
   ) { }
 
   ngOnInit() {
-    this.subjectId = this.route.snapshot.params['id'];
-    this.currentUser = this.auth.getCurrentUser();
-    this.loadCourse();
+    this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      this.subjectId = params['id'];
+      this.loadCourse();
+      this.loadGroups();
+    });
+
+    this.authService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
+      this.currentUser = user;
+      this.cdr.markForCheck();
+    });
+
     this.checkActiveStream();
 
     // Load content for access control checks
@@ -992,7 +1004,10 @@ export class CourseViewComponent implements OnInit {
     });
   }
 
-  hasChild = (_: number, node: TreeNode) => !!node.children && node.children.length > 0;
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   selectLesson(node: TreeNode) {
     this.selectedLesson = node;
