@@ -63,6 +63,11 @@ import { Subject, takeUntil } from 'rxjs';
               <mat-icon matPrefix>link</mat-icon>
             </mat-form-field>
             <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Название видео</mat-label>
+              <input matInput [(ngModel)]="videoTitle" placeholder="Введите название видео">
+              <mat-icon matPrefix>title</mat-icon>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
               <mat-label>Описание (опционально)</mat-label>
               <input matInput [(ngModel)]="videoNote" placeholder="Например: лекция 1">
             </mat-form-field>
@@ -304,6 +309,7 @@ export class VideosComponent implements OnInit, OnDestroy {
   videos: any[] = [];
   selectedSubjectId: string = '';
   videoUrl: string = '';
+  videoTitle: string = '';
   videoNote: string = '';
   loading: boolean = false;
   private safeUrlCache = new Map<string, SafeResourceUrl>();
@@ -379,12 +385,13 @@ export class VideosComponent implements OnInit, OnDestroy {
     this.apiService.createVideo({
       subject_id: this.selectedSubjectId,
       url: this.videoUrl,
-      title: 'Загрузка...', 
+      title: this.videoTitle || 'Загрузка...', 
       note: this.videoNote,
       uploader: user?.name || 'anonymous'
     }).subscribe({
       next: () => {
         this.videoUrl = '';
+        this.videoTitle = '';
         this.videoNote = '';
         this.loadVideos();
         alert('Видео добавлено!');

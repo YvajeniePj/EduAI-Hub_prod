@@ -7,9 +7,12 @@ from bs4 import BeautifulSoup
 from typing import Optional, Dict
 
 
-async def get_video_info(url: str) -> Optional[Dict]:
+async def get_video_info(url: str, provided_title: Optional[str] = None) -> Optional[Dict]:
     """Get video information from URL (YouTube, VK, etc.)"""
     try:
+        # Check if provided title is useful
+        is_generic = not provided_title or provided_title in ["Видео", "YouTube видео", "Rutube видео", "Загрузка...", "Видео без названия"]
+        
         if "youtube.com" in url or "youtu.be" in url:
             # Extract video ID from YouTube URL
             video_id = None
@@ -19,8 +22,11 @@ async def get_video_info(url: str) -> Optional[Dict]:
                 video_id = url.split("youtu.be/")[1].split("?")[0]
             
             if video_id:
-                # Get video title from YouTube
-                video_title = await get_youtube_title(video_id)
+                # Get video title from YouTube ONLY if no specific title provided
+                if is_generic:
+                    video_title = await get_youtube_title(video_id)
+                else:
+                    video_title = provided_title
                 
                 return {
                     "type": "youtube",

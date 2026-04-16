@@ -57,10 +57,10 @@ async def get_videos(
 @router.post("", response_model=VideoResponse, status_code=201)
 async def create_video(video: VideoCreate, db: Session = Depends(get_db), x_user_name: Optional[str] = Header(None, alias="X-User-Name")):
     """Create a new video with automatic parsing"""
-    # 1. Parse video URL to get information
-    video_info = await get_video_info(video.url)
+    # 1. Parse video URL to get information (pass current title to potentially skip parsing)
+    video_info = await get_video_info(video.url, provided_title=video.title)
     
-    # 2. Determine title: Prioritize manual title if provided and not just "Видео"
+    # 2. Determine title: Prioritize manual title if provided and not just "Видео" or "Загрузка..."
     title = video.title
     
     # If title is empty or generic, and we have info from parser, use parser info
