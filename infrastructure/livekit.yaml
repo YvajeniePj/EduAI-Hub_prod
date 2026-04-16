@@ -5,6 +5,7 @@ rtc:
   use_external_ip: false
   # Публичный IP VM2 для WebRTC ICE candidates
   node_ip: 77.234.204.110
+  tcp_port: 7882
 keys:
   devkey: "this-is-a-very-long-and-secure-secret-for-livekit"
 logging:
