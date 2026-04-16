@@ -861,6 +861,7 @@ export class CourseViewComponent implements OnInit {
   selectedLesson: TreeNode | null = null;
   saving = false;
   safeVideoUrl: SafeResourceUrl | null = null;
+  lastProcessedVideoUrl: string | null = null;
   loading = false;
   isStreamActive = false;
   currentUser: any;
@@ -1028,14 +1029,17 @@ export class CourseViewComponent implements OnInit {
       this.safeVideoUrl = null;
       return;
     }
+    if (url === this.lastProcessedVideoUrl) return;
+    this.lastProcessedVideoUrl = url;
+    
     let embedUrl = '';
     // YouTube
     if (url.includes('youtube.com/watch')) {
       const videoId = url.split('v=')[1]?.split('&')[0];
-      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      embedUrl = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
     } else if (url.includes('youtu.be/')) {
       const videoId = url.split('youtu.be/')[1]?.split('?')[0];
-      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      embedUrl = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
     } else if (url.includes('rutube.ru/video/')) {
       const videoId = url.split('rutube.ru/video/')[1]?.split('/')[0];
       embedUrl = `https://rutube.ru/play/embed/${videoId}`;

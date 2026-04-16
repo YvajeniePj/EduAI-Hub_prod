@@ -184,6 +184,12 @@ interface TreeNode {
                         <input matInput formControlName="videoUrl" placeholder="https://www.youtube.com/watch?v=... или https://rutube.ru/video/...">
                         <mat-hint>Вставьте ссылку на видео с YouTube или Rutube</mat-hint>
                       </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Название этого видео (метка)</mat-label>
+                        <input matInput formControlName="videoTitle" placeholder="Например: Введение в курс">
+                        <mat-hint>Это название будет отображаться в списке видео</mat-hint>
+                      </mat-form-field>
                     </div>
                     
                     <div *ngIf="editForm.get('videoUrl')?.value" class="video-preview">
@@ -624,6 +630,7 @@ export class CourseBuilderComponent implements OnInit {
       lessonType: ['lecture'],
       textContent: [''],
       videoUrl: [''],
+      videoTitle: [''],
       materialId: [''],
       testId: ['']
     });
@@ -631,6 +638,7 @@ export class CourseBuilderComponent implements OnInit {
 
   availableVideos: any[] = [];
   safeVideoUrl: SafeResourceUrl | null = null;
+  lastProcessedVideoUrl: string | null = null;
 
   ngOnInit() {
     this.subjectId = this.route.snapshot.params['id'];
@@ -714,7 +722,7 @@ export class CourseBuilderComponent implements OnInit {
       lessonType: node.lessonType || 'lecture',
       textContent: node.content?.text_content || '',
       videoUrl: node.content?.video_url || '',
-      materialId: node.content?.material_id || '',
+      videoTitle: node.content?.extra_data?.video_title || '',
       materialId: node.content?.material_id || '',
       testId: node.content?.test_id || ''
     });
@@ -726,15 +734,18 @@ export class CourseBuilderComponent implements OnInit {
       this.safeVideoUrl = null;
       return;
     }
+    if (url === this.lastProcessedVideoUrl) return;
+    this.lastProcessedVideoUrl = url;
+    
     let embedUrl = '';
     // YouTube
     if (url.includes('youtube.com/watch?v=')) {
       const videoId = url.split('v=')[1]?.split('&')[0];
-      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      embedUrl = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
     }
     else if (url.includes('youtu.be/')) {
       const videoId = url.split('youtu.be/')[1]?.split('?')[0];
-      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      embedUrl = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
     }
     // Rutube
     else if (url.includes('rutube.ru/video/')) {
@@ -874,6 +885,15 @@ export class CourseBuilderComponent implements OnInit {
           if (formValue.videoUrl) {
             contentData.video_url = formValue.videoUrl;
             contentData.video_platform = formValue.videoUrl.includes('youtube') ? 'youtube' : 'rutube';
+            contentData.extra_data = { video_title: formValue.videoTitle };
+            
+            // Register video in video-service if it's new or has a manual title
+            this.apiService.createVideo({
+              subject_id: this.subjectId,
+              url: formValue.videoUrl,
+              title: formValue.videoTitle || 'Видео',
+              uploader: this.apiService.getCurrentUserName() || 'Teacher'
+            }).subscribe();
           }
           if (formValue.materialId) contentData.material_id = formValue.materialId;
           if (formValue.testId) contentData.test_id = formValue.testId;
@@ -1007,7 +1027,11 @@ export class CourseBuilderComponent implements OnInit {
   }
 
   onVideoSelect(url: string) {
-    this.editForm.patchValue({ videoUrl: url });
+    const selectedVideo = this.availableVideos.find(v => v.url === url);
+    this.editForm.patchValue({ 
+      videoUrl: url,
+      videoTitle: selectedVideo ? selectedVideo.title : ''
+    });
     this.updateSafeVideoUrl(url);
   }
 }
