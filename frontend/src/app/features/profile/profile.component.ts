@@ -65,9 +65,9 @@ import { HttpEventType } from '@angular/common/http';
 
               <!-- Regular Role Badge (hidden for SuperAdmin to avoid confusion) -->
               <span class="role-badge" 
-                    [class.teacher]="user.role === 'teacher' || user.role === 'admin'"
+                    [class.teacher]="user.role === 'teacher' || user.role === 'instructor' || user.role === 'admin'"
                     *ngIf="!user?.is_hidden_admin">
-                {{ user.role === 'admin' ? 'Администратор' : (user.role === 'teacher' ? 'Преподаватель' : 'Студент') }}
+                {{ user.role === 'admin' ? 'Администратор' : (user.role === 'teacher' || user.role === 'instructor' ? 'Преподаватель' : 'Студент') }}
               </span>
 
               <button mat-icon-button (click)="startEditName()" matTooltip="Изменить имя">

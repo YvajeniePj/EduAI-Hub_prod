@@ -16,8 +16,8 @@ import { MatChipsModule } from '@angular/material/chips';
         <mat-icon *ngIf="!data.user.avatar_url" style="font-size: 64px; width: 64px; height: 64px; color: #999;">person</mat-icon>
       </div>
       <h2>{{ data.user.name }}</h2>
-      <span class="role-badge" [class.teacher]="data.user.role === 'teacher'">
-        {{ data.user.role === 'teacher' ? 'Преподаватель' : 'Студент' }}
+      <span class="role-badge" [class.teacher]="data.user.role === 'teacher' || data.user.role === 'instructor'">
+        {{ (data.user.role === 'teacher' || data.user.role === 'instructor') ? 'Преподаватель' : 'Студент' }}
       </span>
     </div>
     

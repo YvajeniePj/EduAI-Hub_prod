@@ -194,10 +194,15 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         if internal_name != user_data["name"]:
             await proxy_request(SUBMISSION_SERVICE_URL, f"/users/{external_id}", "PUT", body={"name": internal_name})
 
+    # Normalize 'instructor' to 'teacher' for frontend compatibility
+    role = user_data["role"]
+    if role == "instructor":
+        role = "teacher"
+
     internal_user = {
         "user_id": str(user_data["id"]),
         "username": internal_name,
-        "role": user_data["role"],
+        "role": role,
         "avatar_url": user_data.get("avatar_url"),
         "is_hidden_admin": user_data.get("is_hidden_admin", False)
     }
@@ -211,9 +216,12 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         # Ensure superuser always has hidden admin privileges for simulation mode
         internal_user["is_hidden_admin"] = True
         
-    # 2. Force Instructor (307553 - Юлия Разливина)
+    # 2. Force Teacher (307553 - Юлия Разливина)
     if preferred_username in ["307553", "isu_307553"] or isu_number == "307553":
-        internal_user["role"] = "instructor"
+        internal_user["role"] = "teacher"
+        # Sync back to DB if currently student
+        if user_data.get("role") == "student":
+            asyncio.create_task(proxy_request(SUBMISSION_SERVICE_URL, f"/users/{external_id}", "PUT", body={"role": "teacher"}))
     
     # Cache it
     _user_mapping_cache[external_id] = internal_user

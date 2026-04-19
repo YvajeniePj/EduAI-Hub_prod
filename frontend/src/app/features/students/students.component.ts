@@ -109,7 +109,7 @@ import { AuthService } from '../../core/services/auth.service';
                       <mat-option value="student">
                         <mat-icon>person</mat-icon> Студент
                       </mat-option>
-                      <mat-option value="instructor">
+                      <mat-option value="teacher">
                         <mat-icon>school</mat-icon> Преподаватель
                       </mat-option>
                     </mat-select>
@@ -286,7 +286,7 @@ import { AuthService } from '../../core/services/auth.service';
         background: linear-gradient(135deg, #6a1b9a, #4a0072);
         color: white;
     }
-    .role-badge-picker.instructor, .role-display-badge.instructor {
+    .role-badge-picker.teacher, .role-display-badge.teacher {
         background: linear-gradient(135deg, #2e7d32, #1b5e20);
         color: white;
     }
@@ -419,7 +419,7 @@ export class StudentsComponent implements OnInit {
   }
 
   canManageRoles(): boolean {
-    return this.currentUser?.role === 'admin' || this.currentUser?.role === 'instructor';
+    return this.currentUser?.role === 'admin' || this.currentUser?.role === 'teacher';
   }
 
   changeRole(student: any, newRole: string) {
@@ -439,7 +439,7 @@ export class StudentsComponent implements OnInit {
   getRoleLabel(role: string): string {
     switch (role) {
       case 'admin': return 'Администратор';
-      case 'instructor': return 'Преподаватель';
+      case 'teacher': return 'Преподаватель';
       case 'student': return 'Студент';
       default: return role;
     }
@@ -448,7 +448,7 @@ export class StudentsComponent implements OnInit {
   getRoleIcon(role: string): string {
     switch (role) {
       case 'admin': return 'admin_panel_settings';
-      case 'instructor': return 'school';
+      case 'teacher': return 'school';
       case 'student': return 'person';
       default: return 'help_outline';
     }
