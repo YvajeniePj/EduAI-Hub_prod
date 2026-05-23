@@ -905,30 +905,33 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit() {
-    this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
-      this.subjectId = params['id'];
-      this.loadCourse();
-      this.loadGroups();
-    });
-
     this.authService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
       this.currentUser = user;
+      
+      // Если subjectId уже загружен, подгружаем группы студента
+      if (this.subjectId && this.currentUser?.role === 'student') {
+        this.loadMyGroups();
+        this.loadMyRequests();
+      }
       this.cdr.markForCheck();
     });
 
+    this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      this.subjectId = params['id'];
+      this.loadCourse();
+      
+      // Загружаем данные только после получения subjectId
+      this.loadMaterials();
+      this.loadTests();
+      this.loadGroups();
+      
+      if (this.currentUser?.role === 'student') {
+        this.loadMyGroups();
+        this.loadMyRequests();
+      }
+    });
+
     this.checkActiveStream();
-
-    // Load content for access control checks
-    this.loadMaterials();
-    this.loadTests();
-
-    // Load management data
-    this.loadGroups();
-    if (this.currentUser?.role === 'student') {
-      // Load my groups for access checking
-      this.loadMyGroups();
-      this.loadMyRequests();
-    }
   }
 
   checkActiveStream() {

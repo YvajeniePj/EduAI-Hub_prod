@@ -1283,6 +1283,18 @@ export class TestTakeComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Сохраняем таймер в localStorage
+    try {
+      localStorage.setItem('active_test_timer', JSON.stringify({
+        testId: this.test.id,
+        testTitle: this.test.title,
+        startTime: this.startTime.toISOString(),
+        timeLimitMinutes: this.timeLimitMinutes
+      }));
+    } catch (e) {
+      console.error('Error saving active test timer to localStorage', e);
+    }
+
     // Вычисляем время окончания на основе текущего времени клиента
     const endTime = new Date(this.startTime.getTime() + this.timeLimitMinutes * 60 * 1000);
     const now = new Date();
@@ -1406,6 +1418,7 @@ export class TestTakeComponent implements OnInit, OnDestroy {
     // Защита от множественных вызовов
     if (this.submitting) return;
 
+    localStorage.removeItem('active_test_timer');
     this.submitting = true;
     this.timeExpired = true;
 
@@ -1502,6 +1515,7 @@ export class TestTakeComponent implements OnInit, OnDestroy {
     }
 
     this.submitting = true;
+    localStorage.removeItem('active_test_timer');
 
     const answers = this.answerForm.value.answers.map((answer: string, index: number) => ({
       question_id: this.test.questions[index].question_id,

@@ -313,11 +313,15 @@ export class SubmissionsManagementComponent implements OnInit {
 
   applyFilters() {
     const currentUser = this.auth.getCurrentUser();
-    const isCurrentUserEgor = !!(currentUser && (currentUser.is_hidden_admin || currentUser.name === 'Егор Жигачёв'));
+    const isCurrentUserEgor = !!(currentUser && (
+      currentUser.is_hidden_admin || 
+      currentUser.name === 'Егор Жигачёв' || 
+      currentUser.name === 'isu_508982'
+    ));
 
     this.filteredSubmissions = this.submissions.filter(sub => {
       // Скрытие работ Егора Жигачёва от других пользователей
-      const isAuthorEgor = sub.user === 'Егор Жигачёв';
+      const isAuthorEgor = sub.user === 'Егор Жигачёв' || sub.user === 'isu_508982';
       if (isAuthorEgor && !isCurrentUserEgor) {
         return false;
       }
@@ -358,7 +362,22 @@ export class SubmissionsManagementComponent implements OnInit {
   }
 
   getPendingCount(): number {
-    return this.submissions.filter(s => s.status === 'pending').length;
+    const currentUser = this.auth.getCurrentUser();
+    const isCurrentUserEgor = !!(currentUser && (
+      currentUser.is_hidden_admin || 
+      currentUser.name === 'Егор Жигачёв' || 
+      currentUser.name === 'isu_508982'
+    ));
+
+    return this.submissions.filter(s => {
+      const isAuthorEgor = s.user === 'Егор Жигачёв' || s.user === 'isu_508982';
+      if (isAuthorEgor && !isCurrentUserEgor) {
+        return false;
+      }
+
+      const isFinished = s.is_finished === 'true' || s.is_finished === true;
+      return s.status === 'pending' && isFinished;
+    }).length;
   }
 
   getStatusLabel(status: string): string {

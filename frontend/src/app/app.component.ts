@@ -174,6 +174,13 @@ import { interval, Subscription } from 'rxjs';
           </mat-icon>
           
           <span class="app-title">EduAI Hub</span>
+
+          <!-- Active test timer widget -->
+          <div class="active-test-timer-toolbar" *ngIf="activeTestTimer" (click)="goToActiveTest()" matTooltip="Нажмите, чтобы вернуться к тесту" style="cursor: pointer; display: flex; align-items: center; background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; margin-left: 20px; gap: 8px; font-weight: 500;">
+            <mat-icon style="color: #ffd700; font-size: 20px; width: 20px; height: 20px; margin: 0;">timer</mat-icon>
+            <span style="font-size: 13px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff;">{{ activeTestTimer.testTitle }}</span>
+            <span style="font-size: 14px; font-family: monospace; background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 12px; color: #fff;">{{ activeTestTimer.displayTime }}</span>
+          </div>
           
           <span class="spacer"></span>
           
@@ -481,6 +488,8 @@ import { interval, Subscription } from 'rxjs';
 export class AppComponent implements OnInit, OnDestroy {
   title = 'EduAI Hub';
   aiStatus: any = null;
+  activeTestTimer: any = null;
+  private timerSubscription?: Subscription;
   private statusCheckSubscription?: Subscription;
   private authSubscription?: Subscription;
   currentUser: CurrentUser | null = null;
@@ -532,9 +541,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.notificationCheckInterval = interval(10000).subscribe(() => {
       this.loadNotifications();
     });
+
+    this.startGlobalTimerCheck();
   }
 
   ngOnDestroy() {
+    if (this.timerSubscription) {
+      this.timerSubscription.unsubscribe();
+    }
     if (this.statusCheckSubscription) {
       this.statusCheckSubscription.unsubscribe();
     }
@@ -696,6 +710,50 @@ export class AppComponent implements OnInit, OnDestroy {
     if (url.startsWith('/static')) return `/api${url}`;
     if (url.startsWith('/api/')) return url;
     return `/api/${url}`;
+  }
+
+  startGlobalTimerCheck() {
+    this.timerSubscription = interval(1000).subscribe(() => {
+      const timerDataStr = localStorage.getItem('active_test_timer');
+      if (!timerDataStr) {
+        this.activeTestTimer = null;
+        return;
+      }
+
+      try {
+        const timerData = JSON.parse(timerDataStr);
+        const startTime = new Date(timerData.startTime);
+        const timeLimitMinutes = timerData.timeLimitMinutes;
+        const endTime = new Date(startTime.getTime() + timeLimitMinutes * 60 * 1000);
+        const now = new Date();
+        const remaining = Math.max(0, Math.floor((endTime.getTime() - now.getTime()) / 1000));
+
+        if (remaining <= 0) {
+          this.activeTestTimer = null;
+          localStorage.removeItem('active_test_timer');
+        } else {
+          this.activeTestTimer = {
+            testId: timerData.testId,
+            testTitle: timerData.testTitle,
+            displayTime: this.formatActiveTime(remaining)
+          };
+        }
+      } catch (e) {
+        this.activeTestTimer = null;
+      }
+    });
+  }
+
+  formatActiveTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+
+  goToActiveTest() {
+    if (this.activeTestTimer) {
+      this.router.navigate(['/tests', this.activeTestTimer.testId, 'take']);
+    }
   }
 }
 
