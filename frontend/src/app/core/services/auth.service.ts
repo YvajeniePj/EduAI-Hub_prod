@@ -154,9 +154,9 @@ export class AuthService {
           this.currentUserSubject.next({
             ...current,
             id: backendUser.user_id,
-            name: current.name || backendUser.username,
+            name: backendUser.username || current.name,
             role: backendUser.role,
-            avatar_url: current.avatar_url || backendUser.avatar_url,
+            avatar_url: backendUser.avatar_url || current.avatar_url,
             is_hidden_admin: backendUser.is_hidden_admin || false
           });
         }

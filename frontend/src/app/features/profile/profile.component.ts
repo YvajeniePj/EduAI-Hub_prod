@@ -110,7 +110,7 @@ import { HttpEventType } from '@angular/common/http';
         </div>
       </div>
 
-      <div class="profile-grid">
+      <div class="profile-grid" *ngIf="user.role === 'student'">
         <div class="main-column">
           <section class="submissions-section">
             <div class="section-header">
@@ -567,15 +567,26 @@ export class ProfileComponent implements OnInit {
           this.isOwnProfile = false;
           this.api.getUserByName(usernameParam).subscribe({
             next: (userData) => {
+              const role = userData.role === 'instructor' ? 'teacher' : userData.role;
               this.user = {
                 id: userData.id,
                 name: userData.name,
                 avatar_url: userData.avatar_url,
-                role: userData.role === 'instructor' ? 'teacher' : userData.role
+                role: role
               };
-              this.loadSubmissions(usernameParam);
-              this.loadUserGroups(usernameParam);
-              this.loadMyReviews(usernameParam);
+              
+              if (role === 'student') {
+                this.loadSubmissions(usernameParam);
+                this.loadUserGroups(usernameParam);
+                this.loadMyReviews(usernameParam);
+                this.loadSubjects();
+                this.loadAllTests();
+              } else {
+                this.submissions = [];
+                this.userGroups = [];
+                this.myReviews = [];
+                this.filteredReviews = [];
+              }
             },
             error: (err) => {
               console.error('Error loading user profile:', err);
@@ -586,13 +597,20 @@ export class ProfileComponent implements OnInit {
         } else {
           this.isOwnProfile = true;
           this.user = currentUser;
-          this.loadSubmissions(currentUser.name);
-          this.loadUserGroups(currentUser.name);
-          this.loadMyReviews(currentUser.name);
+          
+          if (currentUser.role === 'student') {
+            this.loadSubmissions(currentUser.name);
+            this.loadUserGroups(currentUser.name);
+            this.loadMyReviews(currentUser.name);
+            this.loadSubjects();
+            this.loadAllTests();
+          } else {
+            this.submissions = [];
+            this.userGroups = [];
+            this.myReviews = [];
+            this.filteredReviews = [];
+          }
         }
-        
-        this.loadSubjects();
-        this.loadAllTests();
       });
     });
   }
