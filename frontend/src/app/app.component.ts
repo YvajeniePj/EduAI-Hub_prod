@@ -210,7 +210,7 @@ import { interval, Subscription } from 'rxjs';
           <button mat-button routerLink="/profile" class="profile-button">
             <div class="profile-content">
               <div class="avatar-container" *ngIf="currentUser.avatar_url">
-                <img [src]="currentUser.avatar_url" alt="avatar" class="toolbar-avatar" (error)="currentUser.avatar_url = undefined">
+                <img [src]="getAvatarUrl(currentUser.avatar_url)" alt="avatar" class="toolbar-avatar" (error)="currentUser.avatar_url = undefined">
               </div>
               <mat-icon *ngIf="!currentUser.avatar_url" class="toolbar-avatar-icon">person</mat-icon>
               <span class="toolbar-user-name">{{ currentUser.name }}</span>
@@ -688,6 +688,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.auth.logout();
     this.currentUser = null;
     this.router.navigate(['/login']);
+  }
+
+  getAvatarUrl(url: string | undefined): string | undefined {
+    if (!url) return undefined;
+    if (url.startsWith('http')) return url;
+    if (url.startsWith('/static')) return `/api${url}`;
+    if (url.startsWith('/api/')) return url;
+    return `/api/${url}`;
   }
 }
 

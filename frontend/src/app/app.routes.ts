@@ -48,6 +48,7 @@ export const routes: Routes = [
   { path: 'submissions/:id/results', component: SubmissionResultsComponent, canActivate: [authGuard] },
   { path: 'materials', component: MaterialsComponent, canActivate: [authGuard] },
   { path: 'profile', component: ProfileComponent, canActivate: [authGuard] },
+  { path: 'profile/:username', component: ProfileComponent, canActivate: [authGuard] },
   { path: 'admin/db', component: AdminDbComponent, canActivate: [authGuard] },
   { path: 'analytics', component: AnalyticsComponent, canActivate: [authGuard] },
   { path: 'activity-monitor', component: ActivityMonitorComponent, canActivate: [authGuard] },

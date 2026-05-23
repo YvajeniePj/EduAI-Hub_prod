@@ -376,12 +376,14 @@ export class StudentsComponent implements OnInit {
     this.apiService.getUsers(search).subscribe({
       next: (users) => {
         // Load groups for each user
-        const userPromises = users.map(user =>
-          this.apiService.getGroups(undefined, user.name).toPromise().then(groups => ({
+        const userPromises = users.map(user => {
+          const role = user.role === 'instructor' ? 'teacher' : user.role;
+          return this.apiService.getGroups(undefined, user.name).toPromise().then(groups => ({
             ...user,
+            role,
             groups: groups || []
-          }))
-        );
+          }));
+        });
 
         Promise.all(userPromises).then(studentsWithGroups => {
           // Filter by subject if selected
