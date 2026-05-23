@@ -89,6 +89,11 @@ import { HttpEventType } from '@angular/common/http';
               Оставить отзыв
             </button>
 
+            <button mat-raised-button *ngIf="isOwnProfile" color="accent" class="notification-trigger-button" (click)="sendTestNotification()" style="margin-left: 8px;">
+              <mat-icon>notifications_active</mat-icon>
+              Проверить уведомления
+            </button>
+
             
             <div class="name-edit-form" *ngIf="isEditingName">
               <mat-form-field appearance="outline">
@@ -831,6 +836,25 @@ export class ProfileComponent implements OnInit {
             alert('Ошибка при отправке отзыва');
           }
         });
+      }
+    });
+  }
+
+  sendTestNotification() {
+    if (!this.user) return;
+    const testNotification = {
+      user_name: this.user.name,
+      title: 'Тестовое уведомление',
+      message: 'Система уведомлений работает корректно! Это сообщение отправлено для проверки.',
+      type: 'info'
+    };
+    this.api.createNotification(testNotification).subscribe({
+      next: () => {
+        this.snackBar.open('Тестовое уведомление успешно отправлено! Проверьте колокольчик в шапке.', 'OK', { duration: 5000 });
+      },
+      error: (err) => {
+        console.error('Error sending test notification:', err);
+        this.snackBar.open('Ошибка при отправке тестового уведомления: ' + (err.error?.detail || 'Неизвестная ошибка'), 'OK', { duration: 5000 });
       }
     });
   }
