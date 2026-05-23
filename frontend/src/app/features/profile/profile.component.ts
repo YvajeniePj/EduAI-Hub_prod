@@ -115,7 +115,7 @@ import { HttpEventType } from '@angular/common/http';
         </div>
       </div>
 
-      <div class="profile-grid" *ngIf="user.role === 'student'">
+      <div class="profile-grid" *ngIf="isOwnProfile || user.role === 'student'">
         <div class="main-column">
           <section class="submissions-section">
             <div class="section-header">
@@ -603,18 +603,12 @@ export class ProfileComponent implements OnInit {
           this.isOwnProfile = true;
           this.user = currentUser;
           
-          if (currentUser.role === 'student') {
-            this.loadSubmissions(currentUser.name);
-            this.loadUserGroups(currentUser.name);
-            this.loadMyReviews(currentUser.name);
-            this.loadSubjects();
-            this.loadAllTests();
-          } else {
-            this.submissions = [];
-            this.userGroups = [];
-            this.myReviews = [];
-            this.filteredReviews = [];
-          }
+          // Для собственного профиля загружаем все данные независимо от роли
+          this.loadSubmissions(currentUser.name);
+          this.loadUserGroups(currentUser.name);
+          this.loadMyReviews(currentUser.name);
+          this.loadSubjects();
+          this.loadAllTests();
         }
       });
     });
