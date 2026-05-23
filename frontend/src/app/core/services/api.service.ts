@@ -35,6 +35,10 @@ export class ApiService {
     return this.http.post<any>(`${API_URL}/users/${id}/avatar`, formData);
   }
 
+  uploadNewsImage(formData: FormData): Observable<any> {
+    return this.http.post<any>(`${API_URL}/news/upload-image`, formData);
+  }
+
   // Subjects
   getSubjects(): Observable<any[]> {
     return this.http.get<any[]>(`${API_URL}/subjects`);

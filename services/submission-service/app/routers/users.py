@@ -143,3 +143,31 @@ async def delete_user(user_id: UUID, db: Session = Depends(get_db)):
     db.delete(user)
     db.commit()
     return {"status": "success", "message": "User deleted"}
+
+
+@router.post("/news/upload-image")
+async def upload_news_image(file: UploadFile = File(...)):
+    """Upload news image and save it to static storage"""
+    import uuid
+    import os
+    from pathlib import Path
+    import shutil
+    
+    news_dir = Path("static/news")
+    news_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod("static/news", 0o777)
+    except:
+        pass
+        
+    file_extension = Path(file.filename).suffix
+    unique_id = uuid.uuid4()
+    file_name = f"{unique_id}{file_extension}"
+    file_path = news_dir / file_name
+    
+    file.file.seek(0)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    image_url = f"/static/news/{file_name}"
+    return {"image_url": image_url}

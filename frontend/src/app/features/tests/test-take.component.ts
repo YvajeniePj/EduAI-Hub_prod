@@ -1542,13 +1542,19 @@ export class TestTakeComponent implements OnInit, OnDestroy {
             }
 
             // Redirect based on source
-            if (this.source === 'tests') {
-              this.router.navigate(['/tests']);
-            } else if (this.source === 'courses' && this.test && this.test.subject_id) {
-              alert('Тест завершен! Ваш результат сохранен.');
-              this.router.navigate(['/courses', this.test.subject_id]);
+            const isMultipleChoice = this.test && this.test.test_type === 'multiple_choice';
+            
+            if (isMultipleChoice) {
+              this.router.navigate(['/submissions', this.submissionId, 'results'], { queryParams: { source: this.source } });
             } else {
-              this.router.navigate(['/submissions', this.submissionId, 'results']);
+              if (this.source === 'tests') {
+                this.router.navigate(['/tests']);
+              } else if (this.source === 'courses' && this.test && this.test.subject_id) {
+                alert('Тест завершен! Ваш результат сохранен.');
+                this.router.navigate(['/courses', this.test.subject_id]);
+              } else {
+                this.router.navigate(['/submissions', this.submissionId, 'results']);
+              }
             }
           },
           error: (err) => {

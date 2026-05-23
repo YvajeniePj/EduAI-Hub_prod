@@ -59,11 +59,27 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
               <textarea matInput formControlName="content" rows="6" required></textarea>
             </mat-form-field>
 
-            <mat-form-field appearance="outline" style="width: 100%;">
-              <mat-label>URL изображения (опционально)</mat-label>
-              <input matInput formControlName="image_url" placeholder="https://example.com/image.jpg">
-              <mat-hint>Введите URL изображения для новости</mat-hint>
-            </mat-form-field>
+            <div class="image-upload-section" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
+              <mat-form-field appearance="outline" style="width: 100%; margin-bottom: 0;">
+                <mat-label>URL изображения (опционально)</mat-label>
+                <input matInput formControlName="image_url" placeholder="https://example.com/image.jpg" #imageUrlInput>
+                <mat-hint>Введите URL изображения или загрузите файл с компьютера</mat-hint>
+              </mat-form-field>
+              
+              <div style="display: flex; align-items: center; gap: 15px; margin-top: 5px;">
+                <input type="file" #fileInput (change)="onFileSelected($event)" accept="image/*" style="display: none;">
+                <button mat-stroked-button type="button" color="accent" (click)="fileInput.click()" [disabled]="uploadingImage">
+                  <mat-icon>upload_file</mat-icon>
+                  Выбрать картинку
+                </button>
+                <span class="file-name" *ngIf="selectedFile" style="font-size: 13px; color: #555;">{{ selectedFile.name }}</span>
+                <button mat-raised-button type="button" color="primary" *ngIf="selectedFile" (click)="uploadImage()" [disabled]="uploadingImage" style="height: 36px;">
+                  <mat-icon *ngIf="!uploadingImage">cloud_upload</mat-icon>
+                  <mat-icon class="spin" *ngIf="uploadingImage">sync</mat-icon>
+                  {{ uploadingImage ? 'Загрузка...' : 'Загрузить локально' }}
+                </button>
+              </div>
+            </div>
 
             <div class="actions">
               <button mat-raised-button color="primary" type="submit" [disabled]="!newsForm.valid || submitting">
@@ -157,6 +173,8 @@ export class NewsManageComponent implements OnInit {
   allNews: any[] = [];
   editingNews: any = null;
   submitting = false;
+  selectedFile: File | null = null;
+  uploadingImage = false;
 
   constructor(
     private fb: FormBuilder,
@@ -264,8 +282,41 @@ export class NewsManageComponent implements OnInit {
     }
   }
 
+  onFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      this.selectedFile = file;
+    }
+  }
+
+  uploadImage() {
+    if (!this.selectedFile) return;
+
+    this.uploadingImage = true;
+    const formData = new FormData();
+    formData.append('file', this.selectedFile);
+
+    this.apiService.uploadNewsImage(formData).subscribe({
+      next: (res) => {
+        this.uploadingImage = false;
+        this.selectedFile = null;
+        if (res && res.image_url) {
+          const fullImageUrl = `/api${res.image_url}`;
+          this.newsForm.patchValue({ image_url: fullImageUrl });
+          alert('Изображение успешно загружено!');
+        }
+      },
+      error: (err) => {
+        console.error('Error uploading news image:', err);
+        alert('Ошибка при загрузке изображения');
+        this.uploadingImage = false;
+      }
+    });
+  }
+
   resetForm() {
     this.editingNews = null;
+    this.selectedFile = null;
     this.newsForm.reset();
   }
 }

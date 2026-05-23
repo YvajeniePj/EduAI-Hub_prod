@@ -2,7 +2,7 @@
 API Gateway - Entry point for all API requests
 Routes requests to appropriate microservices
 """
-from fastapi import FastAPI, HTTPException, Request, Query, Depends
+from fastapi import FastAPI, HTTPException, Request, Query, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -929,6 +929,45 @@ async def get_avatar_submissions(filename: str):
             )
     except httpx.RequestError as e:
         logger.error(f"Request error to submission service for avatar: {e}")
+        raise HTTPException(status_code=503, detail="Submission service unavailable")
+
+
+@app.get("/static/news/{filename}")
+async def get_news_image(filename: str):
+    """Proxy news image files from submission-service"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{SUBMISSION_SERVICE_URL}/static/news/{filename}")
+            if response.status_code >= 400:
+                raise HTTPException(status_code=response.status_code, detail="Image not found")
+            return Response(
+                content=response.content,
+                media_type=response.headers.get("content-type", "image/jpeg")
+            )
+    except httpx.RequestError as e:
+        logger.error(f"Request error to submission service for news image: {e}")
+        raise HTTPException(status_code=503, detail="Submission service unavailable")
+
+
+@app.post("/news/upload-image")
+async def upload_news_image(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_teacher)
+):
+    """Proxy news image upload to submission-service (Teachers/Admins only)"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            file_content = await file.read()
+            files = {'file': (file.filename, file_content, file.content_type)}
+            response = await client.post(
+                f"{SUBMISSION_SERVICE_URL}/news/upload-image",
+                files=files
+            )
+            if response.status_code >= 400:
+                raise HTTPException(status_code=response.status_code, detail=response.text)
+            return response.json()
+    except httpx.RequestError as e:
+        logger.error(f"Request error to submission service for news upload: {e}")
         raise HTTPException(status_code=503, detail="Submission service unavailable")
 
 

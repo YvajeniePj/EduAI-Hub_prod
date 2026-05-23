@@ -263,8 +263,8 @@ import { Router } from '@angular/router';
         </div>
 
         <div class="actions">
-          <button mat-raised-button color="primary" routerLink="/tests" class="back-button">
-            Вернуться к тестам
+          <button mat-raised-button color="primary" (click)="goBack()" class="back-button">
+            {{ getBackButtonLabel() }}
           </button>
         </div>
       </div>
@@ -791,6 +791,8 @@ export class SubmissionResultsComponent implements OnInit {
   teacherFeedback: string = '';
   projectScore: number = 0;
   allVersions: any[] = [];
+  source: string | null = null;
+  subjectId: string | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -801,6 +803,7 @@ export class SubmissionResultsComponent implements OnInit {
 
   ngOnInit() {
     this.isTeacher = this.auth.getCurrentUser()?.role === 'teacher';
+    this.source = this.route.snapshot.queryParamMap.get('source');
     const submissionId = this.route.snapshot.paramMap.get('id');
     if (submissionId) {
       this.loadResults(submissionId);
@@ -870,6 +873,7 @@ export class SubmissionResultsComponent implements OnInit {
           this.apiService.getTest(results.submission.test_id).subscribe({
             next: (test) => {
               this.testType = test.test_type || '';
+              this.subjectId = test.subject_id || null;
               this.isAiGenerated = test.ai_generated === 'true' || test.ai_generated === true;
               
               // Extract material IDs from description
@@ -952,6 +956,18 @@ export class SubmissionResultsComponent implements OnInit {
           this.loadingFeedback[index] = false;
         }
       });
+    }
+  }
+
+  getBackButtonLabel(): string {
+    return this.source === 'courses' ? 'Вернуться к курсу' : 'Вернуться к тестам';
+  }
+
+  goBack() {
+    if (this.source === 'courses' && this.subjectId) {
+      this.router.navigate(['/courses', this.subjectId]);
+    } else {
+      this.router.navigate(['/tests']);
     }
   }
 }

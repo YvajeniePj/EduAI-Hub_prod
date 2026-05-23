@@ -714,6 +714,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
   startGlobalTimerCheck() {
     this.timerSubscription = interval(1000).subscribe(() => {
+      // Скрываем таймер в шапке, если пользователь находится на странице прохождения теста
+      if (this.router.url.includes('/take')) {
+        this.activeTestTimer = null;
+        return;
+      }
+
       const timerDataStr = localStorage.getItem('active_test_timer');
       if (!timerDataStr) {
         this.activeTestTimer = null;
