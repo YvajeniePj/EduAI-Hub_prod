@@ -175,12 +175,16 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
       height: 240px;
       overflow: hidden;
       border-bottom: 1px solid #f1f5f9;
+      background: #eaeef3;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     .news-item-image {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
     }
 
     .news-item-content {
@@ -336,15 +340,18 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
       width: 100%;
       border-radius: 8px;
       overflow: hidden;
-      max-height: 160px;
+      height: 160px;
       border: 1px solid #e2e8f0;
+      background: #eaeef3;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     .preview-img {
       width: 100%;
       height: 100%;
-      object-fit: cover;
-      max-height: 160px;
+      object-fit: contain;
       display: block;
     }
 

@@ -28,7 +28,7 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
       <!-- Content wrapper with scroll -->
       <div class="dialog-body" style="flex: 1; overflow-y: auto; padding: 24px; background: #f8fafc;">
         <img *ngIf="data.news.image_url" [src]="data.news.image_url" alt="News image" 
-             style="width: 100%; max-height: 380px; object-fit: cover; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+             style="width: 100%; max-height: 480px; object-fit: contain; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); background: #eaeef3;">
         
         <div class="news-meta" style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
           <mat-chip-set>
@@ -328,11 +328,15 @@ export class NewsDialogComponent {
       height: 240px;
       overflow: hidden;
       border-bottom: 1px solid #f1f5f9;
+      background: #eaeef3;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
     .news-image {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       transition: transform 0.4s ease;
     }
     .news-card:hover .news-image {
