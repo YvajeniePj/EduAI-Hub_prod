@@ -14,6 +14,7 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
 import { AuthService, CurrentUser } from '../../core/services/auth.service';
 import { ApiService } from '../../core/services/api.service';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { HttpEventType } from '@angular/common/http';
 
 @Component({
@@ -32,6 +33,7 @@ import { HttpEventType } from '@angular/common/http';
     MatDialogModule,
     MatProgressBarModule,
     MatSnackBarModule,
+    MatTooltipModule,
     FormsModule,
     ReactiveFormsModule
   ],
