@@ -898,6 +898,40 @@ async def upload_avatar(user_id: str, request: Request, current_user: Optional[d
         raise HTTPException(status_code=503, detail="Submission service unavailable")
 
 
+@app.get("/static/avatars/{filename}")
+async def get_avatar(filename: str):
+    """Proxy avatar files from submission-service"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{SUBMISSION_SERVICE_URL}/static/avatars/{filename}")
+            if response.status_code >= 400:
+                raise HTTPException(status_code=response.status_code, detail="Avatar not found")
+            return Response(
+                content=response.content,
+                media_type=response.headers.get("content-type", "image/jpeg")
+            )
+    except httpx.RequestError as e:
+        logger.error(f"Request error to submission service for avatar: {e}")
+        raise HTTPException(status_code=503, detail="Submission service unavailable")
+
+
+@app.get("/submissions/static/avatars/{filename}")
+async def get_avatar_submissions(filename: str):
+    """Proxy cached avatars from submission-service"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{SUBMISSION_SERVICE_URL}/static/avatars/{filename}")
+            if response.status_code >= 400:
+                raise HTTPException(status_code=response.status_code, detail="Avatar not found")
+            return Response(
+                content=response.content,
+                media_type=response.headers.get("content-type", "image/jpeg")
+            )
+    except httpx.RequestError as e:
+        logger.error(f"Request error to submission service for avatar: {e}")
+        raise HTTPException(status_code=503, detail="Submission service unavailable")
+
+
 # Material Service Routes
 @app.get("/materials")
 async def get_materials(subject_id: Optional[str] = None):

@@ -1,6 +1,6 @@
 import { Component, OnInit, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
@@ -41,9 +41,9 @@ import { HttpEventType } from '@angular/common/http';
         <div class="profile-header-content">
           <div class="avatar-section">
             <div class="profile-avatar-wrapper">
-              <img [src]="user.avatar_url" alt="avatar" class="profile-avatar" *ngIf="user.avatar_url" (error)="user.avatar_url = undefined">
+              <img [src]="getAvatarUrl(user.avatar_url)" alt="avatar" class="profile-avatar" *ngIf="user.avatar_url" (error)="user.avatar_url = undefined">
               <mat-icon class="profile-avatar-placeholder" *ngIf="!user.avatar_url">person</mat-icon>
-              <div class="avatar-overlay" (click)="fileInput.click()">
+              <div class="avatar-overlay" *ngIf="isOwnProfile" (click)="fileInput.click()">
                 <mat-icon>photo_camera</mat-icon>
               </div>
             </div>
@@ -56,10 +56,11 @@ import { HttpEventType } from '@angular/common/http';
               <h1>{{ user.name }}</h1>
               
               <!-- SuperAdmin Toggle Badge -->
-              <span class="role-badge super-admin-badge clickable" 
+              <span class="role-badge super-admin-badge" 
+                    [class.clickable]="isOwnProfile"
                     *ngIf="user?.is_hidden_admin" 
-                    (click)="toggleRole()"
-                    matTooltip="Нажмите, чтобы переключить режим отображения (Админ/Студент)">
+                    (click)="isOwnProfile ? toggleRole() : null"
+                    [matTooltip]="isOwnProfile ? 'Нажмите, чтобы переключить режим отображения (Админ/Студент)' : ''">
                 Администратор
               </span>
 
@@ -70,7 +71,7 @@ import { HttpEventType } from '@angular/common/http';
                 {{ user.role === 'admin' ? 'Администратор' : (user.role === 'teacher' || user.role === 'instructor' ? 'Преподаватель' : 'Студент') }}
               </span>
 
-              <button mat-icon-button (click)="startEditName()" matTooltip="Изменить имя">
+              <button mat-icon-button *ngIf="isOwnProfile" (click)="startEditName()" matTooltip="Изменить имя">
                 <mat-icon>edit</mat-icon>
               </button>
             </div>
@@ -81,7 +82,7 @@ import { HttpEventType } from '@angular/common/http';
               <span>Включен режим просмотра от лица студента</span>
             </div>
             
-            <button mat-stroked-button color="primary" class="feedback-button" (click)="openFeedbackDialog()">
+            <button mat-stroked-button *ngIf="isOwnProfile" color="primary" class="feedback-button" (click)="openFeedbackDialog()">
               <mat-icon>feedback</mat-icon>
               Оставить отзыв
             </button>
@@ -112,7 +113,7 @@ import { HttpEventType } from '@angular/common/http';
           <section class="submissions-section">
             <div class="section-header">
               <mat-icon>assignment</mat-icon>
-              <h2>Мои сдачи</h2>
+              <h2>{{ isOwnProfile ? 'Мои сдачи' : 'Оценки студента' }}</h2>
             </div>
             
             <div *ngIf="submissions.length === 0" class="empty-state">
@@ -135,7 +136,7 @@ import { HttpEventType } from '@angular/common/http';
                     <div class="score-label">Общий балл</div>
                   </div>
                 </mat-card-content>
-                <mat-card-actions align="end">
+                <mat-card-actions align="end" *ngIf="isOwnProfile || isTeacherOrAdmin">
                   <button mat-button color="primary" [routerLink]="['/submissions', s.id, 'results']">
                     ПОДРОБНЕЕ
                   </button>
@@ -144,10 +145,10 @@ import { HttpEventType } from '@angular/common/http';
             </div>
           </section>
 
-          <section class="reviews-section">
+          <section class="reviews-section" *ngIf="isOwnProfile || isTeacherOrAdmin">
             <div class="section-header">
               <mat-icon>rate_review</mat-icon>
-              <h2>Мои оценки</h2>
+              <h2>{{ isOwnProfile ? 'Мои оценки' : 'Отзывы о студенте' }}</h2>
             </div>
             
             <mat-card class="filter-card">
@@ -521,6 +522,7 @@ export class ProfileComponent implements OnInit {
   selectedSubjectFilter: string | null = null;
   selectedTestFilter: string | null = null;
   userGroups: any[] = [];
+  isOwnProfile = true;
 
   // Edit states
   isEditingName = false;
@@ -533,22 +535,63 @@ export class ProfileComponent implements OnInit {
     private api: ApiService,
     private dialog: MatDialog,
     private fb: FormBuilder,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private route: ActivatedRoute,
+    private router: Router
   ) { }
 
+  getAvatarUrl(url: string | undefined): string | undefined {
+    if (!url) return undefined;
+    if (url.startsWith('http')) return url;
+    if (url.startsWith('/static')) return `/api${url}`;
+    if (url.startsWith('/api/')) return url;
+    return `/api/${url}`;
+  }
+
+  get isTeacherOrAdmin(): boolean {
+    const role = this.auth.getCurrentUser()?.role;
+    return role === 'teacher' || role === 'admin';
+  }
+
   ngOnInit(): void {
-    this.refreshUser();
-    
-    // Subscribe to current user to stay in sync with Keycloak
-    this.auth.currentUser$.subscribe(user => {
-      if (user) {
-        this.user = user;
-        this.loadSubmissions();
+    this.route.params.subscribe(params => {
+      const usernameParam = params['username'];
+      this.refreshUser();
+      
+      this.auth.currentUser$.subscribe(currentUser => {
+        if (!currentUser) return;
+        
+        if (usernameParam && usernameParam !== currentUser.name) {
+          this.isOwnProfile = false;
+          this.api.getUserByName(usernameParam).subscribe({
+            next: (userData) => {
+              this.user = {
+                id: userData.id,
+                name: userData.name,
+                avatar_url: userData.avatar_url,
+                role: userData.role === 'instructor' ? 'teacher' : userData.role
+              };
+              this.loadSubmissions(usernameParam);
+              this.loadUserGroups(usernameParam);
+              this.loadMyReviews(usernameParam);
+            },
+            error: (err) => {
+              console.error('Error loading user profile:', err);
+              this.snackBar.open('Пользователь не найден', 'OK', { duration: 3000 });
+              this.router.navigate(['/']);
+            }
+          });
+        } else {
+          this.isOwnProfile = true;
+          this.user = currentUser;
+          this.loadSubmissions(currentUser.name);
+          this.loadUserGroups(currentUser.name);
+          this.loadMyReviews(currentUser.name);
+        }
+        
         this.loadSubjects();
         this.loadAllTests();
-        this.loadMyReviews();
-        this.loadUserGroups();
-      }
+      });
     });
   }
 
@@ -644,9 +687,10 @@ export class ProfileComponent implements OnInit {
     }
   }
 
-  loadUserGroups() {
-    if (!this.user) return;
-    this.api.getGroups(undefined, this.user.name).subscribe({
+  loadUserGroups(username?: string) {
+    const targetUser = username || this.user?.name;
+    if (!targetUser) return;
+    this.api.getGroups(undefined, targetUser).subscribe({
       next: (groups) => {
         this.userGroups = groups;
       },
@@ -659,9 +703,10 @@ export class ProfileComponent implements OnInit {
     return subject ? subject.name : 'Неизвестный курс';
   }
 
-  loadSubmissions() {
-    if (!this.user) return;
-    this.api.getSubmissions(undefined, this.user.name).subscribe({
+  loadSubmissions(username?: string) {
+    const targetUser = username || this.user?.name;
+    if (!targetUser) return;
+    this.api.getSubmissions(undefined, targetUser).subscribe({
       next: (subs) => (this.submissions = subs),
       error: (err) => console.error('Error loading submissions', err)
     });
@@ -695,11 +740,12 @@ export class ProfileComponent implements OnInit {
     }
   }
 
-  loadMyReviews() {
-    if (!this.user) return;
+  loadMyReviews(username?: string) {
+    const targetUser = username || this.user?.name;
+    if (!targetUser) return;
 
     // Загружаем все отзывы для пользователя (без фильтра по тесту)
-    this.api.getMyReviews(this.user.name).subscribe({
+    this.api.getMyReviews(targetUser).subscribe({
       next: (reviews) => {
         this.myReviews = reviews;
         this.applyFilters();

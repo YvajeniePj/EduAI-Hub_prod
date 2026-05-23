@@ -1,9 +1,10 @@
 import { Component, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatDialogModule, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
+import { Router } from '@angular/router';
 
 @Component({
     selector: 'app-user-profile-dialog',
@@ -12,12 +13,15 @@ import { MatChipsModule } from '@angular/material/chips';
     template: `
     <div class="profile-dialog-header">
       <div class="avatar-container">
-        <img *ngIf="data.user.avatar_url" [src]="data.user.avatar_url" alt="avatar" class="avatar" (error)="data.user.avatar_url = undefined">
+        <img *ngIf="data.user.avatar_url" [src]="getAvatarUrl(data.user.avatar_url)" alt="avatar" class="avatar" (error)="data.user.avatar_url = undefined">
         <mat-icon *ngIf="!data.user.avatar_url" style="font-size: 64px; width: 64px; height: 64px; color: #999;">person</mat-icon>
       </div>
       <h2>{{ data.user.name }}</h2>
-      <span class="role-badge" [class.teacher]="data.user.role === 'teacher' || data.user.role === 'instructor'">
-        {{ (data.user.role === 'teacher' || data.user.role === 'instructor') ? 'Преподаватель' : 'Студент' }}
+      <span class="role-badge" 
+            [class.admin]="data.user.role === 'admin'"
+            [class.teacher]="data.user.role === 'teacher' || data.user.role === 'instructor'"
+            [class.student]="data.user.role === 'student'">
+        {{ getRoleLabel(data.user.role) }}
       </span>
     </div>
     
@@ -38,6 +42,7 @@ import { MatChipsModule } from '@angular/material/chips';
     </mat-dialog-content>
 
     <mat-dialog-actions align="end">
+      <button mat-button (click)="viewFullProfile()" color="primary">Посмотреть профиль</button>
       <button mat-button mat-dialog-close>Закрыть</button>
     </mat-dialog-actions>
   `,
@@ -83,6 +88,14 @@ import { MatChipsModule } from '@angular/material/chips';
       background: #e8f5e9;
       color: #2e7d32;
     }
+    .role-badge.admin {
+      background: #f3e5f5;
+      color: #7b1fa2;
+    }
+    .role-badge.student {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
     .info-section {
       margin-top: 24px;
       min-width: 300px;
@@ -103,5 +116,32 @@ import { MatChipsModule } from '@angular/material/chips';
   `]
 })
 export class UserProfileDialogComponent {
-    constructor(@Inject(MAT_DIALOG_DATA) public data: { user: any }) { }
+    constructor(
+        @Inject(MAT_DIALOG_DATA) public data: { user: any },
+        private dialogRef: MatDialogRef<UserProfileDialogComponent>,
+        private router: Router
+    ) { }
+
+    getRoleLabel(role: string): string {
+        switch (role) {
+            case 'admin': return 'Администратор';
+            case 'teacher':
+            case 'instructor': return 'Преподаватель';
+            case 'student': return 'Студент';
+            default: return role;
+        }
+    }
+
+    getAvatarUrl(url: string | undefined): string | undefined {
+        if (!url) return undefined;
+        if (url.startsWith('http')) return url;
+        if (url.startsWith('/static')) return `/api${url}`;
+        if (url.startsWith('/api/')) return url;
+        return `/api/${url}`;
+    }
+
+    viewFullProfile() {
+        this.dialogRef.close();
+        this.router.navigate(['/profile', this.data.user.name]);
+    }
 }
