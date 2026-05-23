@@ -198,7 +198,7 @@ interface TreeNode {
                     <mat-icon class="resource-icon">quiz</mat-icon>
                     <div class="resource-info">
                        <div class="resource-title">Проверочное тестирование</div>
-                       <button mat-raised-button color="primary" [routerLink]="['/tests', selectedLesson.content.test_id, 'take']">
+                       <button mat-raised-button color="primary" [routerLink]="['/tests', selectedLesson.content.test_id, 'take']" [queryParams]="{ source: 'courses' }">
                          Начать тест
                        </button>
                     </div>

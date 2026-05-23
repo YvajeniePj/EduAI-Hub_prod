@@ -1,7 +1,7 @@
 """
 Test router - CRUD operations for tests
 """
-from fastapi import APIRouter, HTTPException, Depends, Query, Header, File, UploadFile
+from fastapi import APIRouter, HTTPException, Depends, Query, Header, File, UploadFile, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -216,7 +216,7 @@ async def get_test(test_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=TestResponse, status_code=201)
-async def create_test(test: TestCreate, db: Session = Depends(get_db), x_user_name: Optional[str] = Header(None, alias="X-User-Name")):
+async def create_test(test: TestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), x_user_name: Optional[str] = Header(None, alias="X-User-Name")):
     """Create a new test with questions"""
     from app.models import Question, Keyword
     
@@ -293,7 +293,8 @@ async def create_test(test: TestCreate, db: Session = Depends(get_db), x_user_na
     except:
         decoded_name = x_user_name
 
-    await create_notification(
+    background_tasks.add_task(
+        create_notification,
         user_name=None, 
         title="Новый тест доступен", 
         message=f"Добавлен новый тест: {test.title}{due_date_str}",

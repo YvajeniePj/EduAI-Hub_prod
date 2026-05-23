@@ -1,7 +1,7 @@
 """
 Subject router - CRUD operations for subjects
 """
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Header
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Header, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -55,7 +55,7 @@ async def get_subjects(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=SubjectResponse, status_code=201)
-async def create_subject(subject: SubjectCreate, db: Session = Depends(get_db), x_user_name: Optional[str] = Header(None, alias="X-User-Name")):
+async def create_subject(subject: SubjectCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), x_user_name: Optional[str] = Header(None, alias="X-User-Name")):
     """Create a new subject"""
     # Check if subject with same name already exists
     existing = db.query(Subject).filter(Subject.name == subject.name).first()
@@ -75,7 +75,8 @@ async def create_subject(subject: SubjectCreate, db: Session = Depends(get_db), 
     except:
         decoded_name = x_user_name
 
-    await create_notification(
+    background_tasks.add_task(
+        create_notification,
         user_name=None, 
         title="Новый курс создан", 
         message=f"Создан новый курс: {subject.name}",
@@ -165,7 +166,7 @@ async def get_cover_image(subject_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/{subject_id}/clone", response_model=SubjectResponse)
-async def clone_subject(subject_id: UUID, db: Session = Depends(get_db), x_user_name: Optional[str] = Header(None, alias="X-User-Name")):
+async def clone_subject(subject_id: UUID, background_tasks: BackgroundTasks, db: Session = Depends(get_db), x_user_name: Optional[str] = Header(None, alias="X-User-Name")):
     """Clone a subject with all its materials, ignoring students and groups"""
     original = db.query(Subject).filter(Subject.id == subject_id).first()
     if not original:
@@ -265,7 +266,8 @@ async def clone_subject(subject_id: UUID, db: Session = Depends(get_db), x_user_
     except:
         decoded_name = x_user_name
 
-    await create_notification(
+    background_tasks.add_task(
+        create_notification,
         user_name=None, 
         title="Курс скопирован", 
         message=f"Создана копия курса: {cloned_subject.name}",

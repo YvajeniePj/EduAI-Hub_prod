@@ -1,7 +1,7 @@
 """
 Submission router - Handles test submissions
 """
-from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile
+from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -379,6 +379,7 @@ async def download_submission_file(
 @router.post("/{submission_id}/finish", response_model=SubmissionResponse)
 async def finish_submission(
     submission_id: UUID,
+    background_tasks: BackgroundTasks,
     use_ai: bool = Query(False),
     db: Session = Depends(get_db)
 ):
@@ -495,7 +496,8 @@ async def finish_submission(
 
     # Notify teachers about new submission if it's not auto-approved multiple choice
     if test_type.lower() != "multiple_choice":
-        await create_notification(
+        background_tasks.add_task(
+            create_notification,
             user_name=None, # Broadcast to all teachers/admins
             title="Новая работа на проверку",
             message=f"Студент {submission.user} сдал работу по тесту '{test_data.get('title')}'",
@@ -511,6 +513,7 @@ async def finish_submission(
 async def update_submission_status(
     submission_id: UUID,
     status_update: SubmissionStatusUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     submission = db.query(Submission).filter(Submission.id == submission_id).first()
@@ -539,7 +542,8 @@ async def update_submission_status(
 
     # Notify student about status update
     status_label = "одобрена" if submission.status == "approved" else "отклонена"
-    await create_notification(
+    background_tasks.add_task(
+        create_notification,
         user_name=submission.user,
         title=f"Работа {status_label}",
         message=f"Ваша работа по тесту была {status_label} преподавателем.",

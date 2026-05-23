@@ -312,7 +312,16 @@ export class SubmissionsManagementComponent implements OnInit {
   }
 
   applyFilters() {
+    const currentUser = this.auth.getCurrentUser();
+    const isCurrentUserEgor = !!(currentUser && (currentUser.is_hidden_admin || currentUser.name === 'Егор Жигачёв'));
+
     this.filteredSubmissions = this.submissions.filter(sub => {
+      // Скрытие работ Егора Жигачёва от других пользователей
+      const isAuthorEgor = sub.user === 'Егор Жигачёв';
+      if (isAuthorEgor && !isCurrentUserEgor) {
+        return false;
+      }
+
       const matchesSubject = !this.filter.subjectId || this.getTestSubjectId(sub.test_id) === this.filter.subjectId;
       const matchesType = !this.filter.type || this.getTestType(sub.test_id) === this.filter.type;
       const matchesStudent = !this.filter.studentName || sub.user.toLowerCase().includes(this.filter.studentName.toLowerCase());

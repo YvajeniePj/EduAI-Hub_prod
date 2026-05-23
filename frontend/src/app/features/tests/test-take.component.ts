@@ -1153,8 +1153,12 @@ export class TestTakeComponent implements OnInit, OnDestroy {
               // Already started, just resume
               this.startSubmission(testId);
             } else {
-              // Fresh start, show buffer
-              this.isPreStart = true;
+              // Fresh start, show buffer only if there is a time limit
+              if (this.hasTimeLimit) {
+                this.isPreStart = true;
+              } else {
+                this.startSubmission(testId);
+              }
             }
           });
         } else {
@@ -1475,7 +1479,7 @@ export class TestTakeComponent implements OnInit, OnDestroy {
   private navigateBack() {
     if (this.source === 'tests') {
       this.router.navigate(['/tests']);
-    } else if (this.test && this.test.subject_id) {
+    } else if (this.source === 'courses' && this.test && this.test.subject_id) {
       this.router.navigate(['/courses', this.test.subject_id]);
     } else {
       this.router.navigate(['/tests']);
@@ -1526,7 +1530,7 @@ export class TestTakeComponent implements OnInit, OnDestroy {
             // Redirect based on source
             if (this.source === 'tests') {
               this.router.navigate(['/tests']);
-            } else if (this.test && this.test.subject_id) {
+            } else if (this.source === 'courses' && this.test && this.test.subject_id) {
               alert('Тест завершен! Ваш результат сохранен.');
               this.router.navigate(['/courses', this.test.subject_id]);
             } else {

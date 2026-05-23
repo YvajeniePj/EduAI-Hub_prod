@@ -49,13 +49,6 @@ import { AuthService } from '../../core/services/auth.service';
       </div>
 
       <div class="test-buffer-info" *ngIf="!isTeacher">
-        <mat-card class="warning-card">
-          <mat-card-content>
-            <mat-icon color="warn">warning</mat-icon>
-            <p><strong>Внимание!</strong> После начала теста выполнение отменить нельзя. Тест будет автоматически отправлен по истечении времени или при нажатии кнопки завершить.</p>
-          </mat-card-content>
-        </mat-card>
-
         <div class="test-stats-row">
           <div class="stat-box">
             <span class="stat-label">Количество вопросов</span>
@@ -69,10 +62,10 @@ import { AuthService } from '../../core/services/auth.service';
       </div>
 
       <div class="actions">
-        <button mat-raised-button color="primary" [routerLink]="['/tests', test.id, 'take']" class="start-btn">
+        <button mat-raised-button color="primary" [routerLink]="['/tests', test.id, 'take']" [queryParams]="{ source: source || 'tests' }" class="start-btn">
           Пройти тест
         </button>
-        <button mat-button routerLink="/tests" class="back-btn">Выйти</button>
+        <button mat-button [routerLink]="source === 'courses' && test?.subject_id ? ['/courses', test.subject_id] : '/tests'" class="back-btn">Выйти</button>
       </div>
 
       <div *ngIf="isTeacher">
@@ -198,6 +191,7 @@ export class TestDetailComponent implements OnInit {
   test: any = null;
   testAssets: any[] = [];
   isTeacher = false;
+  source: string | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -208,6 +202,9 @@ export class TestDetailComponent implements OnInit {
 
   ngOnInit() {
     this.isTeacher = this.auth.getCurrentUser()?.role === 'teacher';
+    this.route.queryParams.subscribe(params => {
+      this.source = params['source'];
+    });
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.apiService.getTest(id).subscribe({

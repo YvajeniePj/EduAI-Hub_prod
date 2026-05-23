@@ -848,6 +848,17 @@ export class SubmissionResultsComponent implements OnInit {
         this.results = results;
         // Initialize project score from existing value
         if (results.submission) {
+          // Скрытие работы Егора Жигачёва от других пользователей
+          const currentUser = this.auth.getCurrentUser();
+          const isAuthorEgor = results.submission.user === 'Егор Жигачёв';
+          const isCurrentUserEgor = !!(currentUser && (currentUser.is_hidden_admin || currentUser.name === 'Егор Жигачёв'));
+          
+          if (isAuthorEgor && !isCurrentUserEgor) {
+            alert('Доступ запрещен');
+            this.router.navigate(['/submissions-management']);
+            return;
+          }
+
           this.projectScore = results.submission.total_score || 0;
           this.loadVersionHistory(results.submission.test_id, results.submission.user);
         }
