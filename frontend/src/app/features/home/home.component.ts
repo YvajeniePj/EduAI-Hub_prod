@@ -77,10 +77,10 @@ export class NewsDialogComponent {
       <div class="welcome-banner">
         <div class="welcome-content">
           <h1>Добро пожаловать в EduAI Hub</h1>
-          <p>Ваше персональное цифровое пространство для обучения, тестирования и аналитики. Используйте инструменты искусственного интеллекта для проверки знаний и достижения максимальных результатов.</p>
+          <p>Платформа находится в разработке. При обнаружении ошибок или некорректном отображении пишите в Telegram: <a href="https://t.me/Uvajenie_pj" target="_blank" class="contact-link">&#64;Uvajenie_pj</a>. Также буду очень рад вашим предложениям по улучшению!</p>
         </div>
         <div class="welcome-illustration">
-          <mat-icon class="banner-icon">school</mat-icon>
+          <mat-icon class="banner-icon">construction</mat-icon>
         </div>
       </div>
 
@@ -98,26 +98,29 @@ export class NewsDialogComponent {
             <p>Новостей пока нет</p>
           </div>
 
-          <div class="news-grid" *ngIf="news.length > 0">
-            <mat-card *ngFor="let item of news" class="news-card">
-              <div class="news-image-container" *ngIf="item.image_url">
-                <img [src]="item.image_url" alt="News image" class="news-image">
-              </div>
-              <mat-card-content class="news-card-body">
-                <div class="news-card-meta">
-                  <span class="subject-tag">{{ getSubjectName(item.subject_id) }}</span>
-                  <span class="news-date">{{ item.created_at | russianDate:'datetime' }}</span>
+          <div class="news-scroll-wrapper" *ngIf="news.length > 0">
+            <div class="news-fade-top"></div>
+            <div class="news-grid">
+              <mat-card *ngFor="let item of news" class="news-card">
+                <div class="news-image-container" *ngIf="item.image_url">
+                  <img [src]="item.image_url" alt="News image" class="news-image">
                 </div>
-                <h3 class="news-card-title">{{ item.title }}</h3>
-                <p class="news-card-excerpt">{{ item.content }}</p>
-              </mat-card-content>
-              <mat-card-actions class="news-card-actions">
-                <button mat-button color="primary" (click)="openNewsDialog(item)" class="read-more-btn">
-                  Читать полностью
-                  <mat-icon>arrow_forward</mat-icon>
-                </button>
-              </mat-card-actions>
-            </mat-card>
+                <mat-card-content class="news-card-body">
+                  <div class="news-card-meta">
+                    <span class="subject-tag">{{ getSubjectName(item.subject_id) }}</span>
+                    <span class="news-date">{{ item.created_at | russianDate:'datetime' }}</span>
+                  </div>
+                  <h3 class="news-card-title">{{ item.title }}</h3>
+                  <p class="news-card-excerpt">{{ item.content }}</p>
+                </mat-card-content>
+                <mat-card-actions class="news-card-actions">
+                  <button mat-button color="primary" (click)="openNewsDialog(item)" class="read-more-btn">
+                    Читать полностью
+                    <mat-icon>arrow_forward</mat-icon>
+                  </button>
+                </mat-card-actions>
+              </mat-card>
+            </div>
           </div>
         </div>
 
@@ -208,40 +211,50 @@ export class NewsDialogComponent {
       background: #1e293b;
       color: white;
       border-radius: 16px;
-      padding: 32px 40px;
-      margin-bottom: 32px;
+      padding: 16px 32px;
+      margin-bottom: 24px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.05);
     }
     .welcome-content {
-      max-width: 70%;
+      max-width: 85%;
     }
     .welcome-content h1 {
-      font-size: 32px;
+      font-size: 24px;
       font-weight: 700;
-      margin: 0 0 12px 0;
+      margin: 0 0 6px 0;
       color: #f8fafc;
       letter-spacing: -0.5px;
     }
     .welcome-content p {
-      font-size: 15px;
-      line-height: 1.6;
+      font-size: 13.5px;
+      line-height: 1.5;
       margin: 0;
       color: #94a3b8;
     }
+    .contact-link {
+      color: #818cf8;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+    .contact-link:hover {
+      color: #a5b4fc;
+      text-decoration: underline;
+    }
     .welcome-illustration {
       background: rgba(255, 255, 255, 0.05);
-      width: 80px;
-      height: 80px;
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .banner-icon {
-      font-size: 40px;
-      width: 40px;
-      height: 40px;
-      color: #3f51b5;
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
+      color: #818cf8;
     }
 
     /* Layout Grid */
@@ -259,11 +272,43 @@ export class NewsDialogComponent {
       margin: 0 0 20px 0;
     }
 
-    /* News Cards */
+    /* News Cards with Inner Scrolling */
+    .news-scroll-wrapper {
+      position: relative;
+      display: block;
+    }
+    .news-fade-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 24px;
+      background: linear-gradient(to bottom, #f8fafc 0%, rgba(248, 250, 252, 0) 100%);
+      z-index: 5;
+      pointer-events: none;
+    }
     .news-grid {
       display: flex;
       flex-direction: column;
       gap: 20px;
+      max-height: 760px;
+      overflow-y: auto;
+      padding-top: 8px;
+      padding-right: 8px;
+      scroll-behavior: smooth;
+    }
+    .news-grid::-webkit-scrollbar {
+      width: 6px;
+    }
+    .news-grid::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .news-grid::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    .news-grid::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
     }
     .news-card {
       border-radius: 16px;
