@@ -172,18 +172,21 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
 
     .news-item-image-wrapper {
       width: 100%;
-      max-height: 300px;
-      overflow: hidden;
+      height: 240px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       border-bottom: 1px solid #f1f5f9;
       background: #eaeef3;
+      overflow: hidden;
     }
 
     .news-item-image {
-      width: 100% !important;
+      max-width: 100%;
+      max-height: 100%;
+      width: auto !important;
       height: auto !important;
-      min-height: 180px;
-      max-height: 300px !important;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
     }
 

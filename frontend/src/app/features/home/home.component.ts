@@ -325,17 +325,20 @@ export class NewsDialogComponent {
     }
     .news-image-container {
       width: 100%;
-      max-height: 360px;
-      overflow: hidden;
+      height: 300px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       border-bottom: 1px solid #f1f5f9;
       background: #eaeef3;
+      overflow: hidden;
     }
     .news-image {
-      width: 100% !important;
+      max-width: 100%;
+      max-height: 100%;
+      width: auto !important;
       height: auto !important;
-      min-height: 200px;
-      max-height: 360px !important;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
       transition: transform 0.4s ease;
     }
