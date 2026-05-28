@@ -317,6 +317,7 @@ export class NewsDialogComponent {
       box-shadow: 0 1px 3px rgba(0,0,0,0.02);
       transition: all 0.25s ease;
       overflow: hidden;
+      flex-shrink: 0;
     }
     .news-card:hover {
       transform: translateY(-2px);
@@ -325,10 +326,11 @@ export class NewsDialogComponent {
     }
     .news-image-container {
       width: 100%;
-      height: 600px;
+      height: 400px;
       overflow: hidden;
       border-bottom: 1px solid #f1f5f9;
       background: #eaeef3;
+      flex-shrink: 0;
     }
     .news-image {
       width: 100% !important;

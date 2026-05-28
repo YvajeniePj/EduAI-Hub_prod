@@ -168,14 +168,16 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      flex-shrink: 0;
     }
 
     .news-item-image-wrapper {
       width: 100%;
-      height: 500px;
+      height: 400px;
       overflow: hidden;
       border-bottom: 1px solid #f1f5f9;
       background: #eaeef3;
+      flex-shrink: 0;
     }
 
     .news-item-image {
