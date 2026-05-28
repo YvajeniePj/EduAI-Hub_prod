@@ -172,7 +172,7 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
 
     .news-item-image-wrapper {
       width: 100%;
-      height: 360px;
+      height: 500px;
       overflow: hidden;
       border-bottom: 1px solid #f1f5f9;
       background: #eaeef3;

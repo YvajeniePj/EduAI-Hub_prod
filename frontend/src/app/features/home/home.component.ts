@@ -325,7 +325,7 @@ export class NewsDialogComponent {
     }
     .news-image-container {
       width: 100%;
-      height: 450px;
+      height: 600px;
       overflow: hidden;
       border-bottom: 1px solid #f1f5f9;
       background: #eaeef3;
