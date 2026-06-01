@@ -21,7 +21,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
   ],
   template: `
     <div class="invite-container">
-      <mat-card class="invite-card" *ngIf="subject && group">
+      <mat-card class="invite-card" *ngIf="subject && group && !isTeacherOfCourse">
         <mat-card-header>
           <mat-icon mat-card-avatar class="invite-icon">mail_outline</mat-icon>
           <mat-card-title>Приглашение на курс</mat-card-title>
@@ -35,6 +35,25 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
         <mat-card-actions align="end">
           <button mat-button (click)="decline()">Отклонить</button>
           <button mat-raised-button color="primary" (click)="acceptInvite()">Принять приглашение</button>
+        </mat-card-actions>
+      </mat-card>
+
+      <mat-card class="invite-card" *ngIf="subject && group && isTeacherOfCourse">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="invite-icon">info</mat-icon>
+          <mat-card-title>Управление курсом</mat-card-title>
+          <mat-card-subtitle>Информация для преподавателя</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content class="invite-content">
+          <p class="invite-text">
+            Вы являетесь преподавателем на курсе <strong class="highlight">{{ subject.name }}</strong>.
+          </p>
+          <p class="invite-text" style="margin-top: 8px;">
+            Эта ссылка предназначена для приглашения учащихся в группу <strong class="highlight">{{ group.name }}</strong>.
+          </p>
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <button mat-raised-button color="primary" [routerLink]="['/courses', subjectId]">Перейти к курсу</button>
         </mat-card-actions>
       </mat-card>
 
@@ -102,6 +121,7 @@ export class InviteComponent implements OnInit {
   subject: any = null;
   group: any = null;
   loading: boolean = true;
+  isTeacherOfCourse: boolean = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -121,13 +141,30 @@ export class InviteComponent implements OnInit {
 
   loadDetails(): void {
     this.loading = true;
+    const currentUser = this.authService.getCurrentUser();
+    
     this.apiService.getGroup(this.groupId).subscribe({
       next: (group) => {
         this.group = group;
         this.apiService.getSubject(this.subjectId).subscribe({
           next: (subject) => {
             this.subject = subject;
-            this.loading = false;
+            
+            if (currentUser) {
+              this.apiService.getSubjectTeachers(this.subjectId).subscribe({
+                next: (teachers) => {
+                  const teachersList = teachers || [];
+                  this.isTeacherOfCourse = teachersList.some((t: any) => t.user_name === currentUser.name);
+                  this.loading = false;
+                },
+                error: (err) => {
+                  console.error(err);
+                  this.loading = false;
+                }
+              });
+            } else {
+              this.loading = false;
+            }
           },
           error: (err) => {
             console.error(err);

@@ -2308,22 +2308,34 @@ export class CourseViewComponent implements OnInit, OnDestroy {
 
   loadParticipants() {
     this.apiService.getSubjectTeachers(this.subjectId).subscribe({
-      next: (teachers) => {
-        this.courseTeachers = teachers || [];
-        this.cdr.markForCheck();
+      next: (teachersList) => {
+        const list = teachersList || [];
+        this.apiService.getUsers().subscribe({
+          next: (users) => {
+            this.courseTeachers = list.map((t: any) => {
+              const matchingUser = users.find((u: any) => u.name === t.user_name);
+              return {
+                id: t.id,
+                name: matchingUser ? matchingUser.name : t.user_name,
+                avatar_url: matchingUser ? matchingUser.avatar_url : undefined
+              };
+            });
+            this.courseStudents = users.filter((u: any) => u.role === 'student');
+            this.cdr.markForCheck();
+          },
+          error: (err) => {
+            console.error('Error loading users:', err);
+            this.courseTeachers = list.map((t: any) => ({
+              id: t.id,
+              name: t.user_name,
+              avatar_url: undefined
+            }));
+            this.cdr.markForCheck();
+          }
+        });
       },
       error: (err) => {
         console.error('Error loading subject teachers:', err);
-      }
-    });
-
-    this.apiService.getUsers().subscribe({
-      next: (users) => {
-        this.courseStudents = users.filter((u: any) => u.role === 'student');
-        this.cdr.markForCheck();
-      },
-      error: (err) => {
-        console.error('Error loading users:', err);
       }
     });
   }

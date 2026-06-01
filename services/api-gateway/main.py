@@ -332,13 +332,6 @@ async def get_subjects(current_user: Optional[dict] = Depends(get_current_user))
     return data
 
 
-@app.get("/subjects/{subject_id}")
-async def get_subject(subject_id: str):
-    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}", "GET")
-    if status != 200:
-        raise HTTPException(status_code=status, detail=error or "Failed to fetch subject")
-    return data
-
 
 @app.get("/subjects/{subject_id}/teachers")
 async def get_subject_teachers(subject_id: str):
@@ -472,6 +465,14 @@ async def get_course_structure(subject_id: str):
     data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}/structure", "GET")
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to fetch course structure")
+    return data
+
+
+@app.get("/subjects/{subject_id}")
+async def get_subject(subject_id: str):
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}", "GET")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to fetch subject")
     return data
 
 
