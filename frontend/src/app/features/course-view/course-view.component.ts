@@ -16,8 +16,9 @@ import { AuthService } from '../../core/services/auth.service';
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { MatDialogModule, MatDialog, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatSelectModule } from '@angular/material/select';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { CreateGroupDialogComponent } from '../groups/groups.component';
@@ -56,6 +57,7 @@ interface TreeNode {
     MatTableModule,
     MatDialogModule,
     MatSelectModule,
+    MatCheckboxModule,
     MatInputModule,
     MatListModule,
     FormsModule,
@@ -270,7 +272,10 @@ interface TreeNode {
                                     <span *ngIf="test.due_date">Дедлайн: {{ test.due_date | date:'short' }}</span>
                                 </div>
                             </div>
-                            <div class="item-actions">
+                            <div class="item-actions" style="display: flex; align-items: center; gap: 16px;">
+                                <mat-checkbox [checked]="test.peer_review_enabled === 'true'" (change)="togglePeerReview(test, $event.checked)">
+                                    Включить кросс-проверку
+                                </mat-checkbox>
                                 <button mat-icon-button color="warn" (click)="deleteTest(test.id)">
                                     <mat-icon>delete</mat-icon>
                                 </button>
@@ -440,12 +445,17 @@ interface TreeNode {
                       <ng-container *ngIf="selectedLesson.content?.test_id">
                           <div *ngIf="lessonMetadata.testAllowed" class="resource-card test-card">
                             <mat-icon class="resource-icon">quiz</mat-icon>
-                            <div class="resource-info">
-                               <div class="resource-title">Проверочное тестирование</div>
-                               <button mat-raised-button color="primary" [routerLink]="['/tests', selectedLesson.content.test_id, 'take']" [queryParams]="{ source: 'courses' }">
-                                 Начать тест
-                               </button>
-                            </div>
+                             <div class="resource-info">
+                                <div class="resource-title">Проверочное тестирование</div>
+                                <div class="test-action-buttons" style="display: flex; gap: 8px;">
+                                  <button mat-raised-button color="primary" [routerLink]="['/tests', selectedLesson.content.test_id, 'take']" [queryParams]="{ source: 'courses' }">
+                                    Начать тест
+                                  </button>
+                                  <button mat-stroked-button color="accent" *ngIf="isPeerReviewEnabledForTest(selectedLesson.content.test_id)" (click)="openPeerReviewDialog(selectedLesson.content.test_id)">
+                                    <mat-icon>rate_review</mat-icon> Кросс-проверка
+                                  </button>
+                                </div>
+                             </div>
                           </div>
                           <div *ngIf="!lessonMetadata.testAllowed" class="resource-card locked">
                               <mat-icon class="resource-icon">lock</mat-icon>
@@ -480,6 +490,18 @@ interface TreeNode {
                   <h2>Преподаватели</h2>
                   <span class="people-count">{{ courseTeachers.length }}</span>
                 </div>
+                <!-- Assign Teacher Form -->
+                <div class="add-teacher-form-wrapper" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'">
+                  <form [formGroup]="addTeacherForm" (ngSubmit)="assignTeacher()" class="add-teacher-form">
+                    <mat-form-field appearance="outline" class="small-input" style="margin-bottom: 0;">
+                      <mat-label>Имя пользователя преподавателя</mat-label>
+                      <input matInput formControlName="username" placeholder="Имя пользователя..." />
+                    </mat-form-field>
+                    <button mat-raised-button color="primary" type="submit" [disabled]="addTeacherForm.invalid">
+                      Назначить
+                    </button>
+                  </form>
+                </div>
                 <div class="people-list">
                   <div *ngFor="let teacher of courseTeachers" class="person-row">
                     <div class="person-info">
@@ -490,6 +512,9 @@ interface TreeNode {
                       <a mat-icon-button [href]="'mailto:' + getUserEmail(teacher.name)" title="Написать письмо">
                         <mat-icon>mail_outline</mat-icon>
                       </a>
+                      <button mat-icon-button color="warn" *ngIf="(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && teacher.name !== currentUser.name" (click)="removeTeacher(teacher.name)" title="Удалить преподавателя">
+                        <mat-icon>person_remove</mat-icon>
+                      </button>
                     </div>
                   </div>
                   <div *ngIf="courseTeachers.length === 0" class="empty-people">
@@ -547,7 +572,10 @@ interface TreeNode {
                             </div>
                             <div class="item-actions">
                                 <!-- Teacher actions -->
-                                <div *ngIf="currentUser?.role === 'teacher'" class="teacher-btns">
+                                <div *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'" class="teacher-btns">
+                                    <button mat-stroked-button color="primary" (click)="copyInviteLink(group)" style="height: 40px; margin-right: 8px;">
+                                        <mat-icon>share</mat-icon> Ссылка для приглашения
+                                    </button>
                                     <button mat-icon-button color="primary" (click)="navigateToGroup(group.id)" matTooltip="Управление">
                                         <mat-icon>settings</mat-icon>
                                     </button>
@@ -1546,6 +1574,22 @@ interface TreeNode {
       margin-bottom: 16px;
       font-size: 13px;
     }
+
+    .add-teacher-form-wrapper {
+      margin: 16px 0;
+      padding: 16px;
+      background-color: #f1f3f4;
+      border-radius: 8px;
+      border: 1px dashed #dadce0;
+    }
+    .add-teacher-form {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    .small-input {
+      flex: 1;
+    }
   `]
 })
 export class CourseViewComponent implements OnInit, OnDestroy {
@@ -1565,6 +1609,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   viewingLessonMode = false;
   showComposeForm = false;
   announcementForm!: FormGroup;
+  addTeacherForm!: FormGroup;
   courseAnnouncements: any[] = [];
   courseDeadlines: any[] = [];
   userSubmissions: any[] = [];
@@ -1604,6 +1649,9 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     this.announcementForm = this.fb.group({
       title: ['', Validators.required],
       content: ['', Validators.required]
+    });
+    this.addTeacherForm = this.fb.group({
+      username: ['', Validators.required]
     });
   }
 
@@ -2230,9 +2278,18 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   }
 
   loadParticipants() {
+    this.apiService.getSubjectTeachers(this.subjectId).subscribe({
+      next: (teachers) => {
+        this.courseTeachers = teachers || [];
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error loading subject teachers:', err);
+      }
+    });
+
     this.apiService.getUsers().subscribe({
       next: (users) => {
-        this.courseTeachers = users.filter((u: any) => u.role === 'teacher' || u.role === 'admin' || u.role === 'hidden_admin');
         this.courseStudents = users.filter((u: any) => u.role === 'student');
         this.cdr.markForCheck();
       },
@@ -2318,5 +2375,295 @@ export class CourseViewComponent implements OnInit, OnDestroy {
       return test && test.due_date ? new Date(test.due_date) : null;
     }
     return null;
+  }
+
+  assignTeacher() {
+    if (this.addTeacherForm.invalid) return;
+    const username = this.addTeacherForm.value.username;
+    this.apiService.addSubjectTeacher(this.subjectId, username).subscribe({
+      next: () => {
+        this.addTeacherForm.reset();
+        this.loadParticipants();
+      },
+      error: (err) => {
+        console.error('Error assigning teacher:', err);
+        alert('Ошибка при добавлении преподавателя. Возможно, пользователь не найден или уже назначен.');
+      }
+    });
+  }
+
+  removeTeacher(username: string) {
+    if (confirm(`Вы уверены, что хотите удалить преподавателя ${username}?`)) {
+      this.apiService.removeSubjectTeacher(this.subjectId, username).subscribe({
+        next: () => {
+          this.loadParticipants();
+        },
+        error: (err) => {
+          console.error('Error removing teacher:', err);
+          alert('Ошибка при удалении преподавателя.');
+        }
+      });
+    }
+  }
+
+  copyInviteLink(group: any) {
+    const link = window.location.origin + '/invite/subject/' + this.subjectId + '/group/' + group.id;
+    navigator.clipboard.writeText(link).then(() => {
+      alert('Ссылка скопирована в буфер обмена: ' + link);
+    }).catch(err => {
+      console.error('Could not copy text: ', err);
+      // Fallback
+      const textarea = document.createElement('textarea');
+      textarea.value = link;
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        alert('Ссылка скопирована в буфер обмена: ' + link);
+      } catch (e) {
+        console.error(e);
+      }
+      document.body.removeChild(textarea);
+    });
+  }
+
+  togglePeerReview(test: any, checked: boolean) {
+    const value = checked ? 'true' : 'false';
+    this.apiService.updateTest(test.id, { peer_review_enabled: value }).subscribe({
+      next: () => {
+        test.peer_review_enabled = value;
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error updating peer review status:', err);
+        alert('Ошибка при обновлении статуса кросс-проверки');
+      }
+    });
+  }
+
+  isPeerReviewEnabledForTest(testId: string): boolean {
+    const test = this.tests.find(t => t.id === testId);
+    return test && test.peer_review_enabled === 'true';
+  }
+
+  openPeerReviewDialog(testId: string) {
+    this.dialog.open(PeerReviewDialogComponent, {
+      width: '600px',
+      data: {
+        testId: testId,
+        currentUser: this.currentUser?.name
+      }
+    });
+  }
+}
+
+@Component({
+  selector: 'app-peer-review-dialog',
+  standalone: true,
+  imports: [
+    CommonModule,
+    MatDialogModule,
+    MatButtonModule,
+    MatIconModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    ReactiveFormsModule
+  ],
+  template: `
+    <h2 mat-dialog-title>Кросс-проверка работ одноклассников</h2>
+    <mat-dialog-content>
+      <div *ngIf="loading" class="loading-state">
+        <p>Загрузка работ для проверки...</p>
+      </div>
+
+      <div *ngIf="!loading && submissions.length === 0" class="empty-state">
+        <mat-icon>check_circle</mat-icon>
+        <p>Нет доступных работ для проверки. Вы проверили все доступные работы или никто ещё не сдал тест.</p>
+      </div>
+
+      <div *ngIf="!loading && submissions.length > 0 && !selectedSubmission" class="submissions-list">
+        <p>Выберите работу для проверки:</p>
+        <div *ngFor="let sub of submissions" class="submission-row-item" (click)="selectSubmission(sub)">
+          <div class="sub-info">
+            <mat-icon>assignment</mat-icon>
+            <span>Работа #{{ sub.id.substring(0, 8) }} (Автор скрыт)</span>
+          </div>
+          <button mat-raised-button color="primary">Оценить</button>
+        </div>
+      </div>
+
+      <div *ngIf="selectedSubmission" class="review-form-container">
+        <button mat-button color="primary" (click)="selectedSubmission = null">
+          <mat-icon>arrow_back</mat-icon> К списку работ
+        </button>
+        
+        <h3>Оценка работы</h3>
+        
+        <form [formGroup]="reviewForm" (ngSubmit)="submitReview()" class="review-form">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Соответствие теме (1-5)</mat-label>
+            <mat-select formControlName="relevance">
+              <mat-option *ngFor="let val of scoreOptions" [value]="val">{{ val }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Структура и логика (1-5)</mat-label>
+            <mat-select formControlName="structure">
+              <mat-option *ngFor="let val of scoreOptions" [value]="val">{{ val }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Аргументация (1-5)</mat-label>
+            <mat-select formControlName="argument">
+              <mat-option *ngFor="let val of scoreOptions" [value]="val">{{ val }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Ясность изложения (1-5)</mat-label>
+            <mat-select formControlName="clarity">
+              <mat-option *ngFor="let val of scoreOptions" [value]="val">{{ val }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Комментарий / Критика</mat-label>
+            <textarea matInput formControlName="comment" rows="3" placeholder="Опишите ваши впечатления о работе..."></textarea>
+          </mat-form-field>
+
+          <div class="actions">
+            <button mat-raised-button color="primary" type="submit" [disabled]="reviewForm.invalid || submitting">
+              Отправить оценку
+            </button>
+          </div>
+        </form>
+      </div>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button mat-dialog-close>Закрыть</button>
+    </mat-dialog-actions>
+  `,
+  styles: [`
+    .full-width {
+      width: 100%;
+      margin-bottom: 12px;
+    }
+    .loading-state, .empty-state {
+      text-align: center;
+      padding: 24px;
+      color: #666;
+    }
+    .empty-state mat-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      color: #4caf50;
+      margin-bottom: 8px;
+    }
+    .submission-row-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .submission-row-item:hover {
+      background-color: #f5f5f5;
+    }
+    .sub-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .review-form {
+      margin-top: 16px;
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 16px;
+    }
+  `]
+})
+export class PeerReviewDialogComponent implements OnInit {
+  submissions: any[] = [];
+  selectedSubmission: any = null;
+  loading = true;
+  submitting = false;
+  reviewForm: FormGroup;
+  scoreOptions = [1, 2, 3, 4, 5];
+
+  constructor(
+    private dialogRef: MatDialogRef<PeerReviewDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: { testId: string; currentUser: string },
+    private apiService: ApiService,
+    private fb: FormBuilder
+  ) {
+    this.reviewForm = this.fb.group({
+      relevance: [5, [Validators.required, Validators.min(1), Validators.max(5)]],
+      structure: [5, [Validators.required, Validators.min(1), Validators.max(5)]],
+      argument: [5, [Validators.required, Validators.min(1), Validators.max(5)]],
+      clarity: [5, [Validators.required, Validators.min(1), Validators.max(5)]],
+      comment: ['']
+    });
+  }
+
+  ngOnInit(): void {
+    this.loadSubmissions();
+  }
+
+  loadSubmissions(): void {
+    this.loading = true;
+    this.apiService.getSubmissionsForReview(this.data.testId, this.data.currentUser).subscribe({
+      next: (subs) => {
+        this.submissions = subs || [];
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error(err);
+        this.loading = false;
+      }
+    });
+  }
+
+  selectSubmission(sub: any): void {
+    this.selectedSubmission = sub;
+  }
+
+  submitReview(): void {
+    if (this.reviewForm.invalid || !this.selectedSubmission) return;
+    this.submitting = true;
+    const formVal = this.reviewForm.value;
+    const review = {
+      submission_id: this.selectedSubmission.id,
+      assignment_id: this.data.testId,
+      reviewer: this.data.currentUser,
+      relevance: formVal.relevance,
+      structure: formVal.structure,
+      argument: formVal.argument,
+      clarity: formVal.clarity,
+      comment: formVal.comment
+    };
+
+    this.apiService.createReview(review).subscribe({
+      next: () => {
+        alert('Отзыв успешно сохранен!');
+        this.selectedSubmission = null;
+        this.loadSubmissions();
+        this.submitting = false;
+      },
+      error: (err) => {
+        console.error(err);
+        alert('Ошибка сохранения отзыва: ' + (err.error?.detail || 'Неизвестная ошибка'));
+        this.submitting = false;
+      }
+    });
   }
 }

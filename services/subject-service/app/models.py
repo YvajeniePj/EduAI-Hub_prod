@@ -25,6 +25,7 @@ class Subject(Base):
     news = relationship("News", back_populates="subject", cascade="all, delete-orphan")
     groups = relationship("Group", back_populates="subject", cascade="all, delete-orphan")
     modules = relationship("CourseModule", back_populates="subject", cascade="all, delete-orphan", order_by="CourseModule.order_index")
+    teachers = relationship("SubjectTeacher", back_populates="subject", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Subject(id={self.id}, name={self.name})>"
@@ -164,4 +165,19 @@ class CourseContent(Base):
 
     def __repr__(self):
         return f"<CourseContent(id={self.id}, lesson_id={self.lesson_id})>"
+
+
+class SubjectTeacher(Base):
+    __tablename__ = "subject_teachers"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.id"), nullable=False)
+    user_name = Column(String, nullable=False)
+    role = Column(String, default="teacher")
+
+    # Relationships
+    subject = relationship("Subject", back_populates="teachers")
+
+    def __repr__(self):
+        return f"<SubjectTeacher(id={self.id}, subject_id={self.subject_id}, user_name={self.user_name}, role={self.role})>"
+
 

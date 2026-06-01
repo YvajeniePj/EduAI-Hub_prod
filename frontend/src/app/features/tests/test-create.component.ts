@@ -407,6 +407,7 @@ export class TestCreateComponent implements OnInit {
   selectedFiles: File[] = [];
   existingFiles: any[] = [];
   source: string | null = null;
+  returnTo: string | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -446,6 +447,7 @@ export class TestCreateComponent implements OnInit {
 
     // Capture source from query params
     this.source = this.route.snapshot.queryParamMap.get('source');
+    this.returnTo = this.route.snapshot.queryParamMap.get('returnTo');
 
     // Check for edit mode
     this.route.params.subscribe(params => {
@@ -1017,7 +1019,9 @@ export class TestCreateComponent implements OnInit {
   }
 
   finishCreation(subjectId: string) {
-    if (this.source === 'tests') {
+    if (this.returnTo) {
+      this.router.navigateByUrl(this.returnTo);
+    } else if (this.source === 'tests') {
       this.router.navigate(['/tests']);
     } else if (subjectId) {
       this.router.navigate(['/courses', subjectId]);
@@ -1027,7 +1031,9 @@ export class TestCreateComponent implements OnInit {
   }
 
   onCancel() {
-    if (this.source === 'tests') {
+    if (this.returnTo) {
+      this.router.navigateByUrl(this.returnTo);
+    } else if (this.source === 'tests') {
       this.router.navigate(['/tests']);
     } else {
       const subjectId = this.testForm.get('subject_id')?.value || this.route.snapshot.queryParams['subjectId'];

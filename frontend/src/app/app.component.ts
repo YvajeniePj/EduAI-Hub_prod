@@ -73,19 +73,17 @@ import { interval, Subscription } from 'rxjs';
           <div class="nav-divider"></div>
           
           <!-- Block: Tests -->
-          <div class="nav-block-header">ТЕСТЫ</div>
-          <a mat-list-item routerLink="/tests" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>quiz</mat-icon>
-            <span matListItemTitle>Тесты</span>
-          </a>
-          <a mat-list-item routerLink="/ai-test" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role !== 'student'">
-            <mat-icon matListItemIcon>psychology</mat-icon>
-            <span matListItemTitle>AI-генерация</span>
-          </a>
-          <a mat-list-item routerLink="/peer-review" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>rate_review</mat-icon>
-            <span matListItemTitle>Кросс-проверка</span>
-          </a>
+          <ng-container *ngIf="currentUser.role !== 'student'">
+            <div class="nav-block-header">ТЕСТЫ</div>
+            <a mat-list-item routerLink="/tests" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>quiz</mat-icon>
+              <span matListItemTitle>Тесты</span>
+            </a>
+            <a mat-list-item routerLink="/peer-review" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>rate_review</mat-icon>
+              <span matListItemTitle>Кросс-проверка</span>
+            </a>
+          </ng-container>
 
           <!-- Block: Builders -->
           <ng-container *ngIf="currentUser.role !== 'student'">
@@ -99,20 +97,11 @@ import { interval, Subscription } from 'rxjs';
               <mat-icon matListItemIcon>construction</mat-icon>
               <span matListItemTitle>Конструктор курсов</span>
             </a>
+            <a mat-list-item routerLink="/ai-test" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>psychology</mat-icon>
+              <span matListItemTitle>AI-генерация</span>
+            </a>
           </ng-container>
-
-          <div class="nav-divider"></div>
-
-          <!-- Block: Materials -->
-          <div class="nav-block-header">МАТЕРИАЛЫ</div>
-          <a mat-list-item routerLink="/materials" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>folder</mat-icon>
-            <span matListItemTitle>Материалы</span>
-          </a>
-          <a mat-list-item routerLink="/videos" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>video_library</mat-icon>
-            <span matListItemTitle>Видео</span>
-          </a>
 
           <div class="nav-divider"></div>
 
@@ -140,11 +129,11 @@ import { interval, Subscription } from 'rxjs';
 
           <!-- Block: Students -->
           <div class="nav-block-header">СТУДЕНТАМ</div>
-          <a mat-list-item routerLink="/groups" (click)="sidenav.close()" routerLinkActive="active-link">
+          <a mat-list-item routerLink="/groups" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role !== 'student'">
             <mat-icon matListItemIcon>groups</mat-icon>
             <span matListItemTitle>Группы</span>
           </a>
-          <a mat-list-item routerLink="/students" (click)="sidenav.close()" routerLinkActive="active-link">
+          <a mat-list-item routerLink="/students" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role !== 'student'">
             <mat-icon matListItemIcon>person_search</mat-icon>
             <span matListItemTitle>Пользователи</span>
           </a>

@@ -238,3 +238,22 @@ class CourseStructureResponse(BaseModel):
     """Full course structure with modules, lessons, and content"""
     subject: SubjectResponse
     modules: list[CourseModuleResponse]
+
+
+class SubjectTeacherBase(BaseModel):
+    subject_id: UUID
+    user_name: str
+    role: Optional[str] = "teacher"
+
+
+class SubjectTeacherCreate(BaseModel):
+    user_name: str
+    role: Optional[str] = "teacher"
+
+
+class SubjectTeacherResponse(SubjectTeacherBase):
+    id: UUID
+
+    class Config:
+        from_attributes = True
+

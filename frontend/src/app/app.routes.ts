@@ -25,6 +25,7 @@ import { CourseBuilderComponent } from './features/course-builder/course-builder
 import { CourseBuilderListComponent } from './features/course-builder/course-builder-list.component';
 import { CourseViewComponent } from './features/course-view/course-view.component';
 import { authGuard } from './core/guards/auth.guard';
+import { InviteComponent } from './features/subjects/invite.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -39,7 +40,8 @@ export const routes: Routes = [
   { path: 'courses/:id', component: CourseViewComponent, canActivate: [authGuard] },
   { path: 'courses/:id/stream', loadComponent: () => import('./features/streaming/stream.component').then(m => m.StreamComponent), canActivate: [authGuard] },
   { path: 'streaming', loadComponent: () => import('./features/streaming/stream-list.component').then(m => m.StreamListComponent), canActivate: [authGuard] },
-  { path: 'tests', component: TestsComponent, canActivate: [authGuard] },
+  { path: 'tests', redirectTo: '', pathMatch: 'full' },
+  { path: 'invite/subject/:subjectId/group/:groupId', component: InviteComponent, canActivate: [authGuard] },
   { path: 'tests/create', component: TestCreateComponent, canActivate: [authGuard] },
   { path: 'tests/edit/:id', component: TestCreateComponent, canActivate: [authGuard] },
   { path: 'tests/:id', component: TestDetailComponent, canActivate: [authGuard] },

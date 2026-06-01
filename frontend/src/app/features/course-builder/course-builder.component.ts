@@ -263,11 +263,16 @@ interface TreeNode {
                           </mat-option>
                         </mat-select>
                       </mat-form-field>
-                      <div *ngIf="editForm.get('testId')?.value" class="selected-test">
-                        <mat-icon>quiz</mat-icon>
-                        <span>Выбран тест: {{ getTestName(editForm.get('testId')?.value) }}</span>
-                        <button mat-icon-button (click)="viewTest(editForm.get('testId')?.value)" type="button">
-                          <mat-icon>open_in_new</mat-icon>
+                      <div *ngIf="editForm.get('testId')?.value" class="selected-test" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <mat-icon>quiz</mat-icon>
+                          <span>Выбран тест: {{ getTestName(editForm.get('testId')?.value) }}</span>
+                          <button mat-icon-button (click)="viewTest(editForm.get('testId')?.value)" type="button" matTooltip="Просмотр теста">
+                            <mat-icon>open_in_new</mat-icon>
+                          </button>
+                        </div>
+                        <button mat-raised-button color="accent" (click)="editTestQuestions(editForm.get('testId')?.value)" type="button">
+                          Редактировать вопросы
                         </button>
                       </div>
                     </div>
@@ -676,6 +681,16 @@ export class CourseBuilderComponent implements OnInit {
   buildTree() {
     if (!this.structure || !this.structure.modules) return;
 
+    // Save expanded states
+    const expandedIds = new Set<string>();
+    if (this.dataSource.data) {
+      this.dataSource.data.forEach(node => {
+        if (this.treeControl.isExpanded(node)) {
+          expandedIds.add(node.id);
+        }
+      });
+    }
+
     const nodes: TreeNode[] = this.structure.modules.map((module: any) => ({
       id: module.id,
       title: module.title,
@@ -693,6 +708,15 @@ export class CourseBuilderComponent implements OnInit {
     }));
 
     this.dataSource.data = nodes;
+
+    // Restore expanded states
+    if (expandedIds.size > 0) {
+      this.dataSource.data.forEach(node => {
+        if (expandedIds.has(node.id)) {
+          this.treeControl.expand(node);
+        }
+      });
+    }
   }
 
   hasChild = (_: number, node: TreeNode) => !!node.children && node.children.length > 0;
@@ -1018,15 +1042,19 @@ export class CourseBuilderComponent implements OnInit {
   }
 
   openCreateTestDialog() {
-    this.router.navigate(['/tests'], { queryParams: { subjectId: this.subjectId, returnTo: 'builder' } });
+    this.router.navigate(['/tests/create'], { queryParams: { subjectId: this.subjectId, returnTo: `/courses/${this.subjectId}/builder` } });
   }
 
   openGenerateTestDialog() {
-    this.router.navigate(['/ai-test'], { queryParams: { subjectId: this.subjectId, returnTo: 'builder' } });
+    this.router.navigate(['/ai-test'], { queryParams: { subjectId: this.subjectId, returnTo: `/courses/${this.subjectId}/builder` } });
   }
 
   viewTest(testId: string) {
-    this.router.navigate(['/tests'], { queryParams: { testId: testId } });
+    this.router.navigate(['/tests', testId]);
+  }
+
+  editTestQuestions(testId: string) {
+    this.router.navigate(['/tests/edit', testId], { queryParams: { returnTo: `/courses/${this.subjectId}/builder` } });
   }
 
   onVideoSelect(url: string) {

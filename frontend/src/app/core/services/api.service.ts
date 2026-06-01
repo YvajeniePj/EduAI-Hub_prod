@@ -248,6 +248,10 @@ export class ApiService {
     return this.http.get<any[]>(`${API_URL}/reviews`, { params });
   }
 
+  getSubmissionReviews(submissionId: string): Observable<any[]> {
+    return this.getReviews(submissionId);
+  }
+
   deleteReview(id: string): Observable<any> {
     return this.http.delete<any>(`${API_URL}/reviews/${id}`);
   }
@@ -556,5 +560,18 @@ export class ApiService {
       topic,
       additional_info: additionalInfo
     });
+  }
+
+  // Subject Teachers
+  getSubjectTeachers(subjectId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/subjects/${subjectId}/teachers`);
+  }
+
+  addSubjectTeacher(subjectId: string, userName: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/subjects/${subjectId}/teachers`, { user_name: userName });
+  }
+
+  removeSubjectTeacher(subjectId: string, userName: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/subjects/${subjectId}/teachers/${userName}`);
   }
 }

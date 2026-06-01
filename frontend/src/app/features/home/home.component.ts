@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -385,7 +385,8 @@ export class HomeComponent implements OnInit {
     private apiService: ApiService,
     private authService: AuthService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private router: Router
   ) { 
     const user = this.authService.getCurrentUser();
     this.isAdmin = user?.role === 'teacher' || user?.role === 'admin';
@@ -425,8 +426,12 @@ export class HomeComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
         this.apiService.createSubject(result.name, result.description).subscribe({
-          next: () => {
-            this.loadSubjects();
+          next: (createdSubject: any) => {
+            if (createdSubject && createdSubject.id) {
+              this.router.navigate(['/course-builder', createdSubject.id]);
+            } else {
+              this.loadSubjects();
+            }
           },
           error: (err) => {
             console.error('Error creating subject:', err);

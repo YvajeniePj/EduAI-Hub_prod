@@ -59,9 +59,9 @@ class TestBase(BaseModel):
     due_date: Optional[datetime] = None
     available_until: Optional[datetime] = None  # Дата до которой тест доступен для прохождения
     time_limit_minutes: Optional[int] = None
-    time_limit_minutes: Optional[int] = None
     ai_generated: Optional[bool] = False
     allowed_groups: Optional[List[str]] = None
+    peer_review_enabled: Optional[str] = "false"
 
 
 class TestCreate(TestBase):
@@ -73,9 +73,10 @@ class TestUpdate(BaseModel):
     description: Optional[str] = None
     due_date: Optional[datetime] = None
     available_until: Optional[datetime] = None
-    available_until: Optional[datetime] = None
     time_limit_minutes: Optional[int] = None
     allowed_groups: Optional[List[str]] = None
+    peer_review_enabled: Optional[str] = "false"
+
 
 
 class TestFileResponse(BaseModel):

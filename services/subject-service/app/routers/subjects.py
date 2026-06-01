@@ -13,8 +13,8 @@ import httpx
 import logging
 
 from app.database import get_db
-from app.models import Subject, CourseModule, CourseLesson, CourseContent
-from app.schemas import SubjectCreate, SubjectResponse
+from app.models import Subject, CourseModule, CourseLesson, CourseContent, SubjectTeacher
+from app.schemas import SubjectCreate, SubjectResponse, SubjectTeacherCreate, SubjectTeacherResponse
 
 router = APIRouter()
 
@@ -66,14 +66,16 @@ async def create_subject(subject: SubjectCreate, background_tasks: BackgroundTas
     db.add(db_subject)
     db.commit()
     db.refresh(db_subject)
-    db.refresh(db_subject)
     
-    # Notify admin or general channel about new subject
-    # Sending with user_name=None makes it a broadcast notification for all users
     try:
         decoded_name = unquote(x_user_name) if x_user_name else None
     except:
         decoded_name = x_user_name
+
+    if decoded_name:
+        db_teacher = SubjectTeacher(subject_id=db_subject.id, user_name=decoded_name, role="teacher")
+        db.add(db_teacher)
+        db.commit()
 
     background_tasks.add_task(
         create_notification,
@@ -258,6 +260,15 @@ async def clone_subject(subject_id: UUID, background_tasks: BackgroundTasks, db:
                 )
                 db.add(cloned_content)
                 
+    # Copy over all mapped teachers
+    for teacher in original.teachers:
+        cloned_teacher = SubjectTeacher(
+            subject_id=cloned_subject.id,
+            user_name=teacher.user_name,
+            role=teacher.role
+        )
+        db.add(cloned_teacher)
+
     db.commit()
     db.refresh(cloned_subject)
     
@@ -278,3 +289,62 @@ async def clone_subject(subject_id: UUID, background_tasks: BackgroundTasks, db:
     )
     
     return cloned_subject
+
+
+@router.get("/{subject_id}/teachers", response_model=List[SubjectTeacherResponse])
+async def get_subject_teachers(subject_id: UUID, db: Session = Depends(get_db)):
+    """Get all teachers for a subject"""
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    return subject.teachers
+
+
+@router.post("/{subject_id}/teachers", response_model=SubjectTeacherResponse, status_code=201)
+async def add_subject_teacher(subject_id: UUID, teacher: SubjectTeacherCreate, db: Session = Depends(get_db)):
+    """Add a teacher mapping to a subject"""
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    
+    # Check if teacher mapping already exists
+    existing = db.query(SubjectTeacher).filter(
+        SubjectTeacher.subject_id == subject_id,
+        SubjectTeacher.user_name == teacher.user_name
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Teacher is already mapped to this subject")
+        
+    db_teacher = SubjectTeacher(
+        subject_id=subject_id,
+        user_name=teacher.user_name,
+        role=teacher.role
+    )
+    db.add(db_teacher)
+    db.commit()
+    db.refresh(db_teacher)
+    return db_teacher
+
+
+@router.delete("/{subject_id}/teachers/{user_name}", status_code=200)
+async def delete_subject_teacher(subject_id: UUID, user_name: str, db: Session = Depends(get_db)):
+    """Delete a teacher mapping from a subject"""
+    decoded_name = unquote(user_name)
+    teacher = db.query(SubjectTeacher).filter(
+        SubjectTeacher.subject_id == subject_id,
+        SubjectTeacher.user_name == decoded_name
+    ).first()
+    
+    if not teacher:
+        # Fallback to check original user_name in case it wasn't double-encoded
+        teacher = db.query(SubjectTeacher).filter(
+            SubjectTeacher.subject_id == subject_id,
+            SubjectTeacher.user_name == user_name
+        ).first()
+
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher mapping not found")
+        
+    db.delete(teacher)
+    db.commit()
+    return {"message": "Teacher mapping deleted successfully"}

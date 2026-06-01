@@ -115,6 +115,26 @@ import { HttpEventType } from '@angular/common/http';
         </div>
       </div>
 
+      <!-- Prominent Student Group Card -->
+      <mat-card class="student-group-card" *ngIf="userGroups.length > 0">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="group-icon">groups</mat-icon>
+          <mat-card-title>Учебные группы</mat-card-title>
+          <mat-card-subtitle>Группы, в которых вы состоите</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="profile-group-list">
+            <div *ngFor="let group of userGroups" class="profile-group-item">
+              <div class="group-name-wrapper">
+                <mat-icon>school</mat-icon>
+                <span class="group-name-text">{{ group.name }}</span>
+              </div>
+              <span class="group-role-badge">Студент</span>
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
       <div class="profile-grid" *ngIf="isOwnProfile || user.role === 'student'">
         <div class="main-column">
           <section class="submissions-section">
@@ -247,6 +267,58 @@ import { HttpEventType } from '@angular/common/http';
     </ng-template>
   `,
   styles: [`
+    .student-group-card {
+      margin-bottom: 32px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+      border: 1px solid #e0e0e0;
+      padding: 16px;
+    }
+    .group-icon {
+      color: #3f51b5;
+      font-size: 40px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .profile-group-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .profile-group-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border-left: 4px solid #3f51b5;
+    }
+    .group-name-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .group-name-wrapper mat-icon {
+      color: #5c6bc0;
+    }
+    .group-name-text {
+      font-weight: 500;
+      font-size: 16px;
+      color: #2c3e50;
+    }
+    .group-role-badge {
+      font-size: 12px;
+      padding: 4px 8px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-radius: 4px;
+      font-weight: 500;
+    }
     .profile-container {
       max-width: 1200px;
       margin: 0 auto;

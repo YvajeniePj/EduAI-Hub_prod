@@ -36,3 +36,13 @@ def init_db():
         import logging
         logging.warning(f"Database initialization warning: {e}")
 
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE tests ADD COLUMN IF NOT EXISTS peer_review_enabled VARCHAR DEFAULT 'false'"))
+            conn.commit()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database migration failed: {e}")
+
+

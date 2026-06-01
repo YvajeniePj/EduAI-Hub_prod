@@ -124,6 +124,78 @@ import { Router } from '@angular/router';
           </mat-card-content>
         </mat-card>
 
+        <!-- Peer Reviews Comparison Panel (only for teachers/admins) -->
+        <mat-card class="peer-reviews-card" *ngIf="isTeacher && peerReviews && peerReviews.length > 0">
+          <mat-card-header>
+            <mat-card-title>
+              <mat-icon style="margin-right: 8px;">rate_review</mat-icon> Результаты кросс-проверки (оценки одноклассников)
+            </mat-card-title>
+            <mat-card-subtitle>Всего проверок: {{ peerReviews.length }}</mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="comparison-layout">
+              <!-- Column 1: AI Recommendation -->
+              <div class="comp-column ai-column">
+                <h3>Оценка ИИ</h3>
+                <div class="comp-score-display">
+                  <span class="comp-score-val">{{ results.submission.total_score }}</span>
+                  <span class="comp-score-max">/ {{ results.submission.total_max }}</span>
+                </div>
+                <p class="comp-hint">Рекомендация на основе ключевых слов/критериев</p>
+              </div>
+
+              <!-- Column 2: Peer Review Averages -->
+              <div class="comp-column peer-column" *ngIf="averagePeerScores">
+                <h3>Средняя оценка одноклассников</h3>
+                <div class="comp-score-display">
+                  <span class="comp-score-val">{{ averagePeerScores.total }}</span>
+                  <span class="comp-score-max">/ 5.00</span>
+                </div>
+                
+                <div class="rubrics-breakdown">
+                  <div class="rubric-item">
+                    <span class="rubric-label">Соответствие теме:</span>
+                    <span class="rubric-val">{{ averagePeerScores.relevance }} / 5</span>
+                  </div>
+                  <div class="rubric-item">
+                    <span class="rubric-label">Структура и логика:</span>
+                    <span class="rubric-val">{{ averagePeerScores.structure }} / 5</span>
+                  </div>
+                  <div class="rubric-item">
+                    <span class="rubric-label">Аргументация:</span>
+                    <span class="rubric-val">{{ averagePeerScores.argument }} / 5</span>
+                  </div>
+                  <div class="rubric-item">
+                    <span class="rubric-label">Ясность изложения:</span>
+                    <span class="rubric-val">{{ averagePeerScores.clarity }} / 5</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- List of Peer Reviews -->
+            <div class="peer-comments-section">
+              <h3>Отзывы рецензентов</h3>
+              <mat-list>
+                <mat-list-item *ngFor="let rev of peerReviews" class="peer-review-item">
+                  <div matListItemTitle class="reviewer-title">
+                    <strong>Рецензент: {{ rev.reviewer || 'Аноним' }}</strong>
+                  </div>
+                  <div matListItemLine class="reviewer-scores">
+                    <span>Соответствие: {{ rev.relevance }}/5</span> | 
+                    <span>Структура: {{ rev.structure }}/5</span> | 
+                    <span>Аргументы: {{ rev.argument }}/5</span> | 
+                    <span>Ясность: {{ rev.clarity }}/5</span>
+                  </div>
+                  <div matListItemLine class="reviewer-comment" *ngIf="rev.comment">
+                    <em>Комментарий:</em> {{ rev.comment }}
+                  </div>
+                </mat-list-item>
+              </mat-list>
+            </div>
+          </mat-card-content>
+        </mat-card>
+
         <div class="questions-section" *ngIf="isTeacher || results.submission.status === 'approved'">
           <h2 class="section-title">Детали по вопросам</h2>
           <mat-card *ngFor="let result of results.per_question_results; let i = index" class="result-card">
@@ -779,6 +851,105 @@ import { Router } from '@angular/router';
         padding: 20px;
       }
     }
+
+    .peer-reviews-card {
+      margin-bottom: 32px;
+      border-radius: 12px;
+      border: 1px solid #e0e0e0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .peer-reviews-card mat-card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #3f51b5;
+    }
+    .comparison-layout {
+      display: flex;
+      gap: 24px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .comp-column {
+      flex: 1;
+      min-width: 250px;
+      padding: 16px;
+      border-radius: 8px;
+      background-color: #f8f9fa;
+      border: 1px solid #e0e0e0;
+    }
+    .ai-column {
+      border-left: 5px solid #667eea;
+    }
+    .peer-column {
+      border-left: 5px solid #4caf50;
+    }
+    .comp-score-display {
+      margin: 12px 0;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+    .comp-score-val {
+      font-size: 36px;
+      font-weight: 700;
+      color: #212121;
+    }
+    .comp-score-max {
+      font-size: 20px;
+      color: #757575;
+    }
+    .comp-hint {
+      font-size: 12px;
+      color: #757575;
+      margin: 0;
+    }
+    .rubrics-breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .rubric-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+    }
+    .rubric-label {
+      color: #616161;
+    }
+    .rubric-val {
+      font-weight: 500;
+      color: #212121;
+    }
+    .peer-comments-section {
+      margin-top: 24px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 16px;
+    }
+    .peer-review-item {
+      border-bottom: 1px solid #f5f5f5;
+      padding: 12px 0;
+      height: auto !important;
+      display: block !important;
+    }
+    .peer-review-item:last-child {
+      border-bottom: none;
+    }
+    .reviewer-title {
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .reviewer-scores {
+      font-size: 13px;
+      color: #616161;
+      margin-bottom: 4px;
+    }
+    .reviewer-comment {
+      font-size: 14px;
+      color: #212121;
+      line-height: 1.4;
+    }
   `]
 })
 export class SubmissionResultsComponent implements OnInit {
@@ -793,6 +964,8 @@ export class SubmissionResultsComponent implements OnInit {
   allVersions: any[] = [];
   source: string | null = null;
   subjectId: string | null = null;
+  peerReviews: any[] = [];
+  averagePeerScores: any = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -808,6 +981,31 @@ export class SubmissionResultsComponent implements OnInit {
     if (submissionId) {
       this.loadResults(submissionId);
     }
+  }
+
+  loadPeerReviews(submissionId: string) {
+    this.apiService.getSubmissionReviews(submissionId).subscribe({
+      next: (reviews) => {
+        this.peerReviews = reviews || [];
+        if (this.peerReviews.length > 0) {
+          const count = this.peerReviews.length;
+          const sumRel = this.peerReviews.reduce((sum, r) => sum + (r.relevance || 0), 0);
+          const sumStr = this.peerReviews.reduce((sum, r) => sum + (r.structure || 0), 0);
+          const sumArg = this.peerReviews.reduce((sum, r) => sum + (r.argument || 0), 0);
+          const sumCla = this.peerReviews.reduce((sum, r) => sum + (r.clarity || 0), 0);
+          this.averagePeerScores = {
+            relevance: (sumRel / count).toFixed(2),
+            structure: (sumStr / count).toFixed(2),
+            argument: (sumArg / count).toFixed(2),
+            clarity: (sumCla / count).toFixed(2),
+            total: ((sumRel + sumStr + sumArg + sumCla) / (count * 4)).toFixed(2)
+          };
+        } else {
+          this.averagePeerScores = null;
+        }
+      },
+      error: (err) => console.error('Error loading peer reviews:', err)
+    });
   }
 
   getStatusLabel(status: string): string {
@@ -846,6 +1044,7 @@ export class SubmissionResultsComponent implements OnInit {
   }
 
   loadResults(submissionId: string) {
+    this.loadPeerReviews(submissionId);
     this.apiService.getSubmissionResults(submissionId).subscribe({
       next: (results) => {
         this.results = results;

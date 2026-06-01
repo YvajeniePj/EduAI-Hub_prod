@@ -31,6 +31,7 @@ class Test(Base):
     time_limit_minutes = Column(Integer, nullable=True)
     ai_generated = Column(String, default="false")  # Store as string for flexibility
     allowed_groups = Column(JSON, nullable=True)  # List of Group IDs allowed to view this test
+    peer_review_enabled = Column(String, default="false")
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
