@@ -38,7 +38,7 @@ import { ApiService } from '../../core/services/api.service';
       <form [formGroup]="testForm" (ngSubmit)="onSubmit()">
         <mat-card>
           <mat-card-content>
-            <div class="form-row">
+            <div class="form-row" *ngIf="!hasPreselectedSubject">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Курс</mat-label>
                 <mat-select formControlName="subject_id" required (selectionChange)="onSubjectChange()">
@@ -50,6 +50,10 @@ import { ApiService } from '../../core/services/api.service';
                   Выберите курс
                 </mat-error>
               </mat-form-field>
+            </div>
+
+            <div class="form-row preselected-subject-info" *ngIf="hasPreselectedSubject && getSelectedSubjectName()" style="margin-bottom: 20px; font-size: 16px; color: #3f51b5;">
+              <p><strong>Курс:</strong> {{ getSelectedSubjectName() }}</p>
             </div>
 
             <div class="form-row" *ngIf="availableGroups.length > 0">
@@ -408,6 +412,7 @@ export class TestCreateComponent implements OnInit {
   existingFiles: any[] = [];
   source: string | null = null;
   returnTo: string | null = null;
+  hasPreselectedSubject = false;
 
   constructor(
     private fb: FormBuilder,
@@ -449,14 +454,26 @@ export class TestCreateComponent implements OnInit {
     this.source = this.route.snapshot.queryParamMap.get('source');
     this.returnTo = this.route.snapshot.queryParamMap.get('returnTo');
 
+    const urlSubjectId = this.route.snapshot.queryParams['subjectId'];
+    if (urlSubjectId) {
+      this.hasPreselectedSubject = true;
+    }
+
     // Check for edit mode
     this.route.params.subscribe(params => {
       if (params['id']) {
         this.isEditMode = true;
         this.testId = params['id'];
+        this.hasPreselectedSubject = true;
         this.loadTestData(this.testId!);
       }
     });
+  }
+
+  getSelectedSubjectName(): string {
+    const subjectId = this.testForm.get('subject_id')?.value;
+    const subject = this.subjects.find(s => s.id === subjectId);
+    return subject ? subject.name : '';
   }
 
   loadTestData(id: string) {

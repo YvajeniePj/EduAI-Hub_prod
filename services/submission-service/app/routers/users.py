@@ -101,6 +101,9 @@ async def update_user(user_id: UUID, user_update: UserUpdate, background_tasks: 
     if user_update.role is not None:
         db_user.role = user_update.role
         
+    if user_update.is_hidden_admin is not None:
+        db_user.is_hidden_admin = user_update.is_hidden_admin
+        
     db.commit()
     db.refresh(db_user)
     return db_user

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
@@ -42,7 +42,7 @@ import { ApiService } from '../../core/services/api.service';
       <div class="ai-test-content">
       <mat-card>
         <mat-card-content>
-          <mat-form-field appearance="outline" class="full-width">
+          <mat-form-field appearance="outline" class="full-width" *ngIf="!hasPreselectedSubject">
             <mat-label>Выберите предмет</mat-label>
             <mat-select [(ngModel)]="selectedSubjectId" (selectionChange)="loadMaterials()">
               <mat-option *ngFor="let subject of subjects" [value]="subject.id">
@@ -50,6 +50,10 @@ import { ApiService } from '../../core/services/api.service';
               </mat-option>
             </mat-select>
           </mat-form-field>
+
+          <div class="preselected-subject-info" *ngIf="hasPreselectedSubject && getSelectedSubjectName()" style="margin-bottom: 20px; font-size: 16px; color: #3f51b5;">
+            <p><strong>Предмет:</strong> {{ getSelectedSubjectName() }}</p>
+          </div>
 
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Название теста</mat-label>
@@ -292,21 +296,36 @@ export class AiTestComponent implements OnInit {
   timeError: string = '';
   timeFieldTouched: boolean = false;
 
+  hasPreselectedSubject = false;
+
   constructor(
     private apiService: ApiService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit() {
+    const urlSubjectId = this.route.snapshot.queryParams['subjectId'];
+    if (urlSubjectId) {
+      this.selectedSubjectId = urlSubjectId;
+      this.hasPreselectedSubject = true;
+    }
     this.loadSubjects();
+  }
+
+  getSelectedSubjectName(): string {
+    const subject = this.subjects.find(s => s.id === this.selectedSubjectId);
+    return subject ? subject.name : '';
   }
 
   loadSubjects() {
     this.apiService.getSubjects().subscribe({
       next: (subjects) => {
         this.subjects = subjects;
-        if (subjects.length > 0 && !this.selectedSubjectId) {
-          this.selectedSubjectId = subjects[0].id;
+        if (subjects.length > 0) {
+          if (!this.selectedSubjectId) {
+            this.selectedSubjectId = subjects[0].id;
+          }
           this.loadMaterials();
         }
       },
@@ -491,7 +510,12 @@ export class AiTestComponent implements OnInit {
       next: () => {
         this.saving = false;
         alert('Тест успешно создан!');
-        this.router.navigate(['/tests']);
+        const returnTo = this.route.snapshot.queryParams['returnTo'];
+        if (returnTo) {
+          this.router.navigateByUrl(returnTo);
+        } else {
+          this.router.navigate(['/tests']);
+        }
       },
       error: (err) => {
         this.saving = false;

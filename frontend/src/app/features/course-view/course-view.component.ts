@@ -21,13 +21,14 @@ import { MatDialogModule, MatDialog, MAT_DIALOG_DATA, MatDialogRef } from '@angu
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 import { CreateGroupDialogComponent } from '../groups/groups.component';
 import { UploadMaterialDialogComponent } from './upload-material-dialog.component';
 import { MaterialViewerComponent } from './material-viewer.component';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 
 interface TreeNode {
   id: string;
@@ -68,7 +69,8 @@ interface TreeNode {
     MaterialViewerComponent,
     MatMenuModule,
     MatTooltipModule,
-    RussianDatePipe
+    RussianDatePipe,
+    MatAutocompleteModule
   ],
   template: `
     <div class="course-hub-container">
@@ -207,7 +209,7 @@ interface TreeNode {
           <div class="tab-content-container" *ngIf="!viewingLessonMode">
             <div class="classwork-header-bar">
               <h2>Задания и Материалы курса</h2>
-              <div class="actions" *ngIf="currentUser?.role === 'teacher'">
+              <div class="actions" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'">
                 <button mat-raised-button color="primary" (click)="openCreateTest()">
                   <mat-icon>quiz</mat-icon> Создать тест
                 </button>
@@ -252,7 +254,7 @@ interface TreeNode {
             </mat-accordion>
 
             <!-- Management Section for Teachers -->
-            <div class="teacher-management-section" *ngIf="currentUser?.role === 'teacher'">
+            <div class="teacher-management-section" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'">
               <div class="section-title">
                 <h3>Панель управления (Все материалы и тесты)</h3>
               </div>
@@ -496,7 +498,12 @@ interface TreeNode {
                   <form [formGroup]="addTeacherForm" (ngSubmit)="assignTeacher()" class="add-teacher-form">
                     <mat-form-field appearance="outline" class="small-input" style="margin-bottom: 0;">
                       <mat-label>Имя пользователя преподавателя</mat-label>
-                      <input matInput formControlName="username" placeholder="Имя пользователя..." />
+                      <input matInput formControlName="username" placeholder="Имя пользователя..." [matAutocomplete]="auto" />
+                      <mat-autocomplete #auto="matAutocomplete">
+                        <mat-option *ngFor="let user of suggestedTeachers" [value]="user.name">
+                          {{ user.name }}
+                        </mat-option>
+                      </mat-autocomplete>
                     </mat-form-field>
                     <button mat-raised-button color="primary" type="submit" [disabled]="addTeacherForm.invalid">
                       Назначить
@@ -547,12 +554,12 @@ interface TreeNode {
               <div class="people-section groups-section-wrapper">
                 <div class="people-section-header">
                   <h2>Группы курса</h2>
-                  <button mat-raised-button color="primary" (click)="createGroup()" *ngIf="currentUser?.role === 'teacher'">
+                  <button mat-raised-button color="primary" (click)="createGroup()" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'">
                     <mat-icon>group_add</mat-icon> Создать группу
                   </button>
                 </div>
                 
-                <div class="list-section" *ngIf="currentUser?.role === 'teacher'">
+                <div class="list-section" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'">
                     <p class="section-hint">Управляйте участниками и заявками на странице каждой группы.</p>
                 </div>
                 
@@ -1615,6 +1622,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   courseDeadlines: any[] = [];
   userSubmissions: any[] = [];
   courseTeachers: any[] = [];
+  suggestedTeachers: any[] = [];
   courseStudents: any[] = [];
   courseDescription: string = '';
 
@@ -1686,6 +1694,26 @@ export class CourseViewComponent implements OnInit, OnDestroy {
       if (this.currentUser?.role === 'student') {
         this.loadMyGroups();
         this.loadMyRequests();
+      }
+    });
+
+    this.addTeacherForm.get('username')?.valueChanges.pipe(
+      takeUntil(this.destroy$),
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(value => {
+      if (value && value.trim().length >= 1) {
+        this.apiService.getUsers(value.trim()).subscribe({
+          next: (users) => {
+            const existingTeacherNames = this.courseTeachers.map(t => t.name);
+            this.suggestedTeachers = (users || []).filter((u: any) => !existingTeacherNames.includes(u.name));
+            this.cdr.markForCheck();
+          },
+          error: (err) => console.error('Error fetching users for suggestion:', err)
+        });
+      } else {
+        this.suggestedTeachers = [];
+        this.cdr.markForCheck();
       }
     });
 
@@ -1928,7 +1956,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   }
 
   isContentAllowed(contentId: string, type: 'test' | 'material'): boolean {
-    if (this.currentUser?.role === 'teacher') return true;
+    if (this.currentUser?.role === 'teacher' || this.currentUser?.role === 'admin') return true;
 
     let item: any;
     if (type === 'test') {

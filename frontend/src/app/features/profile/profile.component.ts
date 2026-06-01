@@ -94,6 +94,11 @@ import { HttpEventType } from '@angular/common/http';
               Проверить уведомления
             </button>
 
+            <button mat-raised-button *ngIf="isOwnProfile && (user?.is_hidden_admin || user?.role === 'admin')" color="warn" class="invisibility-toggle-button" (click)="toggleInvisibility()" style="margin-left: 8px;">
+              <mat-icon>{{ user?.is_hidden_admin ? 'visibility_off' : 'visibility' }}</mat-icon>
+              {{ user?.is_hidden_admin ? 'Отключить невидимость' : 'Включить невидимость' }}
+            </button>
+
             
             <div class="name-edit-form" *ngIf="isEditingName">
               <mat-form-field appearance="outline">
@@ -764,6 +769,28 @@ export class ProfileComponent implements OnInit {
 
   toggleRole() {
     this.auth.toggleSimulationRole();
+  }
+
+  toggleInvisibility() {
+    if (!this.user) return;
+    const newInvisible = !this.user.is_hidden_admin;
+    this.api.updateUser(this.user.id, { is_hidden_admin: newInvisible }).subscribe({
+      next: (updatedUser) => {
+        this.snackBar.open(
+          updatedUser.is_hidden_admin ? 'Режим невидимости включен. Вас не видно в списках пользователей.' : 'Режим невидимости выключен. Теперь вас видно всем.',
+          'OK',
+          { duration: 3000 }
+        );
+        // Sync global state to reflect change across app
+        this.auth.syncUserWithBackend().subscribe(() => {
+          this.refreshAuthUser();
+        });
+      },
+      error: (err) => {
+        console.error(err);
+        this.snackBar.open('Ошибка при переключении видимости: ' + (err.error?.detail || 'Неизвестная ошибка'), 'OK', { duration: 5000 });
+      }
+    });
   }
 
   get isSimulationActive(): boolean {

@@ -100,6 +100,7 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     role: Optional[str] = None
     avatar_url: Optional[str] = None
+    is_hidden_admin: Optional[bool] = None
 
 
 class UserResponse(BaseModel):

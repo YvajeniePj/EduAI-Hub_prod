@@ -213,8 +213,11 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     
     # 1. Force Admin (508982)
     if preferred_username in ["508982", "isu_508982"] or isu_number == "508982":
-        # Ensure superuser always has hidden admin privileges for simulation mode
-        internal_user["is_hidden_admin"] = True
+        # Only override/set to True if not explicitly saved as False in the DB
+        if user_data.get("is_hidden_admin") is not False:
+            internal_user["is_hidden_admin"] = True
+        else:
+            internal_user["is_hidden_admin"] = False
         
     # 2. Force Teacher (307553 - Юлия Разливина)
     if preferred_username in ["307553", "isu_307553"] or isu_number == "307553":
@@ -845,6 +848,11 @@ async def update_user(user_id: str, request: Request, current_user: Optional[dic
     data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, f"/users/{user_id}", "PUT", body)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to update user")
+        
+    # Invalidate cache
+    if user_id in _user_mapping_cache:
+        del _user_mapping_cache[user_id]
+        
     return data
 
 

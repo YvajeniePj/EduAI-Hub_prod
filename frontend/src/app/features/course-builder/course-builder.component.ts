@@ -1042,11 +1042,11 @@ export class CourseBuilderComponent implements OnInit {
   }
 
   openCreateTestDialog() {
-    this.router.navigate(['/tests/create'], { queryParams: { subjectId: this.subjectId, returnTo: `/courses/${this.subjectId}/builder` } });
+    this.router.navigate(['/tests/create'], { queryParams: { subjectId: this.subjectId, returnTo: `/course-builder/${this.subjectId}` } });
   }
 
   openGenerateTestDialog() {
-    this.router.navigate(['/ai-test'], { queryParams: { subjectId: this.subjectId, returnTo: `/courses/${this.subjectId}/builder` } });
+    this.router.navigate(['/ai-test'], { queryParams: { subjectId: this.subjectId, returnTo: `/course-builder/${this.subjectId}` } });
   }
 
   viewTest(testId: string) {
@@ -1054,7 +1054,7 @@ export class CourseBuilderComponent implements OnInit {
   }
 
   editTestQuestions(testId: string) {
-    this.router.navigate(['/tests/edit', testId], { queryParams: { returnTo: `/courses/${this.subjectId}/builder` } });
+    this.router.navigate(['/tests/edit', testId], { queryParams: { returnTo: `/course-builder/${this.subjectId}` } });
   }
 
   onVideoSelect(url: string) {
