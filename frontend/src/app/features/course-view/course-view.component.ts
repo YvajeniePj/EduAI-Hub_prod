@@ -2154,7 +2154,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     this.selectLesson(lesson);
   }
 
-  getLessonTypeIcon(lessonType: string): string {
+  getLessonTypeIcon(lessonType?: string): string {
     switch (lessonType?.toLowerCase()) {
       case 'lecture':
         return 'menu_book';
@@ -2169,7 +2169,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     }
   }
 
-  getLessonIconColor(lessonType: string): string {
+  getLessonIconColor(lessonType?: string): string {
     switch (lessonType?.toLowerCase()) {
       case 'lecture':
         return '#1a73e8';
