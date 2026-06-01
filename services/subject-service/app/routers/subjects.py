@@ -13,7 +13,7 @@ import httpx
 import logging
 
 from app.database import get_db
-from app.models import Subject, CourseModule, CourseLesson, CourseContent, SubjectTeacher
+from app.models import Subject, CourseModule, CourseLesson, CourseContent, SubjectTeacher, Group, GroupMember
 from app.schemas import SubjectCreate, SubjectResponse, SubjectTeacherCreate, SubjectTeacherResponse
 
 router = APIRouter()
@@ -48,10 +48,27 @@ async def create_notification(user_name: str, title: str, message: str, type: st
 
 
 @router.get("", response_model=List[SubjectResponse])
-async def get_subjects(db: Session = Depends(get_db)):
-    """Get all subjects"""
-    subjects = db.query(Subject).all()
-    return subjects
+async def get_subjects(user_name: Optional[str] = None, role: Optional[str] = None, db: Session = Depends(get_db)):
+    """Get all subjects, optionally filtered by user assignment"""
+    if not user_name or role == "admin":
+        return db.query(Subject).all()
+        
+    if role == "teacher":
+        return db.query(Subject).join(SubjectTeacher).filter(SubjectTeacher.user_name == user_name).all()
+        
+    if role == "student":
+        return db.query(Subject).join(Group).join(GroupMember).filter(GroupMember.user_name == user_name).all()
+        
+    return []
+
+
+@router.get("/{subject_id}", response_model=SubjectResponse)
+async def get_subject(subject_id: UUID, db: Session = Depends(get_db)):
+    """Get subject by ID"""
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    return subject
 
 
 @router.post("", response_model=SubjectResponse, status_code=201)

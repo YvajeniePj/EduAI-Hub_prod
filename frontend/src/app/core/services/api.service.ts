@@ -44,6 +44,10 @@ export class ApiService {
     return this.http.get<any[]>(`${API_URL}/subjects`);
   }
 
+  getSubject(id: string): Observable<any> {
+    return this.http.get<any>(`${API_URL}/subjects/${id}`);
+  }
+
   createSubject(name: string, description?: string): Observable<any> {
     return this.http.post<any>(`${API_URL}/subjects`, { name, description: description || null });
   }

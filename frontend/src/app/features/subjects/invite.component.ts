@@ -124,9 +124,9 @@ export class InviteComponent implements OnInit {
     this.apiService.getGroup(this.groupId).subscribe({
       next: (group) => {
         this.group = group;
-        this.apiService.getSubjects().subscribe({
-          next: (subjects) => {
-            this.subject = subjects.find(s => s.id === this.subjectId);
+        this.apiService.getSubject(this.subjectId).subscribe({
+          next: (subject) => {
+            this.subject = subject;
             this.loading = false;
           },
           error: (err) => {

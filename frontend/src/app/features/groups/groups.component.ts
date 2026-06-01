@@ -764,7 +764,7 @@ export class GroupsComponent implements OnInit {
     <h2 mat-dialog-title>Создать группу</h2>
     <mat-dialog-content>
       <form [formGroup]="groupForm">
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width" *ngIf="!data.subjects || data.subjects.length > 1">
           <mat-label>Курс</mat-label>
           <mat-select formControlName="subject_id" required>
             <mat-option *ngFor="let subject of data.subjects" [value]="subject.id">
@@ -772,6 +772,10 @@ export class GroupsComponent implements OnInit {
             </mat-option>
           </mat-select>
         </mat-form-field>
+
+        <div class="preselected-subject-info" *ngIf="data.subjects && data.subjects.length === 1" style="margin-bottom: 20px; font-size: 16px; color: #3f51b5;">
+          <p><strong>Курс:</strong> {{ data.subjects[0].name }}</p>
+        </div>
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Название группы</mat-label>
@@ -819,8 +823,9 @@ export class CreateGroupDialogComponent {
     private dialogRef: MatDialogRef<CreateGroupDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {
+    const initialSubject = (data.subjects && data.subjects.length === 1) ? data.subjects[0].id : '';
     this.groupForm = this.fb.group({
-      subject_id: ['', Validators.required],
+      subject_id: [initialSubject, Validators.required],
       name: ['', Validators.required],
       description: [''],
       max_size: [null]

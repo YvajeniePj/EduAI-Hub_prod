@@ -1732,15 +1732,15 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   loadCourse() {
     this.loading = true;
 
-    this.apiService.getSubjects().subscribe({
-      next: (subjects) => {
-        const subject = subjects.find((s: any) => s.id === this.subjectId);
+    this.apiService.getSubject(this.subjectId).subscribe({
+      next: (subject) => {
         if (subject) {
           this.courseName = subject.name;
           this.courseDescription = subject.description || '';
           this.cdr.markForCheck();
         }
-      }
+      },
+      error: (err) => console.error('Error loading subject details:', err)
     });
 
     this.apiService.getCourseStructure(this.subjectId).subscribe({

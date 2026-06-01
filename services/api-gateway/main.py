@@ -321,10 +321,47 @@ async def proxy_request(
 
 # Subject Service Routes
 @app.get("/subjects")
-async def get_subjects():
-    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, "/subjects", "GET")
+async def get_subjects(current_user: Optional[dict] = Depends(get_current_user)):
+    params = {}
+    if current_user:
+        params["user_name"] = current_user.get("username")
+        params["role"] = current_user.get("role")
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, "/subjects", "GET", params=params)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to fetch subjects")
+    return data
+
+
+@app.get("/subjects/{subject_id}")
+async def get_subject(subject_id: str):
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}", "GET")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to fetch subject")
+    return data
+
+
+@app.get("/subjects/{subject_id}/teachers")
+async def get_subject_teachers(subject_id: str):
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}/teachers", "GET")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to fetch teachers")
+    return data
+
+
+@app.post("/subjects/{subject_id}/teachers")
+async def add_subject_teacher(subject_id: str, request: Request, current_user: dict = Depends(get_current_teacher)):
+    body = await request.json()
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}/teachers", "POST", body)
+    if status not in [200, 201]:
+        raise HTTPException(status_code=status, detail=error or "Failed to add teacher")
+    return data
+
+
+@app.delete("/subjects/{subject_id}/teachers/{user_name}")
+async def remove_subject_teacher(subject_id: str, user_name: str, current_user: dict = Depends(get_current_teacher)):
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}/teachers/{user_name}", "DELETE")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to remove teacher")
     return data
 
 
