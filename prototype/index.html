@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EduAI Hub — Мои курсы</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ========== Top Bar ========== -->
+  <header class="topbar">
+    <button class="topbar-hamburger" id="sidebarOpen" aria-label="Открыть меню">
+      <span class="material-icons">menu</span>
+    </button>
+
+    <a href="index.html" class="topbar-brand">
+      <div class="logo-icon">
+        <span class="material-icons" style="font-size:22px">school</span>
+      </div>
+      <div class="logo-text">Edu<span>AI</span> Hub</div>
+    </a>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-actions">
+      <!-- AI Status Indicator -->
+      <div class="topbar-btn" data-tooltip="ИИ-ассистент онлайн">
+        <span class="status-dot online" style="position:absolute;top:8px;right:8px"></span>
+        <span class="material-icons" style="color:var(--green);font-size:22px">check_circle</span>
+      </div>
+
+      <!-- Notifications -->
+      <button class="topbar-btn" aria-label="Уведомления">
+        <span class="material-icons-outlined">notifications</span>
+        <span class="badge"></span>
+      </button>
+
+      <!-- User Avatar -->
+      <div class="topbar-avatar" data-tooltip="Андрей Жигалов">АЖ</div>
+    </div>
+  </header>
+
+  <!-- ========== Sidebar Overlay ========== -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ========== Sidebar ========== -->
+  <nav class="sidebar" id="sidebar" aria-label="Главная навигация">
+    <!-- Sidebar Header -->
+    <div class="sidebar-header">
+      <div class="logo-icon">
+        <span class="material-icons" style="font-size:22px">school</span>
+      </div>
+      <div class="logo-text">Edu<span>AI</span> Hub</div>
+      <button class="sidebar-close" id="sidebarClose" aria-label="Закрыть меню">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+
+    <!-- Sidebar Body -->
+    <div class="sidebar-body">
+      <!-- Main Nav -->
+      <div class="sidebar-section">
+        <a href="index.html" class="sidebar-item active">
+          <span class="material-icons">home</span>
+          Главная
+        </a>
+        <a href="#" class="sidebar-item">
+          <span class="material-icons-outlined">calendar_today</span>
+          Календарь
+        </a>
+        <a href="#" class="sidebar-item">
+          <span class="material-icons-outlined">leaderboard</span>
+          Лидерборд
+        </a>
+        <a href="#" class="sidebar-item">
+          <span class="material-icons-outlined">smart_toy</span>
+          Чат-ассистент
+        </a>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- Courses -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Мои курсы</div>
+        <a href="course.html" class="sidebar-item">
+          <span class="course-dot" style="background:#4f46e5"></span>
+          Основы Python
+        </a>
+        <a href="course.html" class="sidebar-item">
+          <span class="course-dot" style="background:#0d9488"></span>
+          Машинное обучение
+        </a>
+        <a href="course.html" class="sidebar-item">
+          <span class="course-dot" style="background:#d97706"></span>
+          Базы данных
+        </a>
+        <a href="course.html" class="sidebar-item">
+          <span class="course-dot" style="background:#dc2626"></span>
+          Веб-разработка
+        </a>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- Settings -->
+      <div class="sidebar-section">
+        <a href="#" class="sidebar-item">
+          <span class="material-icons-outlined">settings</span>
+          Настройки
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========== Main Content ========== -->
+  <main class="main-content">
+    <div class="page-content">
+
+      <!-- Dashboard Header -->
+      <div class="dashboard-header">
+        <h1>Мои курсы</h1>
+        <p class="text-sm text-muted mt-4">Платформа для обучения с ИИ</p>
+      </div>
+
+      <!-- Courses Grid -->
+      <div class="courses-grid">
+
+        <!-- Card 1: Основы Python -->
+        <a href="course.html" class="course-card animate-in">
+          <div class="course-card-menu">
+            <button aria-label="Ещё" onclick="event.preventDefault()">
+              <span class="material-icons">more_vert</span>
+            </button>
+          </div>
+          <div class="course-card-banner" style="background:var(--course-1)">
+            <h3>Основы Python</h3>
+            <div class="course-section">Группа 101</div>
+          </div>
+          <div class="course-card-body">
+            <div class="course-card-teacher">
+              <div class="teacher-avatar">АЖ</div>
+              Жигалов А.В.
+            </div>
+            <div class="course-card-footer">
+              <div class="course-card-stat">
+                <span class="material-icons-outlined">menu_book</span>
+                12 уроков
+              </div>
+              <div class="course-card-stat">
+                <span class="material-icons-outlined">quiz</span>
+                3 теста
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- Card 2: Машинное обучение -->
+        <a href="course.html" class="course-card animate-in">
+          <div class="course-card-menu">
+            <button aria-label="Ещё" onclick="event.preventDefault()">
+              <span class="material-icons">more_vert</span>
+            </button>
+          </div>
+          <div class="course-card-banner" style="background:var(--course-2)">
+            <h3>Машинное обучение</h3>
+            <div class="course-section">Группа 201</div>
+          </div>
+          <div class="course-card-body">
+            <div class="course-card-teacher">
+              <div class="teacher-avatar">АЖ</div>
+              Жигалов А.В.
+            </div>
+            <div class="course-card-footer">
+              <div class="course-card-stat">
+                <span class="material-icons-outlined">menu_book</span>
+                8 уроков
+              </div>
+              <div class="course-card-stat">
+                <span class="material-icons-outlined">quiz</span>
+                5 тестов
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- Card 3: Базы данных -->
+        <a href="course.html" class="course-card animate-in">
+          <div class="course-card-menu">
+            <button aria-label="Ещё" onclick="event.preventDefault()">
+              <span class="material-icons">more_vert</span>
+            </button>
+          </div>
+          <div class="course-card-banner" style="background:var(--course-3)">
+            <h3>Базы данных</h3>
+            <div class="course-section">Группа 102</div>
+          </div>
+          <div class="course-card-body">
+            <div class="course-card-teacher">
+              <div class="teacher-avatar">АЖ</div>
+              Жигалов А.В.
+            </div>
+            <div class="course-card-footer">
+              <div class="course-card-stat">
+                <span class="material-icons-outlined">menu_book</span>
+                10 уроков
+              </div>
+              <div class="course-card-stat">
+                <span class="material-icons-outlined">quiz</span>
+                4 теста
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- Card 4: Веб-разработка -->
+        <a href="course.html" class="course-card animate-in">
+          <div class="course-card-menu">
+            <button aria-label="Ещё" onclick="event.preventDefault()">
+              <span class="material-icons">more_vert</span>
+            </button>
+          </div>
+          <div class="course-card-banner" style="background:var(--course-4)">
+            <h3>Веб-разработка</h3>
+            <div class="course-section">Группа 301</div>
+          </div>
+          <div class="course-card-body">
+            <div class="course-card-teacher">
+              <div class="teacher-avatar">АЖ</div>
+              Жигалов А.В.
+            </div>
+            <div class="course-card-footer">
+              <div class="course-card-stat">
+                <span class="material-icons-outlined">menu_book</span>
+                15 уроков
+              </div>
+              <div class="course-card-stat">
+                <span class="material-icons-outlined">quiz</span>
+                6 тестов
+              </div>
+            </div>
+          </div>
+        </a>
+
+      </div><!-- /courses-grid -->
+    </div><!-- /page-content -->
+  </main>
+
+  <!-- ========== JavaScript ========== -->
+  <script>
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const openBtn = document.getElementById('sidebarOpen');
+    const closeBtn = document.getElementById('sidebarClose');
+
+    function openSidebar() {
+      sidebar.classList.add('open');
+      overlay.classList.add('visible');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('visible');
+      document.body.style.overflow = '';
+    }
+
+    openBtn.addEventListener('click', openSidebar);
+    closeBtn.addEventListener('click', closeSidebar);
+    overlay.addEventListener('click', closeSidebar);
+
+    // Close sidebar on Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeSidebar();
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Основы Python — EduAI Hub</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ====== Top Bar ====== -->
+  <header class="topbar">
+    <button class="topbar-hamburger" id="menuToggle" aria-label="Открыть меню">
+      <span class="material-icons">menu</span>
+    </button>
+    <a href="index.html" class="topbar-brand">
+      <div class="logo-icon">
+        <span class="material-icons" style="font-size:20px">school</span>
+      </div>
+      <div class="logo-text">Edu<span>AI</span> Hub</div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-actions">
+      <button class="topbar-btn" data-tooltip="Статус: Онлайн">
+        <span class="material-icons-outlined">wifi</span>
+      </button>
+      <button class="topbar-btn" data-tooltip="Уведомления">
+        <span class="material-icons-outlined">notifications</span>
+        <span class="badge"></span>
+      </button>
+      <div class="topbar-avatar" data-tooltip="Профиль">АЖ</div>
+    </div>
+  </header>
+
+  <!-- ====== Sidebar Overlay ====== -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ====== Sidebar ====== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-icon">
+        <span class="material-icons" style="font-size:20px">school</span>
+      </div>
+      <div class="logo-text">Edu<span>AI</span> Hub</div>
+      <button class="sidebar-close" id="sidebarClose" aria-label="Закрыть меню">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    <nav class="sidebar-body">
+      <div class="sidebar-section">
+        <a href="index.html" class="sidebar-item">
+          <span class="material-icons-outlined">home</span>
+          Главная
+        </a>
+        <a class="sidebar-item">
+          <span class="material-icons-outlined">calendar_today</span>
+          Календарь
+        </a>
+        <a class="sidebar-item">
+          <span class="material-icons-outlined">leaderboard</span>
+          Лидерборд
+        </a>
+        <a class="sidebar-item">
+          <span class="material-icons-outlined">smart_toy</span>
+          Чат-ассистент
+        </a>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Мои курсы</div>
+        <a href="course.html" class="sidebar-item active">
+          <span class="course-dot" style="background:#4f46e5"></span>
+          Основы Python
+        </a>
+        <a class="sidebar-item">
+          <span class="course-dot" style="background:#0d9488"></span>
+          Машинное обучение
+        </a>
+        <a class="sidebar-item">
+          <span class="course-dot" style="background:#d97706"></span>
+          Базы данных
+        </a>
+        <a class="sidebar-item">
+          <span class="course-dot" style="background:#dc2626"></span>
+          Веб-разработка
+        </a>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section">
+        <a class="sidebar-item">
+          <span class="material-icons-outlined">settings</span>
+          Настройки
+        </a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ====== Main Content ====== -->
+  <main class="main-content">
+
+    <!-- Course Banner -->
+    <div class="course-banner">
+      <div class="course-banner-inner" style="background: var(--course-1);">
+        <h1>Основы Python</h1>
+        <p>Группа 101 • Жигалов А.В.</p>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="course-tabs-container">
+      <div class="course-tabs">
+        <button class="course-tab active" data-tab="stream">Лента</button>
+        <button class="course-tab" data-tab="classwork">Задания</button>
+        <button class="course-tab" data-tab="people">Участники</button>
+      </div>
+    </div>
+
+    <!-- ============ Tab 1: Лента (Stream) ============ -->
+    <div class="tab-panel active" id="tab-stream">
+      <div class="stream-layout">
+
+        <!-- Stream Main Column -->
+        <div class="stream-main">
+
+          <!-- Compose Bar -->
+          <div class="stream-compose">
+            <div class="compose-avatar">АЖ</div>
+            <div class="compose-text">Добавить объявление для курса...</div>
+          </div>
+
+          <!-- Post 1 -->
+          <div class="stream-post animate-in">
+            <div class="stream-post-header">
+              <div class="stream-post-avatar">АЖ</div>
+              <div class="stream-post-meta">
+                <div class="stream-post-author">Жигалов А.В.</div>
+                <div class="stream-post-time">2 часа назад</div>
+              </div>
+              <button class="topbar-btn">
+                <span class="material-icons-outlined" style="font-size:20px">more_vert</span>
+              </button>
+            </div>
+            <div class="stream-post-body">
+              Добрый день! Загрузил материалы к пятой лекции по функциям. Обязательно ознакомьтесь перед следующим занятием. Обратите внимание на примеры с рекурсией — на практике будем разбирать подробнее.
+            </div>
+            <a class="stream-post-attachment">
+              <div class="att-icon">
+                <span class="material-icons-outlined">picture_as_pdf</span>
+              </div>
+              <div class="att-info">
+                <div class="att-name">Лекция_5_Функции.pdf</div>
+                <div class="att-type">PDF документ</div>
+              </div>
+              <span class="material-icons-outlined" style="font-size:20px; color: var(--text-tertiary);">download</span>
+            </a>
+            <div class="stream-post-actions">
+              <button class="stream-action-btn">
+                <span class="material-icons-outlined">chat_bubble_outline</span>
+                Комментарий
+              </button>
+            </div>
+          </div>
+
+          <!-- Post 2 -->
+          <div class="stream-post animate-in">
+            <div class="stream-post-header">
+              <div class="stream-post-avatar">АЖ</div>
+              <div class="stream-post-meta">
+                <div class="stream-post-author">Жигалов А.В.</div>
+                <div class="stream-post-time">Вчера</div>
+              </div>
+              <button class="topbar-btn">
+                <span class="material-icons-outlined" style="font-size:20px">more_vert</span>
+              </button>
+            </div>
+            <div class="stream-post-body">
+              Доступен новый тест по теме «Циклы и условия». Дедлайн через 3 дня. Пожалуйста, пройдите тест вовремя — результаты учитываются в итоговой оценке.
+            </div>
+            <a class="stream-post-attachment">
+              <div class="att-icon" style="background: var(--blue-light); color: var(--blue);">
+                <span class="material-icons-outlined">quiz</span>
+              </div>
+              <div class="att-info">
+                <div class="att-name">Тест: Циклы и условия</div>
+                <div class="att-type">Тестирование</div>
+              </div>
+              <span class="material-icons-outlined" style="font-size:20px; color: var(--text-tertiary);">arrow_forward</span>
+            </a>
+            <div class="stream-post-actions">
+              <button class="stream-action-btn">
+                <span class="material-icons-outlined">chat_bubble_outline</span>
+                Комментарий
+              </button>
+            </div>
+          </div>
+
+          <!-- Post 3 -->
+          <div class="stream-post animate-in">
+            <div class="stream-post-header">
+              <div class="stream-post-avatar">АЖ</div>
+              <div class="stream-post-meta">
+                <div class="stream-post-author">Жигалов А.В.</div>
+                <div class="stream-post-time">3 дня назад</div>
+              </div>
+              <button class="topbar-btn">
+                <span class="material-icons-outlined" style="font-size:20px">more_vert</span>
+              </button>
+            </div>
+            <div class="stream-post-body">
+              Добро пожаловать на курс «Основы Python»! Рад приветствовать всех студентов группы 101. В этом курсе мы изучим основы программирования на языке Python — от базового синтаксиса до работы с файлами и модулями. Желаю всем продуктивной работы!
+            </div>
+            <div class="stream-post-actions">
+              <button class="stream-action-btn">
+                <span class="material-icons-outlined">chat_bubble_outline</span>
+                Комментарий
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Stream Sidebar -->
+        <div class="stream-sidebar">
+          <div class="sidebar-card">
+            <div class="sidebar-card-title">
+              <span class="material-icons-outlined">event</span>
+              Ближайшие дедлайны
+            </div>
+            <div class="upcoming-item">
+              <div class="upcoming-icon test">
+                <span class="material-icons-outlined" style="font-size:20px">quiz</span>
+              </div>
+              <div class="upcoming-info">
+                <div class="upcoming-title">Тест: Циклы и условия</div>
+                <div class="upcoming-date soon">До 5 июня</div>
+              </div>
+            </div>
+            <div class="upcoming-item">
+              <div class="upcoming-icon material">
+                <span class="material-icons-outlined" style="font-size:20px">science</span>
+              </div>
+              <div class="upcoming-info">
+                <div class="upcoming-title">Лабораторная работа №3</div>
+                <div class="upcoming-date">До 10 июня</div>
+              </div>
+            </div>
+            <div class="upcoming-item">
+              <div class="upcoming-icon assignment">
+                <span class="material-icons-outlined" style="font-size:20px">assignment</span>
+              </div>
+              <div class="upcoming-info">
+                <div class="upcoming-title">Курсовой проект</div>
+                <div class="upcoming-date">До 20 июня</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============ Tab 2: Задания (Classwork) ============ -->
+    <div class="tab-panel" id="tab-classwork">
+
+      <!-- Create bar -->
+      <div class="classwork-create-bar">
+        <button class="btn btn-primary">
+          <span class="material-icons" style="font-size:20px">add</span>
+          Создать
+        </button>
+        <button class="btn btn-outline">
+          <span class="material-icons-outlined" style="font-size:20px">upload_file</span>
+          Загрузить материал
+        </button>
+      </div>
+
+      <!-- Module 1 -->
+      <div class="module-group">
+        <div class="module-header">
+          <span class="material-icons-outlined module-icon">folder</span>
+          <h3>Модуль 1. Введение в Python</h3>
+          <span class="module-count">3 элемента</span>
+        </div>
+        <div class="module-items">
+          <a href="lesson.html" class="module-item">
+            <div class="module-item-icon lesson">
+              <span class="material-icons-outlined">menu_book</span>
+            </div>
+            <div class="module-item-info">
+              <div class="module-item-title">Что такое Python и зачем он нужен</div>
+              <div class="module-item-meta">
+                <span>Лекция</span>
+              </div>
+            </div>
+            <span class="module-item-status done">Пройдено</span>
+          </a>
+          <a href="lesson.html" class="module-item">
+            <div class="module-item-icon lesson">
+              <span class="material-icons-outlined">code</span>
+            </div>
+            <div class="module-item-info">
+              <div class="module-item-title">Установка и настройка среды</div>
+              <div class="module-item-meta">
+                <span>Практика</span>
+              </div>
+            </div>
+            <span class="module-item-status done">Пройдено</span>
+          </a>
+          <a href="lesson.html" class="module-item">
+            <div class="module-item-icon test">
+              <span class="material-icons-outlined">quiz</span>
+            </div>
+            <div class="module-item-info">
+              <div class="module-item-title">Тест: Основы синтаксиса</div>
+              <div class="module-item-meta">
+                <span>Тестирование</span>
+                <span>•</span>
+                <span>Сдано</span>
+              </div>
+            </div>
+            <span class="module-item-status done">Пройдено</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Module 2 -->
+      <div class="module-group">
+        <div class="module-header">
+          <span class="material-icons-outlined module-icon">folder</span>
+          <h3>Модуль 2. Управляющие конструкции</h3>
+          <span class="module-count">4 элемента</span>
+        </div>
+        <div class="module-items">
+          <a href="lesson.html" class="module-item">
+            <div class="module-item-icon lesson">
+              <span class="material-icons-outlined">menu_book</span>
+            </div>
+            <div class="module-item-info">
+              <div class="module-item-title">Условные операторы if/else</div>
+              <div class="module-item-meta">
+                <span>Лекция</span>
+              </div>
+            </div>
+            <span class="module-item-status done">Пройдено</span>
+          </a>
+          <a href="lesson.html" class="module-item">
+            <div class="module-item-icon video">
+              <span class="material-icons-outlined">play_circle</span>
+            </div>
+            <div class="module-item-info">
+              <div class="module-item-title">Видео: Циклы for и while</div>
+              <div class="module-item-meta">
+                <span>Видеоурок</span>
+              </div>
+            </div>
+            <span class="module-item-status pending">В процессе</span>
+          </a>
+          <a href="lesson.html" class="module-item">
+            <div class="module-item-icon material">
+              <span class="material-icons-outlined">science</span>
+            </div>
+            <div class="module-item-info">
+              <div class="module-item-title">Лабораторная работа №3</div>
+              <div class="module-item-meta">
+                <span>Практика</span>
+              </div>
+            </div>
+            <span class="module-item-deadline">До 10 июня</span>
+            <span class="module-item-status not-started">Не начато</span>
+          </a>
+          <a href="lesson.html" class="module-item">
+            <div class="module-item-icon test">
+              <span class="material-icons-outlined">quiz</span>
+            </div>
+            <div class="module-item-info">
+              <div class="module-item-title">Тест: Циклы и условия</div>
+              <div class="module-item-meta">
+                <span>Тестирование</span>
+              </div>
+            </div>
+            <span class="module-item-deadline soon">До 5 июня</span>
+            <span class="module-item-status not-started">Не начато</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============ Tab 3: Участники (People) ============ -->
+    <div class="tab-panel" id="tab-people">
+
+      <!-- Преподаватели -->
+      <div class="people-section">
+        <div class="people-section-header">
+          <h2>Преподаватели</h2>
+        </div>
+        <div class="people-list">
+          <div class="person-item">
+            <div class="person-avatar" style="background: var(--primary-light); color: var(--primary);">АЖ</div>
+            <div class="person-info">
+              <div class="person-name">Жигалов Артём Владимирович</div>
+              <div class="person-role">Преподаватель</div>
+            </div>
+            <div class="person-actions">
+              <button data-tooltip="Написать">
+                <span class="material-icons-outlined" style="font-size:20px">email</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Студенты -->
+      <div class="people-section">
+        <div class="people-section-header">
+          <h2>Студенты</h2>
+          <span class="people-count">24 студента</span>
+        </div>
+        <div class="people-list">
+          <!-- Student 1 -->
+          <div class="person-item">
+            <div class="person-avatar" style="background: var(--teal-light); color: var(--teal);">ИД</div>
+            <div class="person-info">
+              <div class="person-name">Иванов Дмитрий</div>
+              <div class="person-role">Группа 101</div>
+            </div>
+            <div class="person-actions">
+              <button data-tooltip="Написать">
+                <span class="material-icons-outlined" style="font-size:20px">email</span>
+              </button>
+              <button data-tooltip="Ещё">
+                <span class="material-icons-outlined" style="font-size:20px">more_vert</span>
+              </button>
+            </div>
+          </div>
+          <!-- Student 2 -->
+          <div class="person-item">
+            <div class="person-avatar" style="background: var(--orange-light); color: var(--orange);">ПА</div>
+            <div class="person-info">
+              <div class="person-name">Петрова Анна</div>
+              <div class="person-role">Группа 101</div>
+            </div>
+            <div class="person-actions">
+              <button data-tooltip="Написать">
+                <span class="material-icons-outlined" style="font-size:20px">email</span>
+              </button>
+              <button data-tooltip="Ещё">
+                <span class="material-icons-outlined" style="font-size:20px">more_vert</span>
+              </button>
+            </div>
+          </div>
+          <!-- Student 3 -->
+          <div class="person-item">
+            <div class="person-avatar" style="background: var(--blue-light); color: var(--blue);">СМ</div>
+            <div class="person-info">
+              <div class="person-name">Сидоров Максим</div>
+              <div class="person-role">Группа 101</div>
+            </div>
+            <div class="person-actions">
+              <button data-tooltip="Написать">
+                <span class="material-icons-outlined" style="font-size:20px">email</span>
+              </button>
+              <button data-tooltip="Ещё">
+                <span class="material-icons-outlined" style="font-size:20px">more_vert</span>
+              </button>
+            </div>
+          </div>
+          <!-- Student 4 -->
+          <div class="person-item">
+            <div class="person-avatar" style="background: var(--purple-light); color: var(--purple);">КЕ</div>
+            <div class="person-info">
+              <div class="person-name">Козлова Елена</div>
+              <div class="person-role">Группа 101</div>
+            </div>
+            <div class="person-actions">
+              <button data-tooltip="Написать">
+                <span class="material-icons-outlined" style="font-size:20px">email</span>
+              </button>
+              <button data-tooltip="Ещё">
+                <span class="material-icons-outlined" style="font-size:20px">more_vert</span>
+              </button>
+            </div>
+          </div>
+          <!-- Student 5 -->
+          <div class="person-item">
+            <div class="person-avatar" style="background: var(--green-light); color: var(--green);">МА</div>
+            <div class="person-info">
+              <div class="person-name">Морозов Алексей</div>
+              <div class="person-role">Группа 101</div>
+            </div>
+            <div class="person-actions">
+              <button data-tooltip="Написать">
+                <span class="material-icons-outlined" style="font-size:20px">email</span>
+              </button>
+              <button data-tooltip="Ещё">
+                <span class="material-icons-outlined" style="font-size:20px">more_vert</span>
+              </button>
+            </div>
+          </div>
+          <!-- Student 6 -->
+          <div class="person-item">
+            <div class="person-avatar" style="background: var(--red-light); color: var(--red);">ВМ</div>
+            <div class="person-info">
+              <div class="person-name">Волкова Мария</div>
+              <div class="person-role">Группа 101</div>
+            </div>
+            <div class="person-actions">
+              <button data-tooltip="Написать">
+                <span class="material-icons-outlined" style="font-size:20px">email</span>
+              </button>
+              <button data-tooltip="Ещё">
+                <span class="material-icons-outlined" style="font-size:20px">more_vert</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ====== JavaScript ====== -->
+  <script>
+    // --- Sidebar Toggle ---
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const sidebarClose = document.getElementById('sidebarClose');
+
+    function openSidebar() {
+      sidebar.classList.add('open');
+      sidebarOverlay.classList.add('visible');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      sidebarOverlay.classList.remove('visible');
+      document.body.style.overflow = '';
+    }
+
+    menuToggle.addEventListener('click', openSidebar);
+    sidebarClose.addEventListener('click', closeSidebar);
+    sidebarOverlay.addEventListener('click', closeSidebar);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeSidebar();
+    });
+
+    // --- Tab Switching ---
+    const tabs = document.querySelectorAll('.course-tab');
+    const panels = document.querySelectorAll('.tab-panel');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.tab;
+
+        // Deactivate all tabs & panels
+        tabs.forEach(t => t.classList.remove('active'));
+        panels.forEach(p => p.classList.remove('active'));
+
+        // Activate the clicked tab & matching panel
+        tab.classList.add('active');
+        document.getElementById('tab-' + target).classList.add('active');
+      });
+    });
+  </script>
+
+</body>
+</html>

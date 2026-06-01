@@ -13,6 +13,7 @@ import { CallbackComponent } from './features/auth/callback.component';
 import { ProfileComponent } from './features/profile/profile.component';
 import { AdminDbComponent } from './features/admin/admin-db.component';
 import { HomeComponent } from './features/home/home.component';
+import { CalendarNewsComponent } from './features/home/calendar-news.component';
 import { NewsManageComponent } from './features/news/news-manage.component';
 import { AnalyticsComponent } from './features/analytics/analytics.component';
 import { ActivityMonitorComponent } from './features/activity-monitor/activity-monitor.component';
@@ -30,8 +31,9 @@ export const routes: Routes = [
   { path: 'callback', component: CallbackComponent },
   { path: 'register', redirectTo: 'login' },
   { path: '', component: HomeComponent, canActivate: [authGuard] },
+  { path: 'calendar-news', component: CalendarNewsComponent, canActivate: [authGuard] },
   { path: 'news/manage', component: NewsManageComponent, canActivate: [authGuard] },
-  { path: 'subjects', component: SubjectsComponent, canActivate: [authGuard] },
+  { path: 'subjects', redirectTo: '', pathMatch: 'full' },
   { path: 'course-builder', component: CourseBuilderListComponent, canActivate: [authGuard] },
   { path: 'course-builder/:id', component: CourseBuilderComponent, canActivate: [authGuard] },
   { path: 'courses/:id', component: CourseViewComponent, canActivate: [authGuard] },

@@ -55,6 +55,20 @@ import { interval, Subscription } from 'rxjs';
             <mat-icon matListItemIcon>home</mat-icon>
             <span matListItemTitle>Главная</span>
           </a>
+          <a mat-list-item routerLink="/calendar-news" (click)="sidenav.close()" routerLinkActive="active-link">
+            <mat-icon matListItemIcon>calendar_month</mat-icon>
+            <span matListItemTitle>Календарь и новости</span>
+          </a>
+
+          <!-- Dynamic Courses -->
+          <ng-container *ngIf="sidebarSubjects && sidebarSubjects.length > 0">
+            <div class="nav-divider"></div>
+            <div class="nav-block-header">МОИ КУРСЫ</div>
+            <a mat-list-item *ngFor="let subject of sidebarSubjects; let idx = index" [routerLink]="['/courses', subject.id]" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon [style.color]="'var(--course-' + ((idx % 6) + 1) + ')'">book</mat-icon>
+              <span matListItemTitle>{{ subject.name }}</span>
+            </a>
+          </ng-container>
 
           <div class="nav-divider"></div>
           
@@ -73,22 +87,19 @@ import { interval, Subscription } from 'rxjs';
             <span matListItemTitle>Кросс-проверка</span>
           </a>
 
-          <div class="nav-divider"></div>
-
-          <!-- Block: Courses -->
-          <div class="nav-block-header">КУРСЫ</div>
-          <a mat-list-item routerLink="/subjects" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>library_books</mat-icon>
-            <span matListItemTitle>Курсы</span>
-          </a>
-          <a mat-list-item routerLink="/tests/create" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role !== 'student'">
-            <mat-icon matListItemIcon>add_task</mat-icon>
-            <span matListItemTitle>Конструктор тестов</span>
-          </a>
-          <a mat-list-item routerLink="/course-builder" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role !== 'student'">
-            <mat-icon matListItemIcon>construction</mat-icon>
-            <span matListItemTitle>Конструктор курсов</span>
-          </a>
+          <!-- Block: Builders -->
+          <ng-container *ngIf="currentUser.role !== 'student'">
+            <div class="nav-divider"></div>
+            <div class="nav-block-header">КОНСТРУКТОРЫ</div>
+            <a mat-list-item routerLink="/tests/create" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>add_task</mat-icon>
+              <span matListItemTitle>Конструктор тестов</span>
+            </a>
+            <a mat-list-item routerLink="/course-builder" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>construction</mat-icon>
+              <span matListItemTitle>Конструктор курсов</span>
+            </a>
+          </ng-container>
 
           <div class="nav-divider"></div>
 
@@ -486,6 +497,7 @@ import { interval, Subscription } from 'rxjs';
   `]
 })
 export class AppComponent implements OnInit, OnDestroy {
+  sidebarSubjects: any[] = [];
   title = 'EduAI Hub';
   aiStatus: any = null;
   activeTestTimer: any = null;
@@ -518,15 +530,19 @@ export class AppComponent implements OnInit, OnDestroy {
       const previouslyLoggedIn = !!this.currentUser;
       this.currentUser = user;
 
-      if (user && !previouslyLoggedIn) {
-        this.startSession();
-      } else if (!user && previouslyLoggedIn) {
-        // Session handled by logout() or beforeunload
+      if (user) {
+        this.loadSidebarSubjects();
+        if (!previouslyLoggedIn) {
+          this.startSession();
+        }
+      } else {
+        this.sidebarSubjects = [];
       }
     });
 
     if (this.currentUser) {
       this.startSession();
+      this.loadSidebarSubjects();
     }
 
     this.checkAiStatus();
@@ -591,6 +607,17 @@ export class AppComponent implements OnInit, OnDestroy {
       action_type: 'session_end',
       session_duration: duration
     }).subscribe();
+  }
+
+  loadSidebarSubjects() {
+    this.apiService.getSubjects().subscribe({
+      next: (subjects) => {
+        this.sidebarSubjects = subjects;
+      },
+      error: (err) => {
+        console.error('Error loading sidebar subjects:', err);
+      }
+    });
   }
 
   loadNotifications() {

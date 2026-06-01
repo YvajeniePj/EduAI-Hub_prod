@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Условные операторы if/else — Основы Python — EduAI Hub</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ========== Top Bar ========== -->
+  <header class="topbar">
+    <button class="topbar-hamburger" id="menuToggle" aria-label="Открыть меню">
+      <span class="material-icons">menu</span>
+    </button>
+
+    <a href="index.html" class="topbar-brand">
+      <div class="logo-icon">
+        <span class="material-icons" style="font-size:20px">school</span>
+      </div>
+      <div class="logo-text">Edu<span>AI</span> Hub</div>
+    </a>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-actions">
+      <button class="topbar-btn" data-tooltip="Статус: онлайн">
+        <span class="status-dot online"></span>
+      </button>
+      <button class="topbar-btn" data-tooltip="Уведомления">
+        <span class="material-icons-outlined">notifications</span>
+        <span class="badge"></span>
+      </button>
+      <div class="topbar-avatar" data-tooltip="Профиль">АЖ</div>
+    </div>
+  </header>
+
+  <!-- ========== Sidebar Overlay ========== -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ========== Sidebar ========== -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-icon">
+        <span class="material-icons" style="font-size:20px">school</span>
+      </div>
+      <div class="logo-text">Edu<span>AI</span> Hub</div>
+      <button class="sidebar-close" id="sidebarClose" aria-label="Закрыть меню">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+
+    <div class="sidebar-body">
+      <!-- Main nav -->
+      <div class="sidebar-section">
+        <a href="index.html" class="sidebar-item">
+          <span class="material-icons-outlined">home</span>
+          Главная
+        </a>
+        <a class="sidebar-item">
+          <span class="material-icons-outlined">calendar_today</span>
+          Календарь
+        </a>
+        <a class="sidebar-item">
+          <span class="material-icons-outlined">leaderboard</span>
+          Лидерборд
+        </a>
+        <a class="sidebar-item">
+          <span class="material-icons-outlined">smart_toy</span>
+          Чат-ассистент
+        </a>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- My courses -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Мои курсы</div>
+        <a href="course.html" class="sidebar-item active">
+          <span class="course-dot" style="background:#4f46e5"></span>
+          Основы Python
+        </a>
+        <a class="sidebar-item">
+          <span class="course-dot" style="background:#0d9488"></span>
+          Машинное обучение
+        </a>
+        <a class="sidebar-item">
+          <span class="course-dot" style="background:#d97706"></span>
+          Базы данных
+        </a>
+        <a class="sidebar-item">
+          <span class="course-dot" style="background:#dc2626"></span>
+          Веб-разработка
+        </a>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <a class="sidebar-item">
+          <span class="material-icons-outlined">settings</span>
+          Настройки
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========== Main Content ========== -->
+  <main class="main-content">
+    <div class="lesson-layout">
+
+      <!-- ====== Lesson Sidebar (Navigation Tree) ====== -->
+      <aside class="lesson-sidebar">
+        <div class="lesson-sidebar-header">
+          <h3>Основы Python</h3>
+          <a href="course.html" class="back-link">← Вернуться к курсу</a>
+        </div>
+
+        <div class="lesson-nav-group">
+          <!-- Module 1 -->
+          <div class="lesson-nav-module" data-module="mod1">
+            <span class="material-icons-outlined">expand_more</span>
+            Модуль 1. Введение
+          </div>
+          <div class="lesson-nav-items" id="mod1">
+            <a class="lesson-nav-item" href="#">
+              <span class="material-icons-outlined nav-icon">menu_book</span>
+              Что такое Python
+            </a>
+            <a class="lesson-nav-item" href="#">
+              <span class="material-icons-outlined nav-icon">menu_book</span>
+              Установка среды
+            </a>
+            <a class="lesson-nav-item" href="#">
+              <span class="material-icons-outlined nav-icon">quiz</span>
+              Тест: Основы
+            </a>
+          </div>
+
+          <!-- Module 2 -->
+          <div class="lesson-nav-module" data-module="mod2">
+            <span class="material-icons-outlined">expand_more</span>
+            Модуль 2. Управляющие конструкции
+          </div>
+          <div class="lesson-nav-items" id="mod2">
+            <a class="lesson-nav-item active" href="#">
+              <span class="material-icons-outlined nav-icon">menu_book</span>
+              Условные операторы
+            </a>
+            <a class="lesson-nav-item" href="#">
+              <span class="material-icons-outlined nav-icon">play_circle</span>
+              Видео: Циклы
+            </a>
+            <a class="lesson-nav-item" href="#">
+              <span class="material-icons-outlined nav-icon">description</span>
+              Лабораторная №3
+            </a>
+            <a class="lesson-nav-item" href="#">
+              <span class="material-icons-outlined nav-icon">quiz</span>
+              Тест: Циклы
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ====== Lesson Main Content ====== -->
+      <div class="lesson-main">
+
+        <!-- Breadcrumbs -->
+        <nav class="lesson-breadcrumbs" aria-label="Навигация">
+          <a href="course.html">Основы Python</a>
+          <span class="sep">›</span>
+          <span>Модуль 2</span>
+          <span class="sep">›</span>
+          <span class="current">Условные операторы if/else</span>
+        </nav>
+
+        <!-- Lesson Header -->
+        <div class="lesson-content-header">
+          <div class="lesson-type-icon book">
+            <span class="material-icons">menu_book</span>
+          </div>
+          <div class="header-text">
+            <div class="lesson-label">Учебник</div>
+            <h1>Условные операторы if/else</h1>
+          </div>
+        </div>
+
+        <!-- Lesson Text Content -->
+        <article class="lesson-text">
+
+          <h2>Что такое условные операторы?</h2>
+          <p>
+            Условные операторы — это фундаментальная конструкция в любом языке программирования, которая позволяет
+            программе принимать решения и выполнять различные блоки кода в зависимости от того, истинно или ложно
+            определённое условие. В Python условные операторы реализуются с помощью ключевых слов
+            <code>if</code>, <code>elif</code> и <code>else</code>.
+          </p>
+          <p>
+            Благодаря условным операторам программа может реагировать на различные входные данные и ситуации,
+            делая код гибким и интерактивным. Например, вы можете проверить, является ли пользователь
+            авторизованным, достаточно ли средств на счёте или корректны ли введённые данные.
+          </p>
+
+          <h3>Синтаксис if/else</h3>
+          <p>
+            Базовый синтаксис условного оператора в Python выглядит следующим образом. Обратите внимание, что
+            в Python отступы (обычно 4 пробела) определяют, какой блок кода относится к какому условию:
+          </p>
+
+<pre><code>age = 18
+
+if age >= 18:
+    print("Вы совершеннолетний")
+    print("Доступ разрешён")
+else:
+    print("Вы несовершеннолетний")
+    print("Доступ ограничен")</code></pre>
+
+          <p>
+            В этом примере переменная <code>age</code> проверяется на условие <code>age >= 18</code>. Если
+            условие истинно, выполняется первый блок кода (после <code>if</code>). Если условие ложно —
+            выполняется блок после <code>else</code>.
+          </p>
+
+          <h3>Оператор elif</h3>
+          <p>
+            Когда нужно проверить несколько условий последовательно, используется ключевое слово
+            <code>elif</code> (сокращение от «else if»). Это позволяет создавать цепочки проверок
+            без глубокой вложенности кода:
+          </p>
+
+<pre><code>score = 85
+
+if score >= 90:
+    grade = "Отлично"
+elif score >= 75:
+    grade = "Хорошо"
+elif score >= 60:
+    grade = "Удовлетворительно"
+else:
+    grade = "Неудовлетворительно"
+
+print(f"Ваша оценка: {grade}")
+# Вывод: Ваша оценка: Хорошо</code></pre>
+
+          <p>
+            Python проверяет условия сверху вниз и выполняет блок кода для первого истинного условия.
+            Остальные блоки <code>elif</code> и <code>else</code> пропускаются. Если ни одно из условий
+            не выполняется, выполняется блок <code>else</code> (если он указан).
+          </p>
+
+          <h3>Практические советы</h3>
+          <ul>
+            <li><strong>Избегайте глубокой вложенности:</strong> Если у вас больше 3 уровней вложенных <code>if</code>, подумайте о рефакторинге — выделите логику в отдельные функции или используйте <code>elif</code>.</li>
+            <li><strong>Используйте тернарный оператор для простых случаев:</strong> Вместо многострочного <code>if/else</code> можно написать <code>result = "да" if condition else "нет"</code>.</li>
+            <li><strong>Проверяйте граничные значения:</strong> При написании условий убедитесь, что все возможные значения обработаны, включая крайние случаи (например, <code>0</code>, пустую строку, <code>None</code>).</li>
+            <li><strong>Помните о порядке условий:</strong> Ставьте более специфичные условия выше, а более общие — ниже. Это поможет избежать логических ошибок.</li>
+          </ul>
+
+        </article>
+
+        <!-- Resource Cards -->
+        <div class="resource-card">
+          <div class="resource-card-icon doc">
+            <span class="material-icons-outlined">description</span>
+          </div>
+          <div class="resource-card-info">
+            <div class="resource-card-title">Конспект: Условные операторы.pdf</div>
+            <div class="resource-card-desc">PDF документ, 2.4 МБ</div>
+          </div>
+          <div class="resource-card-actions">
+            <button class="btn btn-outline btn-sm">Просмотр</button>
+            <button class="btn btn-ghost btn-sm" data-tooltip="Скачать">
+              <span class="material-icons-outlined icon-sm">download</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="resource-card">
+          <div class="resource-card-icon test">
+            <span class="material-icons-outlined">quiz</span>
+          </div>
+          <div class="resource-card-info">
+            <div class="resource-card-title">Тест: Циклы и условия</div>
+            <div class="resource-card-desc">Проверочное тестирование • 15 вопросов</div>
+          </div>
+          <div class="resource-card-actions">
+            <button class="btn btn-primary btn-sm">Начать тест</button>
+          </div>
+        </div>
+
+        <!-- Lesson Navigation Buttons -->
+        <div class="lesson-nav-buttons">
+          <button class="nav-btn">
+            <span class="material-icons-outlined">arrow_back</span>
+            Предыдущий урок
+          </button>
+          <button class="nav-btn">
+            Следующий урок
+            <span class="material-icons-outlined">arrow_forward</span>
+          </button>
+        </div>
+
+      </div>
+      <!-- /lesson-main -->
+
+    </div>
+    <!-- /lesson-layout -->
+  </main>
+
+  <!-- ========== JavaScript ========== -->
+  <script>
+    // ---------- Sidebar Toggle ----------
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebarClose = document.getElementById('sidebarClose');
+
+    function openSidebar() {
+      sidebar.classList.add('open');
+      overlay.classList.add('visible');
+    }
+
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('visible');
+    }
+
+    menuToggle.addEventListener('click', openSidebar);
+    sidebarClose.addEventListener('click', closeSidebar);
+    overlay.addEventListener('click', closeSidebar);
+
+    // Close sidebar on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeSidebar();
+    });
+
+    // ---------- Module Toggle (Lesson Sidebar) ----------
+    document.querySelectorAll('.lesson-nav-module').forEach(module => {
+      module.addEventListener('click', () => {
+        const targetId = module.getAttribute('data-module');
+        const items = document.getElementById(targetId);
+        const arrow = module.querySelector('.material-icons-outlined');
+
+        if (items) {
+          const isHidden = items.style.display === 'none';
+          items.style.display = isHidden ? 'block' : 'none';
+          arrow.textContent = isHidden ? 'expand_more' : 'chevron_right';
+        }
+      });
+    });
+
+    // ---------- Lesson Nav Item Click (visual feedback) ----------
+    document.querySelectorAll('.lesson-nav-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.querySelectorAll('.lesson-nav-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+      });
+    });
+  </script>
+
+</body>
+</html>

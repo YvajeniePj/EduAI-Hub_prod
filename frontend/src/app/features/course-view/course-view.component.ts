@@ -18,11 +18,14 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSelectModule } from '@angular/material/select';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { CreateGroupDialogComponent } from '../groups/groups.component';
 import { UploadMaterialDialogComponent } from './upload-material-dialog.component';
 import { MaterialViewerComponent } from './material-viewer.component';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
 
 interface TreeNode {
   id: string;
@@ -59,7 +62,10 @@ interface TreeNode {
     ReactiveFormsModule,
     CreateGroupDialogComponent,
     UploadMaterialDialogComponent,
-    MaterialViewerComponent
+    MaterialViewerComponent,
+    MatMenuModule,
+    MatTooltipModule,
+    RussianDatePipe
   ],
   template: `
     <div class="course-hub-container">
@@ -71,241 +77,455 @@ interface TreeNode {
       </div>
 
       <mat-tab-group animationDuration="0ms" class="course-tabs" [selectedIndex]="0">
-        <!-- Tab 1: Training (Existing View) -->
-        <mat-tab label="Обучение">
-          <div class="course-layout">
-      <!-- Sidebar -->
-      <div class="sidebar">
-        <div class="sidebar-header">
-          <h2>Содержание</h2>
-        </div>
-        <div class="sidebar-content">
-          <mat-tree [dataSource]="dataSource" [treeControl]="treeControl" class="nav-tree">
-            <!-- Lesson Node (Leaf) -->
-            <mat-tree-node *matTreeNodeDef="let node" matTreeNodePadding>
-              <button mat-button class="nav-item-btn" [class.active]="selectedLesson?.id === node.id" (click)="selectLesson(node)">
-                <span class="tree-indicator"></span>
-                <span class="nav-text">{{ node.title }}</span>
-              </button>
-            </mat-tree-node>
+        <!-- Tab 1: Лента -->
+        <mat-tab label="Лента">
+          <div class="tab-content-container">
+            <div class="course-banner-card">
+              <div class="banner-overlay"></div>
+              <div class="banner-content">
+                <h1 class="banner-title">{{ courseName }}</h1>
+                <p class="banner-description" *ngIf="courseDescription">{{ courseDescription }}</p>
+                <div class="banner-meta">
+                  <span *ngIf="courseTeachers.length > 0">
+                    Преподаватель: <strong *ngFor="let t of courseTeachers; let last = last">{{ t.name }}{{ last ? '' : ', ' }}</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
 
-            <!-- Module Node (Parent) -->
-            <mat-nested-tree-node *matTreeNodeDef="let node; when: hasChild" matTreeNodePadding>
-              <div class="module-group">
-                <button mat-icon-button matTreeNodeToggle [attr.aria-label]="'Toggle ' + node.title">
-                  <mat-icon class="mat-icon-rtl-mirror">
-                    {{ treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
-                  </mat-icon>
+            <div class="stream-layout">
+              <!-- Left Column: Deadlines -->
+              <div class="deadlines-sidebar">
+                <mat-card class="sidebar-card">
+                  <mat-card-header>
+                    <mat-card-title>Предстоящие задания</mat-card-title>
+                  </mat-card-header>
+                  <mat-card-content>
+                    <div *ngIf="courseDeadlines.length === 0" class="no-deadlines">
+                      Ура, заданий на этой неделе нет!
+                    </div>
+                    <div *ngIf="courseDeadlines.length > 0" class="deadlines-list">
+                      <div *ngFor="let deadline of courseDeadlines" class="deadline-item" [class.overdue]="deadline.overdue" [class.finished]="deadline.finished">
+                        <mat-icon [style.color]="deadline.finished ? '#43a047' : (deadline.overdue ? '#d32f2f' : '#5f6368')">
+                          {{ deadline.finished ? 'check_circle' : 'event' }}
+                        </mat-icon>
+                        <div class="deadline-info">
+                          <a [routerLink]="['/tests', deadline.id, 'take']" [queryParams]="{ source: 'courses' }" class="deadline-title">
+                            {{ deadline.title }}
+                          </a>
+                          <div class="deadline-date">
+                            Срок: {{ deadline.dueDate | date:'short' }}
+                          </div>
+                          <div *ngIf="deadline.overdue" class="deadline-status overdue-text">Просрочено</div>
+                          <div *ngIf="deadline.finished" class="deadline-status finished-text">Сдано</div>
+                        </div>
+                      </div>
+                    </div>
+                  </mat-card-content>
+                </mat-card>
+              </div>
+
+              <!-- Right Column: Compose Form & Feed -->
+              <div class="stream-feed">
+                <!-- Compose box for teachers/admins -->
+                <mat-card class="compose-card" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+                  <mat-card-content>
+                    <div class="compose-trigger" *ngIf="!showComposeForm" (click)="showComposeForm = true">
+                      <img [src]="getAvatarUrl(currentUser?.avatar_url) || 'assets/default-avatar.png'" (error)="handleAvatarError($event)" class="compose-avatar" />
+                      <span class="placeholder-text">Поделитесь чем-нибудь с классом...</span>
+                    </div>
+                    
+                    <form [formGroup]="announcementForm" (ngSubmit)="postAnnouncement()" *ngIf="showComposeForm" class="compose-form">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Тема объявления</mat-label>
+                        <input matInput formControlName="title" placeholder="Тема..." />
+                      </mat-form-field>
+                      
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Текст объявления</mat-label>
+                        <textarea matInput formControlName="content" rows="4" placeholder="Напишите здесь ваше сообщение..."></textarea>
+                      </mat-form-field>
+                      
+                      <div class="compose-actions">
+                        <button mat-button type="button" (click)="showComposeForm = false; announcementForm.reset()">Отмена</button>
+                        <button mat-raised-button color="primary" type="submit" [disabled]="announcementForm.invalid || saving">
+                          Опубликовать
+                        </button>
+                      </div>
+                    </form>
+                  </mat-card-content>
+                </mat-card>
+
+                <!-- Announcements Feed -->
+                <div class="announcements-feed">
+                  <div *ngIf="courseAnnouncements.length === 0" class="no-announcements">
+                    <mat-icon class="feed-empty-icon">chat_bubble_outline</mat-icon>
+                    <p>Здесь пока ничего нет. Объявления появятся в этой ленте.</p>
+                  </div>
+                  <mat-card *ngFor="let announcement of courseAnnouncements" class="announcement-card">
+                    <mat-card-header class="announcement-header">
+                      <img mat-card-avatar [src]="getAvatarUrl(announcement.author_avatar) || 'assets/default-avatar.png'" (error)="handleAvatarError($event)" class="author-avatar" />
+                      <div class="announcement-meta-container">
+                        <mat-card-title class="announcement-author">
+                          {{ announcement.author_name || 'Преподаватель' }}
+                        </mat-card-title>
+                        <mat-card-subtitle class="announcement-date">
+                          {{ announcement.created_at | russianDate }}
+                        </mat-card-subtitle>
+                      </div>
+                      <span class="spacer"></span>
+                      <button mat-icon-button [matMenuTriggerFor]="announcementMenu" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+                        <mat-icon>more_vert</mat-icon>
+                      </button>
+                      <mat-menu #announcementMenu="matMenu">
+                        <button mat-menu-item (click)="deleteAnnouncement(announcement.id)">
+                          <mat-icon>delete</mat-icon>
+                          <span>Удалить</span>
+                        </button>
+                      </mat-menu>
+                    </mat-card-header>
+                    <mat-card-content class="announcement-body">
+                      <h3 class="announcement-title-text">{{ announcement.title }}</h3>
+                      <div [innerHTML]="announcement.content" class="announcement-content-text"></div>
+                      <div *ngIf="announcement.image_url" class="announcement-image-container">
+                        <img [src]="announcement.image_url" class="announcement-image" />
+                      </div>
+                    </mat-card-content>
+                  </mat-card>
+                </div>
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <!-- Tab 2: Задания -->
+        <mat-tab label="Задания">
+          <!-- Classwork List (viewingLessonMode === false) -->
+          <div class="tab-content-container" *ngIf="!viewingLessonMode">
+            <div class="classwork-header-bar">
+              <h2>Задания и Материалы курса</h2>
+              <div class="actions" *ngIf="currentUser?.role === 'teacher'">
+                <button mat-raised-button color="primary" (click)="openCreateTest()">
+                  <mat-icon>quiz</mat-icon> Создать тест
                 </button>
-                <span class="module-title">{{ node.title }}</span>
+                <button mat-raised-button color="accent" (click)="openUploadMaterial()">
+                  <mat-icon>upload_file</mat-icon> Загрузить материал
+                </button>
               </div>
-              <div [class.example-tree-invisible]="!treeControl.isExpanded(node)" role="group">
-                <ng-container matTreeNodeOutlet></ng-container>
+            </div>
+
+            <!-- Modules Accordion -->
+            <mat-accordion multi="true" class="modules-accordion">
+              <mat-expansion-panel *ngFor="let module of dataSource.data" [expanded]="true" class="module-panel">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <span class="module-panel-title">{{ module.title }}</span>
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+
+                <div class="lessons-list">
+                  <div *ngFor="let lesson of module.children" class="lesson-row" (click)="selectLessonFromOutline(lesson)">
+                    <mat-icon class="lesson-type-icon" [style.color]="getLessonIconColor(lesson.lessonType)">
+                      {{ getLessonTypeIcon(lesson.lessonType) }}
+                    </mat-icon>
+                    <span class="lesson-row-title">{{ lesson.title }}</span>
+                    <span class="spacer"></span>
+                    
+                    <!-- Status Badge -->
+                    <span class="status-badge" [ngClass]="getLessonStatusClass(lesson)">
+                      {{ getLessonStatusText(lesson) }}
+                    </span>
+
+                    <!-- Deadline Badge -->
+                    <span class="deadline-badge-item" *ngIf="getLessonDeadline(lesson)">
+                      Срок: {{ getLessonDeadline(lesson) | date:'short' }}
+                    </span>
+                  </div>
+                  <div *ngIf="!module.children || module.children.length === 0" class="no-lessons">
+                    В этом модуле нет уроков.
+                  </div>
+                </div>
+              </mat-expansion-panel>
+            </mat-accordion>
+
+            <!-- Management Section for Teachers -->
+            <div class="teacher-management-section" *ngIf="currentUser?.role === 'teacher'">
+              <div class="section-title">
+                <h3>Панель управления (Все материалы и тесты)</h3>
               </div>
-            </mat-nested-tree-node>
-          </mat-tree>
-        </div>
-      </div>
+              <div class="assignments-list">
+                <div class="list-section">
+                    <h3>Тесты</h3>
+                    <div *ngIf="visibleTests.length === 0" class="empty-list">Нет тестов</div>
+                    <mat-card *ngFor="let test of visibleTests" class="item-card">
+                        <mat-card-content class="item-content">
+                            <div class="item-info">
+                                <div class="item-title-row">
+                                    <mat-icon class="item-icon">quiz</mat-icon>
+                                    <span class="item-title">{{ test.title }}</span>
+                                </div>
+                                <div class="item-meta">
+                                    <span class="meta-label">Доступ:</span> {{ getGroupNames(test.allowed_groups) }}
+                                    <span *ngIf="test.due_date" class="meta-separator">•</span>
+                                    <span *ngIf="test.due_date">Дедлайн: {{ test.due_date | date:'short' }}</span>
+                                </div>
+                            </div>
+                            <div class="item-actions">
+                                <button mat-icon-button color="warn" (click)="deleteTest(test.id)">
+                                    <mat-icon>delete</mat-icon>
+                                </button>
+                            </div>
+                        </mat-card-content>
+                    </mat-card>
+                </div>
 
-      <!-- Main Content -->
-      <div class="main-content">
-        <!-- Breadcrumbs -->
-         <div class="breadcrumbs" *ngIf="selectedLesson">
-            <span>{{ courseName }}</span>
-            <mat-icon class="separator">chevron_right</mat-icon>
-            <span>{{ lessonMetadata.moduleName }}</span>
-            <mat-icon class="separator">chevron_right</mat-icon>
-            <span class="current">{{ selectedLesson.title }}</span>
-         </div>
-
-        <div *ngIf="loading" class="loading-container">
-          <mat-spinner diameter="40"></mat-spinner>
-        </div>
-
-        <div *ngIf="!loading && selectedLesson" class="content-area">
-          <div class="lesson-header">
-            <div class="header-icon">
-               <mat-icon>menu_book</mat-icon>
+                <div class="list-section">
+                    <h3>Материалы</h3>
+                    <div *ngIf="visibleMaterials.length === 0" class="empty-list">Нет материалов</div>
+                    <mat-card *ngFor="let material of visibleMaterials" class="item-card">
+                         <mat-card-content class="item-content">
+                            <div class="item-info">
+                                <div class="item-title-row">
+                                    <mat-icon class="item-icon">description</mat-icon>
+                                    <span class="item-title">{{ material.original_name || material.name }}</span>
+                                </div>
+                                <div class="item-meta">
+                                    <span class="meta-label">Доступ:</span> {{ getGroupNames(material.allowed_groups) }}
+                                    <span class="meta-separator">•</span>
+                                    <span>{{ material.note || 'Без описания' }}</span>
+                                </div>
+                            </div>
+                            <div class="item-actions">
+                                <button mat-button color="primary" (click)="downloadMaterial(material.id)">Скачать</button>
+                                <button mat-icon-button color="warn" (click)="deleteMaterial(material.id)">
+                                    <mat-icon>delete</mat-icon>
+                                </button>
+                            </div>
+                         </mat-card-content>
+                    </mat-card>
+                </div>
+              </div>
             </div>
-            <div class="header-text">
-               <h1>Учебник</h1>
-               <div class="lesson-title">{{ selectedLesson.title }}</div>
-            </div>
-            <span class="spacer"></span>
-            <button mat-raised-button color="warn" *ngIf="isStreamActive" [routerLink]="['/courses', subjectId, 'stream']" class="live-btn">
-              <mat-icon>videocam</mat-icon>
-              В ЭФИРЕ
-            </button>
           </div>
 
-          <div class="content-body">
-              <!-- Text content -->
-              <div *ngIf="selectedLesson.content?.text_content" class="text-content">
-                <div [innerHTML]="selectedLesson.content.text_content"></div>
-              </div>
+          <!-- Lesson Viewer split layout (viewingLessonMode === true) -->
+          <div class="lesson-viewer-container" *ngIf="viewingLessonMode">
+            <div class="viewer-header">
+              <button mat-button color="primary" (click)="viewingLessonMode = false" class="back-btn">
+                <mat-icon>arrow_back</mat-icon>
+                Вернуться к заданиям
+              </button>
+            </div>
+            
+            <div class="course-layout">
+              <!-- Left Sidebar: Contents -->
+              <div class="sidebar">
+                <div class="sidebar-header">
+                  <h2>Содержание</h2>
+                </div>
+                <div class="sidebar-content">
+                  <mat-tree [dataSource]="dataSource" [treeControl]="treeControl" class="nav-tree">
+                    <!-- Lesson Node (Leaf) -->
+                    <mat-tree-node *matTreeNodeDef="let node" matTreeNodePadding>
+                      <button mat-button class="nav-item-btn" [class.active]="selectedLesson?.id === node.id" (click)="selectLesson(node)">
+                        <span class="tree-indicator"></span>
+                        <span class="nav-text">{{ node.title }}</span>
+                      </button>
+                    </mat-tree-node>
 
-              <!-- Video content -->
-              <div *ngIf="selectedLesson.content?.video_url" class="video-section">
-                <h3>Видеоматериал</h3>
-                <div class="video-container">
-                     <iframe
-                    *ngIf="safeVideoUrl"
-                    [src]="safeVideoUrl"
-                    frameborder="0"
-                    loading="lazy"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen
-                    class="video-iframe">
-                    </iframe>
+                    <!-- Module Node (Parent) -->
+                    <mat-nested-tree-node *matTreeNodeDef="let node; when: hasChild" matTreeNodePadding>
+                      <div class="module-group">
+                        <button mat-icon-button matTreeNodeToggle [attr.aria-label]="'Toggle ' + node.title">
+                          <mat-icon class="mat-icon-rtl-mirror">
+                            {{ treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
+                          </mat-icon>
+                        </button>
+                        <span class="module-title">{{ node.title }}</span>
+                      </div>
+                      <div [class.example-tree-invisible]="!treeControl.isExpanded(node)" role="group">
+                        <ng-container matTreeNodeOutlet></ng-container>
+                      </div>
+                    </mat-nested-tree-node>
+                  </mat-tree>
                 </div>
               </div>
 
-               <!-- Material link -->
-              <ng-container *ngIf="selectedLesson.content?.material_id">
-                  <div *ngIf="lessonMetadata.materialAllowed" class="resource-card">
-                    <mat-icon class="resource-icon">description</mat-icon>
-                    <div class="resource-info">
-                       <div class="resource-title">
-                         {{ lessonMetadata.materialName }}
-                       </div>
-                       <div class="resource-actions">
-                         <button mat-button color="primary" (click)="viewMaterial(selectedLesson.content.material_id)">
-                           <mat-icon>visibility</mat-icon> Просмотр
-                         </button>
-                         <button mat-button (click)="downloadMaterial(selectedLesson.content.material_id)">
-                           <mat-icon>download</mat-icon>
-                         </button>
-                         <button mat-stroked-button color="accent" *ngIf="lessonMetadata.isLatex" (click)="viewMaterialAs(selectedLesson.content.material_id, 'pdf')">
-                           <mat-icon>picture_as_pdf</mat-icon> PDF
-                         </button>
-                         <button mat-stroked-button color="accent" *ngIf="lessonMetadata.isJupyter" (click)="viewMaterialAs(selectedLesson.content.material_id, 'html')">
-                           <mat-icon>html</mat-icon> HTML
-                         </button>
-                       </div>
+              <!-- Right Content Area -->
+              <div class="main-content">
+                <!-- Breadcrumbs -->
+                 <div class="breadcrumbs" *ngIf="selectedLesson">
+                    <span>{{ courseName }}</span>
+                    <mat-icon class="separator">chevron_right</mat-icon>
+                    <span>{{ lessonMetadata.moduleName }}</span>
+                    <mat-icon class="separator">chevron_right</mat-icon>
+                    <span class="current">{{ selectedLesson.title }}</span>
+                 </div>
+
+                <div *ngIf="loading" class="loading-container">
+                  <mat-spinner diameter="40"></mat-spinner>
+                </div>
+
+                <div *ngIf="!loading && selectedLesson" class="content-area">
+                  <div class="lesson-header">
+                    <div class="header-icon">
+                       <mat-icon>menu_book</mat-icon>
                     </div>
+                    <div class="header-text">
+                       <h1>Учебник</h1>
+                       <div class="lesson-title">{{ selectedLesson.title }}</div>
+                    </div>
+                    <span class="spacer"></span>
+                    <button mat-raised-button color="warn" *ngIf="isStreamActive" [routerLink]="['/courses', subjectId, 'stream']" class="live-btn">
+                      <mat-icon>videocam</mat-icon>
+                      В ЭФИРЕ
+                    </button>
                   </div>
-                  <div *ngIf="!lessonMetadata.materialAllowed" class="resource-card locked">
-                      <mat-icon class="resource-icon">lock</mat-icon>
-                      <div class="resource-info">
-                          <div class="resource-title">Материал недоступен для вашей группы</div>
+
+                  <div class="content-body">
+                      <!-- Text content -->
+                      <div *ngIf="selectedLesson.content?.text_content" class="text-content">
+                        <div [innerHTML]="selectedLesson.content.text_content"></div>
+                      </div>
+
+                      <!-- Video content -->
+                      <div *ngIf="selectedLesson.content?.video_url" class="video-section">
+                        <h3>Видеоматериал</h3>
+                        <div class="video-container">
+                             <iframe
+                            *ngIf="safeVideoUrl"
+                            [src]="safeVideoUrl"
+                            frameborder="0"
+                            loading="lazy"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen
+                            class="video-iframe">
+                            </iframe>
+                        </div>
+                      </div>
+
+                       <!-- Material link -->
+                      <ng-container *ngIf="selectedLesson.content?.material_id">
+                          <div *ngIf="lessonMetadata.materialAllowed" class="resource-card">
+                            <mat-icon class="resource-icon">description</mat-icon>
+                            <div class="resource-info">
+                               <div class="resource-title">
+                                 {{ lessonMetadata.materialName }}
+                               </div>
+                               <div class="resource-actions">
+                                 <button mat-button color="primary" (click)="viewMaterial(selectedLesson.content.material_id)">
+                                   <mat-icon>visibility</mat-icon> Просмотр
+                                 </button>
+                                 <button mat-button (click)="downloadMaterial(selectedLesson.content.material_id)">
+                                   <mat-icon>download</mat-icon>
+                                 </button>
+                                 <button mat-stroked-button color="accent" *ngIf="lessonMetadata.isLatex" (click)="viewMaterialAs(selectedLesson.content.material_id, 'pdf')">
+                                   <mat-icon>picture_as_pdf</mat-icon> PDF
+                                 </button>
+                                 <button mat-stroked-button color="accent" *ngIf="lessonMetadata.isJupyter" (click)="viewMaterialAs(selectedLesson.content.material_id, 'html')">
+                                   <mat-icon>html</mat-icon> HTML
+                                 </button>
+                               </div>
+                            </div>
+                          </div>
+                          <div *ngIf="!lessonMetadata.materialAllowed" class="resource-card locked">
+                              <mat-icon class="resource-icon">lock</mat-icon>
+                              <div class="resource-info">
+                                  <div class="resource-title">Материал недоступен для вашей группы</div>
+                              </div>
+                          </div>
+                      </ng-container>
+
+                      <!-- Test link -->
+                      <ng-container *ngIf="selectedLesson.content?.test_id">
+                          <div *ngIf="lessonMetadata.testAllowed" class="resource-card test-card">
+                            <mat-icon class="resource-icon">quiz</mat-icon>
+                            <div class="resource-info">
+                               <div class="resource-title">Проверочное тестирование</div>
+                               <button mat-raised-button color="primary" [routerLink]="['/tests', selectedLesson.content.test_id, 'take']" [queryParams]="{ source: 'courses' }">
+                                 Начать тест
+                               </button>
+                            </div>
+                          </div>
+                          <div *ngIf="!lessonMetadata.testAllowed" class="resource-card locked">
+                              <mat-icon class="resource-icon">lock</mat-icon>
+                              <div class="resource-info">
+                                  <div class="resource-title">Тест недоступен для вашей группы</div>
+                              </div>
+                          </div>
+                      </ng-container>
+
+                      <div *ngIf="!selectedLesson.content || (!selectedLesson.content.text_content && !selectedLesson.content.video_url && !selectedLesson.content.material_id && !selectedLesson.content.test_id)" class="empty-content">
+                        <p>Содержимое урока пока не добавлено.</p>
                       </div>
                   </div>
-              </ng-container>
+                </div>
 
-              <!-- Test link -->
-              <ng-container *ngIf="selectedLesson.content?.test_id">
-                  <div *ngIf="lessonMetadata.testAllowed" class="resource-card test-card">
-                    <mat-icon class="resource-icon">quiz</mat-icon>
-                    <div class="resource-info">
-                       <div class="resource-title">Проверочное тестирование</div>
-                       <button mat-raised-button color="primary" [routerLink]="['/tests', selectedLesson.content.test_id, 'take']" [queryParams]="{ source: 'courses' }">
-                         Начать тест
-                       </button>
-                    </div>
-                  </div>
-                  <div *ngIf="!lessonMetadata.testAllowed" class="resource-card locked">
-                      <mat-icon class="resource-icon">lock</mat-icon>
-                      <div class="resource-info">
-                          <div class="resource-title">Тест недоступен для вашей группы</div>
-                      </div>
-                  </div>
-              </ng-container>
-
-              <div *ngIf="!selectedLesson.content || (!selectedLesson.content.text_content && !selectedLesson.content.video_url && !selectedLesson.content.material_id && !selectedLesson.content.test_id)" class="empty-content">
-                <p>Содержимое урока пока не добавлено.</p>
+                <div *ngIf="!loading && !selectedLesson" class="select-hint">
+                  <mat-icon>touch_app</mat-icon>
+                  <p>Выберите главу из содержания, чтобы начать обучение</p>
+                </div>
               </div>
+            </div>
           </div>
-        </div>
-
-        <div *ngIf="!loading && !selectedLesson" class="select-hint">
-          <mat-icon>touch_app</mat-icon>
-          <p>Выберите главу из содержания, чтобы начать обучение</p>
-        </div>
-      </div>
-    </div>
         </mat-tab>
 
-        <!-- Tab 2: Assignments (Teacher Only) -->
-        <mat-tab label="Задания и Материалы" *ngIf="currentUser?.role === 'teacher'">
-            <div class="tab-content-container">
-                <div class="section-header">
-                    <h2>Управление контентом</h2>
-                    <div class="actions">
-                        <button mat-raised-button color="primary" (click)="openCreateTest()">
-                            <mat-icon>quiz</mat-icon> Создать тест
-                        </button>
-                        <button mat-raised-button color="accent" (click)="openUploadMaterial()">
-                            <mat-icon>upload_file</mat-icon> Загрузить материал
-                        </button>
+        <!-- Tab 3: Участники -->
+        <mat-tab label="Участники">
+          <div class="tab-content-container">
+            <div class="people-tab-container">
+              <!-- Teachers Section -->
+              <div class="people-section">
+                <div class="people-section-header">
+                  <h2>Преподаватели</h2>
+                  <span class="people-count">{{ courseTeachers.length }}</span>
+                </div>
+                <div class="people-list">
+                  <div *ngFor="let teacher of courseTeachers" class="person-row">
+                    <div class="person-info">
+                      <img [src]="getAvatarUrl(teacher.avatar_url) || 'assets/default-avatar.png'" (error)="handleAvatarError($event)" class="person-avatar" />
+                      <span class="person-name">{{ teacher.name }}</span>
                     </div>
+                    <div class="person-actions">
+                      <a mat-icon-button [href]="'mailto:' + getUserEmail(teacher.name)" title="Написать письмо">
+                        <mat-icon>mail_outline</mat-icon>
+                      </a>
+                    </div>
+                  </div>
+                  <div *ngIf="courseTeachers.length === 0" class="empty-people">
+                    Нет назначенных преподавателей.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Students Section -->
+              <div class="people-section">
+                <div class="people-section-header">
+                  <h2>Учащиеся</h2>
+                  <span class="people-count">{{ courseStudents.length }}</span>
+                </div>
+                <div class="people-list">
+                  <div *ngFor="let student of courseStudents" class="person-row">
+                    <div class="person-info">
+                      <img [src]="getAvatarUrl(student.avatar_url) || 'assets/default-avatar.png'" (error)="handleAvatarError($event)" class="person-avatar" />
+                      <span class="person-name">{{ student.name }}</span>
+                    </div>
+                  </div>
+                  <div *ngIf="courseStudents.length === 0" class="empty-people">
+                    Нет учащихся на данном курсе.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Groups Section -->
+              <div class="people-section groups-section-wrapper">
+                <div class="people-section-header">
+                  <h2>Группы курса</h2>
+                  <button mat-raised-button color="primary" (click)="createGroup()" *ngIf="currentUser?.role === 'teacher'">
+                    <mat-icon>group_add</mat-icon> Создать группу
+                  </button>
                 </div>
                 
-                <div class="assignments-list">
-                    <div class="list-section">
-                        <h3>Тесты</h3>
-                        <div *ngIf="visibleTests.length === 0" class="empty-list">Нет тестов</div>
-                        <mat-card *ngFor="let test of visibleTests" class="item-card">
-                            <mat-card-content class="item-content">
-                                <div class="item-info">
-                                    <div class="item-title-row">
-                                        <mat-icon class="item-icon">quiz</mat-icon>
-                                        <span class="item-title">{{ test.title }}</span>
-                                    </div>
-                                    <div class="item-meta">
-                                        <span class="meta-label">Доступ:</span> {{ getGroupNames(test.allowed_groups) }}
-                                        <span *ngIf="test.due_date" class="meta-separator">•</span>
-                                        <span *ngIf="test.due_date">Дедлайн: {{ test.due_date | date:'short' }}</span>
-                                    </div>
-                                </div>
-                                <div class="item-actions">
-                                    <button mat-icon-button color="warn" (click)="deleteTest(test.id)">
-                                        <mat-icon>delete</mat-icon>
-                                    </button>
-                                </div>
-                            </mat-card-content>
-                        </mat-card>
-                    </div>
-
-                    <div class="list-section">
-                        <h3>Материалы</h3>
-                        <div *ngIf="visibleMaterials.length === 0" class="empty-list">Нет материалов</div>
-                        <mat-card *ngFor="let material of visibleMaterials" class="item-card">
-                             <mat-card-content class="item-content">
-                                <div class="item-info">
-                                    <div class="item-title-row">
-                                        <mat-icon class="item-icon">description</mat-icon>
-                                        <span class="item-title">{{ material.original_name || material.name }}</span>
-                                    </div>
-                                    <div class="item-meta">
-                                        <span class="meta-label">Доступ:</span> {{ getGroupNames(material.allowed_groups) }}
-                                        <span class="meta-separator">•</span>
-                                        <span>{{ material.note || 'Без описания' }}</span>
-                                    </div>
-                                </div>
-                                <div class="item-actions">
-                                    <button mat-button color="primary" (click)="downloadMaterial(material.id)">Скачать</button>
-                                    <button mat-icon-button color="warn" (click)="deleteMaterial(material.id)">
-                                        <mat-icon>delete</mat-icon>
-                                    </button>
-                                </div>
-                            </mat-card-content>
-                        </mat-card>
-                    </div>
-                </div>
-            </div>
-        </mat-tab>
-
-        <!-- Tab 3: Groups (Teacher & Student) -->
-        <mat-tab label="Группы">
-             <div class="tab-content-container">
-                <div class="section-header">
-                    <h2>Группы курса</h2>
-                    <button mat-raised-button color="primary" (click)="createGroup()" *ngIf="currentUser?.role === 'teacher'">
-                        <mat-icon>group_add</mat-icon> Создать группу
-                    </button>
-                </div>
-
-                <!-- Teacher Action -->
                 <div class="list-section" *ngIf="currentUser?.role === 'teacher'">
                     <p class="section-hint">Управляйте участниками и заявками на странице каждой группы.</p>
                 </div>
@@ -348,9 +568,10 @@ interface TreeNode {
                          </mat-card-content>
                     </mat-card>
                 </div>
+              </div>
             </div>
+          </div>
         </mat-tab>
-
       </mat-tab-group>
     </div>
   `,
@@ -359,26 +580,29 @@ interface TreeNode {
       display: flex;
       flex-direction: column;
       height: 100vh;
-      background-color: #f5f5f5;
+      background-color: #f8f9fa;
+      color: #3c4043;
+      font-family: Roboto, Arial, sans-serif;
     }
 
     .course-header {
       background: white;
-      padding: 16px 24px;
-      border-bottom: 1px solid #e0e0e0;
+      padding: 12px 24px;
+      border-bottom: 1px solid #dadce0;
       flex-shrink: 0;
     }
 
     .course-header h1 {
         margin: 0;
-        font-size: 24px;
-        color: #1a237e;
+        font-size: 22px;
+        font-weight: 400;
+        color: #1e88e5;
     }
 
-    /* Tabs Override */
     ::ng-deep .course-tabs .mat-mdc-tab-body-wrapper {
         flex: 1; 
         height: 100%;
+        background-color: #f8f9fa;
     }
     
     ::ng-deep .course-tabs {
@@ -388,45 +612,444 @@ interface TreeNode {
         overflow: hidden;
     }
 
-    .tab-content-container {
-        padding: 24px;
-        height: 100%;
-        overflow-y: auto;
+    ::ng-deep .course-tabs .mat-mdc-tab-header {
+        background-color: white;
+        border-bottom: 1px solid #dadce0;
     }
 
-    .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
+    ::ng-deep .course-tabs .mdc-tab__text-label {
+        font-weight: 500;
+        font-size: 14px;
+        letter-spacing: 0.25px;
     }
-    
-    .actions {
-        display: flex;
-        gap: 12px;
-    }
-    
-    .info-card {
+
+    .tab-content-container {
         padding: 24px;
-        text-align: center;
-        color: #666;
+        max-width: 1000px;
+        margin: 0 auto;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-y: auto;
+        height: 100%;
     }
-    
-    .list-section {
-        margin-bottom: 32px;
+
+    /* Course Banner */
+    .course-banner-card {
+      position: relative;
+      background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
+      color: white;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 2px 6px 2px rgba(60,64,67,0.15);
+      overflow: hidden;
+    }
+
+    .banner-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/></svg>') repeat;
+      opacity: 0.3;
+    }
+
+    .banner-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .banner-title {
+      font-size: 32px;
+      font-weight: 500;
+      margin: 0 0 8px 0;
+      line-height: 1.2;
+    }
+
+    .banner-description {
+      font-size: 16px;
+      opacity: 0.9;
+      margin: 0 0 16px 0;
+    }
+
+    .banner-meta {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    /* Stream Layout */
+    .stream-layout {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    .deadlines-sidebar {
+      width: 280px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-card {
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      box-shadow: none !important;
+      background: white;
+    }
+
+    .sidebar-card mat-card-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #3c4043;
+      margin: 16px 16px 8px 16px;
+    }
+
+    .no-deadlines {
+      padding: 16px;
+      color: #5f6368;
+      font-size: 13px;
+    }
+
+    .deadlines-list {
+      padding: 8px 16px 16px 16px;
+    }
+
+    .deadline-item {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .deadline-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .deadline-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .deadline-title {
+      font-size: 14px;
+      color: #1a73e8;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .deadline-title:hover {
+      text-decoration: underline;
+    }
+
+    .deadline-date {
+      font-size: 12px;
+      color: #5f6368;
+      margin-top: 2px;
+    }
+
+    .deadline-status {
+      font-size: 11px;
+      font-weight: 500;
+      margin-top: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      width: fit-content;
+    }
+
+    .overdue-text {
+      background-color: #fce8e6;
+      color: #c5221f;
+    }
+
+    .finished-text {
+      background-color: #e6f4ea;
+      color: #137333;
+    }
+
+    .stream-feed {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Compose Card */
+    .compose-card {
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3) !important;
+      background: white;
+      margin-bottom: 8px;
+    }
+
+    .compose-trigger {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      cursor: pointer;
+      padding: 8px 0;
+    }
+
+    .compose-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .placeholder-text {
+      color: #5f6368;
+      font-size: 14px;
+    }
+
+    .compose-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 8px 0;
+    }
+
+    .compose-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* Announcements Feed */
+    .announcements-feed {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .no-announcements {
+      text-align: center;
+      padding: 48px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #dadce0;
+      color: #5f6368;
+    }
+
+    .feed-empty-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      color: #dadce0;
+    }
+
+    .announcement-card {
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3) !important;
+      background: white;
+    }
+
+    .announcement-header {
+      display: flex;
+      align-items: center;
+      padding: 16px 16px 8px 16px !important;
+    }
+
+    .author-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .announcement-meta-container {
+      display: flex;
+      flex-direction: column;
+      margin-left: 12px;
+    }
+
+    .announcement-author {
+      font-size: 14px;
+      font-weight: 500;
+      color: #3c4043;
+    }
+
+    .announcement-date {
+      font-size: 12px;
+      color: #5f6368;
+    }
+
+    .announcement-body {
+      padding: 0 16px 16px 16px !important;
+    }
+
+    .announcement-title-text {
+      font-size: 16px;
+      font-weight: 500;
+      color: #202124;
+      margin: 8px 0;
+    }
+
+    .announcement-content-text {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #3c4043;
+      white-space: pre-wrap;
+    }
+
+    .announcement-image-container {
+      margin-top: 12px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #dadce0;
+      max-height: 400px;
+    }
+
+    .announcement-image {
+      width: 100%;
+      height: auto;
+      object-fit: cover;
+    }
+
+    /* Classwork Tab Styles */
+    .classwork-header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #dadce0;
+      padding-bottom: 12px;
+    }
+
+    .classwork-header-bar h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 400;
+      color: #3c4043;
+    }
+
+    .modules-accordion {
+      box-shadow: none !important;
+    }
+
+    .module-panel {
+      border: 1px solid #dadce0;
+      border-radius: 8px !important;
+      margin-bottom: 16px !important;
+      box-shadow: none !important;
+      overflow: hidden;
+    }
+
+    .module-panel-title {
+      font-size: 18px;
+      font-weight: 500;
+      color: #1e88e5;
+    }
+
+    .lessons-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .lesson-row {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+      border-top: 1px solid #dadce0;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .lesson-row:hover {
+      background-color: #f1f3f4;
+    }
+
+    .lesson-type-icon {
+      margin-right: 16px;
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+
+    .lesson-row-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: #3c4043;
+    }
+
+    .status-badge {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-weight: 500;
+      margin-right: 12px;
+    }
+
+    .status-completed {
+      background-color: #e6f4ea;
+      color: #137333;
+    }
+
+    .status-progress {
+      background-color: #e8f0fe;
+      color: #1a73e8;
+    }
+
+    .status-not-started {
+      background-color: #f1f3f4;
+      color: #5f6368;
+    }
+
+    .deadline-badge-item {
+      font-size: 12px;
+      color: #5f6368;
+      background: #f1f3f4;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #dadce0;
+    }
+
+    .no-lessons {
+      padding: 16px;
+      text-align: center;
+      color: #5f6368;
+      font-style: italic;
+      border-top: 1px solid #dadce0;
+    }
+
+    /* Teacher Management Section */
+    .teacher-management-section {
+      margin-top: 40px;
+      border-top: 2px dashed #dadce0;
+      padding-top: 24px;
+    }
+
+    .teacher-management-section h3 {
+      font-size: 18px;
+      color: #3c4043;
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+
+    .assignments-list {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
     }
     
     .list-section h3 {
         margin: 0 0 16px 0;
-        font-size: 18px;
-        color: #1a237e;
+        font-size: 16px;
+        color: #1e88e5;
         border-bottom: 2px solid #e8eaf6;
         padding-bottom: 8px;
     }
     
     .item-card {
         margin-bottom: 12px;
-        border-left: 4px solid #3f51b5;
+        border-left: 4px solid #1e88e5;
+        border-right: 1px solid #dadce0;
+        border-top: 1px solid #dadce0;
+        border-bottom: 1px solid #dadce0;
+        box-shadow: none !important;
+        border-radius: 4px;
     }
     
     .item-content {
@@ -448,7 +1071,7 @@ interface TreeNode {
     
     .item-icon {
         margin-right: 8px;
-        color: #3f51b5;
+        color: #1e88e5;
     }
     
     .item-title {
@@ -471,7 +1094,7 @@ interface TreeNode {
         margin: 0 8px;
         color: #ccc;
     }
-    
+
     .empty-list {
         padding: 24px;
         text-align: center;
@@ -479,105 +1102,38 @@ interface TreeNode {
         font-style: italic;
         background: white;
         border-radius: 4px;
+        border: 1px solid #dadce0;
     }
 
-    .info-card-bg {
-        background-color: #f0f7ff !important;
-        border-left: 4px solid #1976d2 !important;
-    }
-
-    .status-badge {
-        font-size: 12px;
-        padding: 4px 12px;
-        border-radius: 12px;
-        font-weight: 500;
-    }
-
-    .status-badge.member {
-        background-color: #e8f5e9;
-        color: #2e7d32;
-    }
-
-    .status-badge.pending {
-        background-color: #fff3e0;
-        color: #e65100;
-    }
-
-    .teacher-btns {
-        display: flex;
-        gap: 8px;
-    }
-
-    .section-hint {
-        color: #666;
-        font-style: italic;
-        margin-bottom: 16px;
-    }
-
-
-    .course-hub-container {
+    /* Lesson Viewer Split Layout */
+    .lesson-viewer-container {
       display: flex;
       flex-direction: column;
-      height: 100vh;
-      background-color: #f5f5f5;
+      height: calc(100vh - 112px);
+      background-color: white;
     }
 
-    .course-header {
-      background: white;
-      padding: 16px 24px;
-      border-bottom: 1px solid #e0e0e0;
-      flex-shrink: 0;
+    .viewer-header {
+      padding: 12px 24px;
+      border-bottom: 1px solid #dadce0;
+      background: #f8f9fa;
     }
 
-    .course-header h1 {
-        margin: 0;
-        font-size: 24px;
-        color: #1a237e;
-    }
-
-    /* Tabs Override */
-    ::ng-deep .course-tabs .mat-mdc-tab-body-wrapper {
-        flex: 1; 
-        height: 100%;
-    }
-    
-    ::ng-deep .course-tabs {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
+    .viewer-header .back-btn {
+      font-weight: 500;
     }
 
     .course-layout {
       display: flex;
-      height: 100%; /* Fill the tab body */
-      background-color: #f5f5f5;
+      flex: 1;
       overflow: hidden;
-    }
-    
-    .tab-content-container {
-        padding: 24px;
-        height: 100%;
-        overflow-y: auto;
-    }
-
-    .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
-    }
-    
-    .actions {
-        display: flex;
-        gap: 12px;
     }
 
     /* Sidebar */
     .sidebar {
       width: 320px;
       background: white;
-      border-right: 1px solid #e0e0e0;
+      border-right: 1px solid #dadce0;
       display: flex;
       flex-direction: column;
       flex-shrink: 0;
@@ -591,8 +1147,8 @@ interface TreeNode {
     .sidebar-header h2 {
       margin: 0;
       font-size: 18px;
-      font-weight: 600;
-      color: #000;
+      font-weight: 500;
+      color: #3c4043;
     }
 
     .sidebar-content {
@@ -610,7 +1166,7 @@ interface TreeNode {
       align-items: center;
       padding: 4px 8px;
       font-weight: 500;
-      color: #333;
+      color: #3c4043;
     }
 
     .module-title {
@@ -625,7 +1181,7 @@ interface TreeNode {
       text-align: left;
       padding: 8px 16px 8px 48px; /* Indent for lessons */
       font-size: 14px;
-      color: #555;
+      color: #5f6368;
       position: relative;
       display: flex;
       align-items: center;
@@ -634,12 +1190,12 @@ interface TreeNode {
     }
     
     .nav-item-btn:hover {
-        background-color: #f5f5f5;
+        background-color: #f1f3f4;
     }
 
     .nav-item-btn.active {
-      background-color: #e3f2fd;
-      color: #1565c0;
+      background-color: #e8f0fe;
+      color: #1a73e8;
       font-weight: 500;
     }
     
@@ -650,7 +1206,7 @@ interface TreeNode {
         top: 0;
         bottom: 0;
         width: 4px;
-        background-color: #1565c0;
+        background-color: #1a73e8;
     }
     
     .nav-text {
@@ -665,7 +1221,7 @@ interface TreeNode {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      background: #fafafa;
+      background: #f8f9fa;
     }
 
     .breadcrumbs {
@@ -673,8 +1229,8 @@ interface TreeNode {
       display: flex;
       align-items: center;
       font-size: 13px;
-      color: #757575;
-      border-bottom: 1px solid #e0e0e0;
+      color: #5f6368;
+      border-bottom: 1px solid #dadce0;
       background: white;
     }
 
@@ -683,11 +1239,11 @@ interface TreeNode {
       width: 16px;
       height: 16px;
       margin: 0 8px;
-      color: #bdbdbd;
+      color: #5f6368;
     }
 
     .current {
-      color: #1565c0;
+      color: #1a73e8;
       font-weight: 500;
     }
 
@@ -707,19 +1263,19 @@ interface TreeNode {
       align-items: flex-start;
       gap: 16px;
       margin-bottom: 32px;
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid #dadce0;
       padding-bottom: 24px;
     }
 
     .header-icon {
         width: 48px;
         height: 48px;
-        background-color: #e8f5e9;
+        background-color: #e8f0fe;
         border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #2e7d32;
+        color: #1a73e8;
     }
 
     .header-icon mat-icon {
@@ -733,21 +1289,21 @@ interface TreeNode {
         font-size: 14px;
         text-transform: uppercase;
         letter-spacing: 1px;
-        color: #757575;
+        color: #5f6368;
         font-weight: 500;
     }
 
     .lesson-title {
         font-size: 24px;
-        font-weight: 600;
-        color: #212121;
+        font-weight: 500;
+        color: #202124;
         margin-top: 4px;
     }
 
     .text-content {
       font-size: 16px;
       line-height: 1.6;
-      color: #212121;
+      color: #3c4043;
       margin-bottom: 32px;
     }
 
@@ -758,6 +1314,7 @@ interface TreeNode {
     .video-section h3 {
         margin-bottom: 16px;
         font-size: 18px;
+        color: #3c4043;
     }
 
     .video-container {
@@ -781,17 +1338,17 @@ interface TreeNode {
       display: flex;
       align-items: center;
       padding: 16px;
-      border: 1px solid #e0e0e0;
+      border: 1px solid #dadce0;
       border-radius: 8px;
       margin-bottom: 16px;
-      background: #fafafa;
+      background: #f8f9fa;
     }
 
     .resource-icon {
         font-size: 32px;
         width: 32px;
         height: 32px;
-        color: #1976d2;
+        color: #1a73e8;
         margin-right: 16px;
     }
 
@@ -804,7 +1361,7 @@ interface TreeNode {
 
     .resource-title {
         font-weight: 500;
-        color: #424242;
+        color: #3c4043;
         margin-right: auto;
     }
 
@@ -814,7 +1371,21 @@ interface TreeNode {
     }
 
     .test-card .resource-icon {
-        color: #7b1fa2;
+        color: #a142f4;
+    }
+
+    .locked {
+      background-color: #f1f3f4;
+      border-color: #dadce0;
+    }
+
+    .locked .resource-icon {
+      color: #5f6368;
+    }
+
+    .locked .resource-title {
+      color: #5f6368;
+      font-style: italic;
     }
 
     .loading-container {
@@ -830,7 +1401,7 @@ interface TreeNode {
         align-items: center;
         justify-content: center;
         height: 100%;
-        color: #9e9e9e;
+        color: #5f6368;
     }
     
     .select-hint mat-icon {
@@ -859,6 +1430,122 @@ interface TreeNode {
     .example-tree-invisible {
       display: none;
     }
+
+    /* People Tab Styles */
+    .people-tab-container {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      background: white;
+      padding: 24px;
+      border-radius: 8px;
+      border: 1px solid #dadce0;
+    }
+
+    .people-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .people-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1a73e8;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+    }
+
+    .people-section-header h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 400;
+      color: #1a73e8;
+    }
+
+    .people-count {
+      font-size: 14px;
+      color: #5f6368;
+    }
+
+    .people-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .person-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 8px;
+      border-bottom: 1px solid #dadce0;
+    }
+
+    .person-row:last-child {
+      border-bottom: none;
+    }
+
+    .person-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .person-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .person-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #3c4043;
+    }
+
+    .empty-people {
+      padding: 16px;
+      color: #5f6368;
+      text-align: center;
+      font-style: italic;
+    }
+
+    .groups-section-wrapper {
+      margin-top: 16px;
+    }
+
+    .groups-section-wrapper .people-section-header {
+      border-bottom: 1px solid #dadce0;
+      padding-bottom: 16px;
+      margin-bottom: 16px;
+    }
+
+    .groups-section-wrapper .people-section-header h2 {
+      color: #3c4043;
+    }
+
+    .teacher-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .status-badge.member {
+      background-color: #e6f4ea;
+      color: #137333;
+    }
+
+    .status-badge.pending {
+      background-color: #fef7e0;
+      color: #b06000;
+    }
+
+    .section-hint {
+      color: #5f6368;
+      font-style: italic;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
   `]
 })
 export class CourseViewComponent implements OnInit, OnDestroy {
@@ -874,7 +1561,18 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   currentUser: any;
   private destroy$ = new Subject<void>();
 
-  // New state object to stabilize template
+  // New state properties
+  viewingLessonMode = false;
+  showComposeForm = false;
+  announcementForm!: FormGroup;
+  courseAnnouncements: any[] = [];
+  courseDeadlines: any[] = [];
+  userSubmissions: any[] = [];
+  courseTeachers: any[] = [];
+  courseStudents: any[] = [];
+  courseDescription: string = '';
+
+  // Data for tabs
   lessonMetadata = {
     moduleName: '',
     materialName: '',
@@ -884,7 +1582,6 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     isJupyter: false
   };
 
-  // Data for tabs
   materials: any[] = [];
   tests: any[] = [];
   groups: any[] = []; // All groups (Teacher/Student View)
@@ -901,17 +1598,27 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     private sanitizer: DomSanitizer,
     private router: Router,
     private dialog: MatDialog,
-    private cdr: ChangeDetectorRef
-  ) { }
+    private cdr: ChangeDetectorRef,
+    private fb: FormBuilder
+  ) {
+    this.announcementForm = this.fb.group({
+      title: ['', Validators.required],
+      content: ['', Validators.required]
+    });
+  }
 
   ngOnInit() {
     this.authService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
       this.currentUser = user;
       
-      // Если subjectId уже загружен, подгружаем группы студента
-      if (this.subjectId && this.currentUser?.role === 'student') {
-        this.loadMyGroups();
-        this.loadMyRequests();
+      if (this.subjectId) {
+        if (this.currentUser?.role === 'student') {
+          this.loadMyGroups();
+          this.loadMyRequests();
+        }
+        this.loadUserSubmissions();
+        this.loadAnnouncements();
+        this.loadParticipants();
       }
       this.cdr.markForCheck();
     });
@@ -920,10 +1627,12 @@ export class CourseViewComponent implements OnInit, OnDestroy {
       this.subjectId = params['id'];
       this.loadCourse();
       
-      // Загружаем данные только после получения subjectId
       this.loadMaterials();
       this.loadTests();
       this.loadGroups();
+      this.loadAnnouncements();
+      this.loadUserSubmissions();
+      this.loadParticipants();
       
       if (this.currentUser?.role === 'student') {
         this.loadMyGroups();
@@ -951,6 +1660,8 @@ export class CourseViewComponent implements OnInit, OnDestroy {
         const subject = subjects.find((s: any) => s.id === this.subjectId);
         if (subject) {
           this.courseName = subject.name;
+          this.courseDescription = subject.description || '';
+          this.cdr.markForCheck();
         }
       }
     });
@@ -998,10 +1709,8 @@ export class CourseViewComponent implements OnInit, OnDestroy {
       }))
     }));
 
-    // Sort accordingly if needed, but backend should handle order
     this.dataSource.data = nodes;
 
-    // Expand all modules by default
     nodes.forEach(node => {
       if (node.children && node.children.length > 0 && !node.isCollapsed) {
         this.treeControl.expand(node);
@@ -1021,7 +1730,13 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     this.updateLessonMetadata(node);
     this.updateSafeVideoUrl(node.content?.video_url);
     
-    // Check if stream is active for this subject
+    // Save to viewed-lessons in localStorage
+    const viewedIds = JSON.parse(localStorage.getItem('viewed-lessons') || '[]');
+    if (!viewedIds.includes(node.id)) {
+      viewedIds.push(node.id);
+      localStorage.setItem('viewed-lessons', JSON.stringify(viewedIds));
+    }
+
     this.checkActiveStream();
     this.cdr.markForCheck();
 
@@ -1033,7 +1748,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
           user_name: currentUser.name,
           action_type: 'video_view',
           resource_type: 'video',
-          resource_id: node.id // Using node id as resource id for simplicity
+          resource_id: node.id
         }).subscribe();
       }
     }
@@ -1073,7 +1788,6 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     this.lastProcessedVideoUrl = url;
     
     let embedUrl = '';
-    // YouTube
     if (url.includes('youtube.com/watch') || url.includes('youtube.com/embed/')) {
         let videoId = '';
         if (url.includes('v=')) {
@@ -1108,7 +1822,6 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   }
 
   downloadMaterial(materialId: string) {
-    // Track material view activity
     const currentUser = this.authService.getCurrentUser();
     if (currentUser) {
       this.apiService.createActivity({
@@ -1119,29 +1832,37 @@ export class CourseViewComponent implements OnInit, OnDestroy {
       }).subscribe();
     }
 
-    // Direct link to download endpoint - open in new tab for viewing
     const url = `/api/materials/${materialId}/download`;
     window.open(url, '_blank');
   }
 
   loadMaterials() {
     this.apiService.getMaterials(this.subjectId).subscribe({
-      next: (data) => this.materials = data,
+      next: (data) => {
+        this.materials = data;
+        this.cdr.markForCheck();
+      },
       error: (err) => console.error('Error loading materials', err)
     });
   }
 
   loadTests() {
-    // Pass subjectId to filter tests
     this.apiService.getTests(this.subjectId).subscribe({
-      next: (data) => this.tests = data,
+      next: (data) => {
+        this.tests = data;
+        this.filterCourseDeadlines();
+        this.cdr.markForCheck();
+      },
       error: (err) => console.error('Error loading tests', err)
     });
   }
 
   loadGroups() {
     this.apiService.getGroups(this.subjectId).subscribe({
-      next: (data) => this.groups = data,
+      next: (data) => {
+        this.groups = data;
+        this.cdr.markForCheck();
+      },
       error: (err) => console.error('Error loading groups', err)
     });
   }
@@ -1149,13 +1870,16 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   loadMyGroups() {
     if (!this.currentUser) return;
     this.apiService.getGroups(this.subjectId, this.currentUser.name).subscribe({
-      next: (data) => this.myGroups = data,
+      next: (data) => {
+        this.myGroups = data;
+        this.cdr.markForCheck();
+      },
       error: (err) => console.error('Error loading my groups', err)
     });
   }
 
   isContentAllowed(contentId: string, type: 'test' | 'material'): boolean {
-    if (this.currentUser?.role === 'teacher') return true; // Teachers see everything
+    if (this.currentUser?.role === 'teacher') return true;
 
     let item: any;
     if (type === 'test') {
@@ -1165,20 +1889,15 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     }
 
     if (!item) {
-      // If item not found in the preloaded lists, we can't determine groups yet.
-      // We should probably hide it to be safe, but let's log it.
       console.warn(`[AccessControl] Item ${contentId} (${type}) not found in loaded lists.`);
       return false;
     }
 
-    // If no groups are specified, it's public
     if (!item.allowed_groups || item.allowed_groups.length === 0) {
       return true;
     }
 
-    // Check intersection: does student have ANY group that is in allowed_groups?
     const hasAccess = this.myGroups.some(g => item.allowed_groups.includes(g.id));
-
     return hasAccess;
   }
 
@@ -1291,7 +2010,6 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Placeholder methods for new tabs
   openCreateTest() {
     this.router.navigate(['/tests/create'], { queryParams: { subjectId: this.subjectId } });
   }
@@ -1313,14 +2031,13 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     const dialogRef = this.dialog.open(CreateGroupDialogComponent, {
       width: '600px',
       data: {
-        subjects: [{ id: this.subjectId, name: this.courseName }], // Restrict to current subject
+        subjects: [{ id: this.subjectId, name: this.courseName }],
         currentUser: this.currentUser
       }
     });
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        // Force subject_id to current subject just in case
         result.subject_id = this.subjectId;
 
         this.apiService.createGroup(result).subscribe({
@@ -1387,5 +2104,219 @@ export class CourseViewComponent implements OnInit, OnDestroy {
         mimeType: format === 'pdf' ? 'application/pdf' : 'text/html'
       }
     });
+  }
+
+  // Handlers for new tabs
+  postAnnouncement() {
+    if (this.announcementForm.invalid) return;
+    const val = this.announcementForm.value;
+    const newsData = {
+      title: val.title,
+      content: val.content,
+      subject_id: this.subjectId
+    };
+    this.saving = true;
+    this.apiService.createNews(newsData).subscribe({
+      next: () => {
+        this.saving = false;
+        this.announcementForm.reset();
+        this.showComposeForm = false;
+        this.loadAnnouncements();
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error posting announcement:', err);
+        this.saving = false;
+        alert('Ошибка при публикации объявления: ' + (err.error?.detail || err.message));
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  deleteAnnouncement(id: string) {
+    if (confirm('Вы уверены, что хотите удалить это объявление?')) {
+      this.apiService.deleteNews(id).subscribe({
+        next: () => {
+          this.loadAnnouncements();
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          console.error('Error deleting announcement:', err);
+          alert('Ошибка при удалении объявления');
+          this.cdr.markForCheck();
+        }
+      });
+    }
+  }
+
+  selectLessonFromOutline(lesson: TreeNode) {
+    this.viewingLessonMode = true;
+    this.selectLesson(lesson);
+  }
+
+  getLessonTypeIcon(lessonType: string): string {
+    switch (lessonType?.toLowerCase()) {
+      case 'lecture':
+        return 'menu_book';
+      case 'quiz':
+        return 'quiz';
+      case 'video':
+        return 'play_circle';
+      case 'material':
+        return 'description';
+      default:
+        return 'insert_drive_file';
+    }
+  }
+
+  getLessonIconColor(lessonType: string): string {
+    switch (lessonType?.toLowerCase()) {
+      case 'lecture':
+        return '#1a73e8';
+      case 'quiz':
+        return '#a142f4';
+      case 'video':
+        return '#ea4335';
+      case 'material':
+        return '#fbbc04';
+      default:
+        return '#5f6368';
+    }
+  }
+
+  isTestFinished(testId: string): boolean {
+    return this.userSubmissions.some(s => s.test_id === testId && (s.status === 'approved' || s.status === 'pending'));
+  }
+
+  getTestDeadlineText(test: any): string {
+    if (!test.due_date) return 'Без дедлайна';
+    return new RussianDatePipe().transform(test.due_date, 'datetime');
+  }
+
+  isTestOverdue(test: any): boolean {
+    if (!test.due_date) return false;
+    const dueDate = new Date(test.due_date);
+    const now = new Date();
+    return dueDate < now && !this.isTestFinished(test.id);
+  }
+
+  loadUserSubmissions() {
+    if (!this.currentUser) return;
+    this.apiService.getSubmissions(undefined, this.currentUser.name).subscribe({
+      next: (subs) => {
+        this.userSubmissions = subs || [];
+        this.filterCourseDeadlines();
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error loading user submissions', err);
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  loadAnnouncements() {
+    this.apiService.getNews(this.subjectId).subscribe({
+      next: (data) => {
+        this.courseAnnouncements = data || [];
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error loading announcements:', err);
+        this.courseAnnouncements = [];
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  loadParticipants() {
+    this.apiService.getUsers().subscribe({
+      next: (users) => {
+        this.courseTeachers = users.filter((u: any) => u.role === 'teacher' || u.role === 'admin' || u.role === 'hidden_admin');
+        this.courseStudents = users.filter((u: any) => u.role === 'student');
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error loading users:', err);
+      }
+    });
+  }
+
+  getUserEmail(name: string): string {
+    if (!name) return 'info@eduai.ru';
+    const clean = name.toLowerCase()
+      .replace(/\s+/g, '.')
+      .replace(/[а-яё]/g, (ch) => {
+        const map: { [key: string]: string } = {
+          'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
+          'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+          'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts',
+          'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+        };
+        return map[ch] || ch;
+      });
+    return `${clean}@eduai.ru`;
+  }
+
+  getAvatarUrl(url: string | undefined): string | undefined {
+    if (!url) return undefined;
+    if (url.startsWith('http')) return url;
+    if (url.startsWith('/static')) return `/api${url}`;
+    if (url.startsWith('/api/')) return url;
+    return `/api/${url}`;
+  }
+
+  handleAvatarError(event: any) {
+    event.target.src = 'assets/default-avatar.png';
+  }
+
+  filterCourseDeadlines() {
+    this.courseDeadlines = this.tests
+      .filter(t => t.due_date)
+      .map(t => ({
+        id: t.id,
+        title: t.title,
+        dueDate: t.due_date ? new Date(t.due_date) : null,
+        overdue: this.isTestOverdue(t),
+        finished: this.isTestFinished(t.id)
+      }))
+      .sort((a, b) => {
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return a.dueDate.getTime() - b.dueDate.getTime();
+      });
+  }
+
+  getLessonStatusText(lesson: TreeNode): string {
+    if (lesson.content?.test_id) {
+      const testId = lesson.content.test_id;
+      const sub = this.userSubmissions.find(s => s.test_id === testId);
+      if (sub) {
+        if (sub.status === 'approved') return 'Сдано';
+        return 'В процессе';
+      }
+      return 'Не начато';
+    }
+
+    const viewedIds = JSON.parse(localStorage.getItem('viewed-lessons') || '[]');
+    if (viewedIds.includes(lesson.id)) {
+      return 'Сдано';
+    }
+    return 'Не начато';
+  }
+
+  getLessonStatusClass(lesson: TreeNode): string {
+    const status = this.getLessonStatusText(lesson);
+    if (status === 'Сдано') return 'status-completed';
+    if (status === 'В процессе') return 'status-progress';
+    return 'status-not-started';
+  }
+
+  getLessonDeadline(lesson: TreeNode): Date | null {
+    if (lesson.content?.test_id) {
+      const test = this.tests.find(t => t.id === lesson.content.test_id);
+      return test && test.due_date ? new Date(test.due_date) : null;
+    }
+    return null;
   }
 }
