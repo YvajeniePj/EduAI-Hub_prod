@@ -5,7 +5,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
@@ -99,18 +99,29 @@ import { AuthService } from '../../core/services/auth.service';
 export class LoginComponent implements OnInit {
   loading = false;
 
-  constructor(private auth: AuthService, private router: Router) { }
+  constructor(
+    private auth: AuthService,
+    private router: Router,
+    private route: ActivatedRoute
+  ) { }
 
   ngOnInit() {
+    const returnUrl = this.route.snapshot.queryParams['returnUrl'];
+    if (returnUrl) {
+      localStorage.setItem('auth_return_url', returnUrl);
+    }
+
     // If the user is already authenticated, don't show the login page
     if (this.auth.isAuthenticated()) {
-      this.router.navigate(['/']);
+      const targetUrl = returnUrl || '/';
+      this.router.navigateByUrl(targetUrl);
     }
     
     // Also subscribe to changes in case the user authenticates while on this page
     this.auth.currentUser$.subscribe(user => {
       if (user) {
-        this.router.navigate(['/']);
+        const targetUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
+        this.router.navigateByUrl(targetUrl);
       }
     });
   }

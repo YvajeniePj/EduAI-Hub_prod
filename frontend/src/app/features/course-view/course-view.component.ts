@@ -136,7 +136,10 @@ interface TreeNode {
                 <mat-card class="compose-card" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
                   <mat-card-content>
                     <div class="compose-trigger" *ngIf="!showComposeForm" (click)="showComposeForm = true">
-                      <img [src]="getAvatarUrl(currentUser?.avatar_url) || 'assets/default-avatar.png'" (error)="handleAvatarError($event)" class="compose-avatar" />
+                      <img *ngIf="currentUser?.avatar_url" [src]="getAvatarUrl(currentUser.avatar_url)" (error)="currentUser.avatar_url = undefined" class="compose-avatar" />
+                      <div *ngIf="!currentUser?.avatar_url" class="compose-avatar-placeholder">
+                        <mat-icon>person</mat-icon>
+                      </div>
                       <span class="placeholder-text">Поделитесь чем-нибудь с классом...</span>
                     </div>
                     
@@ -169,7 +172,10 @@ interface TreeNode {
                   </div>
                   <mat-card *ngFor="let announcement of courseAnnouncements" class="announcement-card">
                     <mat-card-header class="announcement-header">
-                      <img mat-card-avatar [src]="getAvatarUrl(announcement.author_avatar) || 'assets/default-avatar.png'" (error)="handleAvatarError($event)" class="author-avatar" />
+                      <img mat-card-avatar *ngIf="announcement.author_avatar" [src]="getAvatarUrl(announcement.author_avatar)" (error)="announcement.author_avatar = undefined" class="author-avatar" />
+                      <div *ngIf="!announcement.author_avatar" class="author-avatar-placeholder" mat-card-avatar>
+                        <mat-icon>person</mat-icon>
+                      </div>
                       <div class="announcement-meta-container">
                         <mat-card-title class="announcement-author">
                           {{ announcement.author_name || 'Преподаватель' }}
@@ -513,7 +519,10 @@ interface TreeNode {
                 <div class="people-list">
                   <div *ngFor="let teacher of courseTeachers" class="person-row">
                     <div class="person-info">
-                      <img [src]="getAvatarUrl(teacher.avatar_url) || 'assets/default-avatar.png'" (error)="handleAvatarError($event)" class="person-avatar" />
+                      <img *ngIf="teacher.avatar_url" [src]="getAvatarUrl(teacher.avatar_url)" (error)="teacher.avatar_url = undefined" class="person-avatar" />
+                      <div *ngIf="!teacher.avatar_url" class="person-avatar-placeholder">
+                        <mat-icon>person</mat-icon>
+                      </div>
                       <span class="person-name">{{ teacher.name }}</span>
                     </div>
                     <div class="person-actions">
@@ -540,7 +549,10 @@ interface TreeNode {
                 <div class="people-list">
                   <div *ngFor="let student of courseStudents" class="person-row">
                     <div class="person-info">
-                      <img [src]="getAvatarUrl(student.avatar_url) || 'assets/default-avatar.png'" (error)="handleAvatarError($event)" class="person-avatar" />
+                      <img *ngIf="student.avatar_url" [src]="getAvatarUrl(student.avatar_url)" (error)="student.avatar_url = undefined" class="person-avatar" />
+                      <div *ngIf="!student.avatar_url" class="person-avatar-placeholder">
+                        <mat-icon>person</mat-icon>
+                      </div>
                       <span class="person-name">{{ student.name }}</span>
                     </div>
                   </div>
@@ -1597,6 +1609,40 @@ interface TreeNode {
     }
     .small-input {
       flex: 1;
+    }
+
+    .compose-avatar-placeholder, .author-avatar-placeholder {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: #f1f3f4;
+      color: #5f6368;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .compose-avatar-placeholder mat-icon, .author-avatar-placeholder mat-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+      margin: 0;
+    }
+    
+    .person-avatar-placeholder {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background-color: #f1f3f4;
+      color: #5f6368;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .person-avatar-placeholder mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      margin: 0;
     }
   `]
 })

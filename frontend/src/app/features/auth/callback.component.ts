@@ -22,8 +22,10 @@ export class CallbackComponent implements OnInit {
 
     this.auth.completeLogin().subscribe({
       next: () => {
-        console.log('Login complete, navigating to home');
-        this.router.navigate(['/']);
+        console.log('Login complete, navigating to return URL');
+        const returnUrl = localStorage.getItem('auth_return_url') || '/';
+        localStorage.removeItem('auth_return_url');
+        this.router.navigateByUrl(returnUrl);
       },
       error: (err) => {
         console.error('Callback error:', err);
