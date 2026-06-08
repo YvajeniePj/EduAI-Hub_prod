@@ -114,6 +114,10 @@ import { distinctUntilChanged } from 'rxjs/operators';
             <mat-icon matListItemIcon>emoji_events</mat-icon>
             <span matListItemTitle>Лидерборд</span>
           </a>
+          <a mat-list-item routerLink="/messages" (click)="sidenav.close()" routerLinkActive="active-link">
+            <mat-icon matListItemIcon>forum</mat-icon>
+            <span matListItemTitle>Сообщения</span>
+          </a>
           <a mat-list-item routerLink="/chat" (click)="sidenav.close()" routerLinkActive="active-link">
             <mat-icon matListItemIcon>smart_toy</mat-icon>
             <span matListItemTitle>Чат-ассистент</span>

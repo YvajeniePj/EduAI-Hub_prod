@@ -1658,6 +1658,58 @@ async def delete_notification(notification_id: str):
     return data
 
 
+# P2P Messages Routes
+@app.post("/messages")
+async def create_message(request: Request, current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    body = await request.json()
+    encoded_name = quote(current_user["username"])
+    headers = {"X-User-Name": encoded_name}
+    data, status, error = await proxy_request(NOTIFICATION_SERVICE_URL, "/messages", "POST", body=body, headers=headers)
+    if status not in [200, 201]:
+        raise HTTPException(status_code=status, detail=error or "Failed to send message")
+    return data
+
+
+@app.get("/messages/dialogs")
+async def get_dialogs(current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    encoded_name = quote(current_user["username"])
+    headers = {"X-User-Name": encoded_name}
+    data, status, error = await proxy_request(NOTIFICATION_SERVICE_URL, "/messages/dialogs", "GET", headers=headers)
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to fetch dialogs")
+    return data
+
+
+@app.get("/messages/history")
+async def get_history(with_user: str, current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    encoded_name = quote(current_user["username"])
+    headers = {"X-User-Name": encoded_name}
+    params = {"with_user": with_user}
+    data, status, error = await proxy_request(NOTIFICATION_SERVICE_URL, "/messages/history", "GET", params=params, headers=headers)
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to fetch message history")
+    return data
+
+
+@app.post("/messages/mark-read")
+async def mark_messages_read(with_user: str, current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    encoded_name = quote(current_user["username"])
+    headers = {"X-User-Name": encoded_name}
+    params = {"with_user": with_user}
+    data, status, error = await proxy_request(NOTIFICATION_SERVICE_URL, "/messages/mark-read", "POST", params=params, headers=headers)
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to mark messages as read")
+    return data
+
+
 # Feedback Service Routes
 @app.get("/feedbacks")
 async def get_feedbacks(user_name: Optional[str] = None, subject_id: Optional[str] = None, group_id: Optional[str] = None):

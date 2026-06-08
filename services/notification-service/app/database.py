@@ -28,6 +28,6 @@ def get_db():
 
 def init_db():
     """Initialize database tables"""
-    from app.models import Notification
+    from app.models import Notification, Message
     Base.metadata.create_all(bind=engine)
 

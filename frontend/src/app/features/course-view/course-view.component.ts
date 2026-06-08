@@ -452,16 +452,22 @@ interface TreeNode {
                       <!-- Video content -->
                       <div *ngIf="selectedLesson.content?.video_url" class="video-section">
                         <h3>Видеоматериал</h3>
-                        <div class="video-container">
-                             <iframe
-                            *ngIf="safeVideoUrl"
+                        <div class="video-container" style="position: relative;">
+                          <!-- Video overlay for students to track play click -->
+                          <div *ngIf="!isVideoStarted && currentUser?.role === 'student'" class="video-overlay" (click)="startVideo()">
+                            <mat-icon style="font-size: 64px; width: 64px; height: 64px; color: white; margin: 0;">play_circle_filled</mat-icon>
+                            <span style="color: white; font-weight: 500; font-size: 16px; margin-top: 8px;">Нажмите для просмотра видео-урока</span>
+                          </div>
+
+                          <iframe
+                            *ngIf="safeVideoUrl && (isVideoStarted || currentUser?.role !== 'student')"
                             [src]="safeVideoUrl"
                             frameborder="0"
                             loading="lazy"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowfullscreen
                             class="video-iframe">
-                            </iframe>
+                          </iframe>
                         </div>
                       </div>
 
@@ -525,6 +531,18 @@ interface TreeNode {
                         <p>Содержимое урока пока не добавлено.</p>
                       </div>
 
+                      <!-- Text study confirmation button for students -->
+                      <div *ngIf="selectedLesson.content?.text_content && !selectedLesson.content?.video_url && !selectedLesson.content?.material_id && currentUser?.role === 'student'" 
+                           style="margin-top: 24px; display: flex; justify-content: center;">
+                        <button mat-raised-button 
+                                [color]="isLessonViewed(selectedLesson.id) ? 'accent' : 'primary'"
+                                [disabled]="isLessonViewed(selectedLesson.id)"
+                                (click)="triggerLessonViewed()">
+                          <mat-icon>{{ isLessonViewed(selectedLesson.id) ? 'check_circle' : 'assignment_turned_in' }}</mat-icon>
+                          {{ isLessonViewed(selectedLesson.id) ? 'Материал изучен' : 'Я изучил этот материал' }}
+                        </button>
+                      </div>
+
                       <!-- Lesson Navigation Buttons -->
                       <div class="lesson-navigation-buttons" style="display: flex; justify-content: space-between; margin-top: 32px; border-top: 1px solid #dadce0; padding-top: 16px;">
                         <button mat-button color="primary" [disabled]="!previousLesson" (click)="previousLesson && navigateToLesson(previousLesson)" style="display: flex; align-items: center; gap: 4px;">
@@ -583,9 +601,9 @@ interface TreeNode {
                       <span class="person-name">{{ teacher.name }}</span>
                     </div>
                     <div class="person-actions">
-                      <a mat-icon-button [href]="'mailto:' + getUserEmail(teacher.name)" title="Написать письмо">
-                        <mat-icon>mail_outline</mat-icon>
-                      </a>
+                      <button mat-icon-button (click)="startChatWith(teacher.name)" title="Начать чат" *ngIf="teacher.name !== currentUser?.name">
+                        <mat-icon>chat</mat-icon>
+                      </button>
                       <button mat-icon-button color="warn" *ngIf="(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && teacher.name !== currentUser.name" (click)="removeTeacher(teacher.name)" title="Удалить преподавателя">
                         <mat-icon>person_remove</mat-icon>
                       </button>
@@ -611,6 +629,11 @@ interface TreeNode {
                         <mat-icon>person</mat-icon>
                       </div>
                       <span class="person-name">{{ student.name }}</span>
+                    </div>
+                    <div class="person-actions">
+                      <button mat-icon-button (click)="startChatWith(student.name)" title="Начать чат" *ngIf="student.name !== currentUser?.name">
+                        <mat-icon>chat</mat-icon>
+                      </button>
                     </div>
                   </div>
                   <div *ngIf="courseStudents.length === 0" class="empty-people">
@@ -1859,6 +1882,24 @@ interface TreeNode {
       background-color: #fef7e0;
       color: #b06000;
     }
+    .video-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 10;
+      transition: background 0.3s;
+    }
+    .video-overlay:hover {
+      background: rgba(0, 0, 0, 0.7);
+    }
   `]
 })
 export class CourseViewComponent implements OnInit, OnDestroy {
@@ -1873,6 +1914,8 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   isStreamActive = false;
   currentUser: any;
   private destroy$ = new Subject<void>();
+
+  isVideoStarted = false;
 
   // New state properties
   viewingLessonMode = false;
@@ -2184,24 +2227,13 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     this.selectedLesson = node;
     this.updateLessonMetadata(node);
     this.updateSafeVideoUrl(node.content?.video_url);
+    this.isVideoStarted = false;
     
     // Save to viewed-lessons in localStorage
     const viewedIds = JSON.parse(localStorage.getItem('viewed-lessons') || '[]');
     if (!viewedIds.includes(node.id)) {
       viewedIds.push(node.id);
       localStorage.setItem('viewed-lessons', JSON.stringify(viewedIds));
-    }
-
-    if (this.currentUser?.role === 'student') {
-      this.apiService.markLessonViewed(this.subjectId, node.id).subscribe({
-        next: () => {
-          if (!this.lessonProgress.includes(node.id)) {
-            this.lessonProgress.push(node.id);
-          }
-          this.cdr.markForCheck();
-        },
-        error: (err) => console.error('Error marking lesson viewed:', err)
-      });
     }
 
     this.checkActiveStream();
@@ -2219,6 +2251,34 @@ export class CourseViewComponent implements OnInit, OnDestroy {
         }).subscribe();
       }
     }
+  }
+
+  startVideo() {
+    this.isVideoStarted = true;
+    this.triggerLessonViewed();
+  }
+
+  triggerLessonViewed() {
+    if (this.currentUser?.role === 'student' && this.selectedLesson) {
+      const lessonId = this.selectedLesson.id;
+      if (!this.lessonProgress.includes(lessonId)) {
+        this.apiService.markLessonViewed(this.subjectId, lessonId).subscribe({
+          next: () => {
+            this.lessonProgress.push(lessonId);
+            this.cdr.markForCheck();
+          },
+          error: (err) => console.error('Error marking lesson viewed:', err)
+        });
+      }
+    }
+  }
+
+  isLessonViewed(lessonId: string): boolean {
+    return this.lessonProgress.includes(lessonId);
+  }
+
+  startChatWith(username: string) {
+    this.router.navigate(['/messages'], { queryParams: { chatWith: username } });
   }
 
   getModuleName(moduleId?: string): string {
@@ -2299,6 +2359,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
       }).subscribe();
     }
 
+    this.triggerLessonViewed();
     const url = `/api/materials/${materialId}/download`;
     window.open(url, '_blank');
   }
@@ -2547,6 +2608,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     const m = this.materials.find(mat => mat.id === materialId);
     if (!m) return;
 
+    this.triggerLessonViewed();
     this.dialog.open(MaterialViewerComponent, {
       width: '90vw',
       maxWidth: '1200px',
@@ -2563,6 +2625,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     const m = this.materials.find(mat => mat.id === materialId);
     if (!m) return;
 
+    this.triggerLessonViewed();
     this.dialog.open(MaterialViewerComponent, {
       width: '90vw',
       maxWidth: '1200px',

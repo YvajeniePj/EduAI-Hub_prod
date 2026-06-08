@@ -28,3 +28,14 @@ class Notification(Base):
     def __repr__(self):
         return f"<Notification(id={self.id}, user_name={self.user_name}, title={self.title})>"
 
+
+class Message(Base):
+    __tablename__ = "messages"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    sender_name = Column(String, nullable=False)
+    recipient_name = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+

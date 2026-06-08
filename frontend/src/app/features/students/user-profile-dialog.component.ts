@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { Router } from '@angular/router';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
     selector: 'app-user-profile-dialog',
@@ -42,6 +43,9 @@ import { Router } from '@angular/router';
     </mat-dialog-content>
 
     <mat-dialog-actions align="end">
+      <button mat-raised-button color="primary" (click)="startChatWith(data.user.name)" *ngIf="currentUser && data.user.name !== currentUser.name">
+        <mat-icon>chat</mat-icon> Начать чат
+      </button>
       <button mat-button (click)="viewFullProfile()" color="primary">Посмотреть профиль</button>
       <button mat-button mat-dialog-close>Закрыть</button>
     </mat-dialog-actions>
@@ -116,11 +120,16 @@ import { Router } from '@angular/router';
   `]
 })
 export class UserProfileDialogComponent {
+    currentUser: any = null;
+
     constructor(
         @Inject(MAT_DIALOG_DATA) public data: { user: any },
         private dialogRef: MatDialogRef<UserProfileDialogComponent>,
-        private router: Router
-    ) { }
+        private router: Router,
+        private auth: AuthService
+    ) { 
+        this.currentUser = this.auth.getCurrentUser();
+    }
 
     getRoleLabel(role: string): string {
         switch (role) {
@@ -143,5 +152,10 @@ export class UserProfileDialogComponent {
     viewFullProfile() {
         this.dialogRef.close();
         this.router.navigate(['/profile', this.data.user.name]);
+    }
+
+    startChatWith(username: string) {
+        this.dialogRef.close();
+        this.router.navigate(['/messages'], { queryParams: { chatWith: username } });
     }
 }

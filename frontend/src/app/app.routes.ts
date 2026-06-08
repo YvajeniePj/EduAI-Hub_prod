@@ -64,6 +64,7 @@ export const routes: Routes = [
   { path: 'peer-review', loadComponent: () => import('./features/peer-review/peer-review.component').then(m => m.PeerReviewComponent), canActivate: [authGuard] },
   { path: 'leaderboard', loadComponent: () => import('./features/leaderboard/leaderboard.component').then(m => m.LeaderboardComponent), canActivate: [authGuard] },
   { path: 'ai-test', loadComponent: () => import('./features/ai-test/ai-test.component').then(m => m.AiTestComponent), canActivate: [authGuard] },
-  { path: 'chat', loadComponent: () => import('./features/chat/chat.component').then(m => m.ChatComponent), canActivate: [authGuard] }
+  { path: 'chat', loadComponent: () => import('./features/chat/chat.component').then(m => m.ChatComponent), canActivate: [authGuard] },
+  { path: 'messages', loadComponent: () => import('./features/chat/p2p-chat.component').then(m => m.P2pChatComponent), canActivate: [authGuard] }
 ];
 

@@ -34,3 +34,29 @@ class NotificationResponse(NotificationBase):
     class Config:
         from_attributes = True
 
+
+class MessageCreate(BaseModel):
+    recipient_name: str
+    content: str
+
+
+class MessageResponse(BaseModel):
+    id: UUID
+    sender_name: str
+    recipient_name: str
+    content: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DialogResponse(BaseModel):
+    username: str
+    last_message_content: str
+    last_message_time: datetime
+    last_message_sender: str
+    unread_count: int
+
+

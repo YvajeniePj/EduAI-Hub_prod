@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import notifications
+from app.routers import notifications, messages
 from app.scheduler import start_scheduler
 
 app = FastAPI(
@@ -25,6 +25,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+app.include_router(messages.router, prefix="/messages", tags=["messages"])
 
 
 @app.on_event("startup")

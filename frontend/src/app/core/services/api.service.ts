@@ -84,6 +84,22 @@ export class ApiService {
     return this.http.get<any[]>(`${API_URL}/subjects/${subjectId}/progress`);
   }
 
+  sendMessage(recipient: string, content: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/messages`, { recipient_name: recipient, content });
+  }
+
+  getDialogs(): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/messages/dialogs`);
+  }
+
+  getChatHistory(withUser: string): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/messages/history`, { params: new HttpParams().set('with_user', withUser) });
+  }
+
+  markChatRead(withUser: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/messages/mark-read`, {}, { params: new HttpParams().set('with_user', withUser) });
+  }
+
   // Tests
   getTests(subjectId?: string): Observable<any[]> {
     let params = new HttpParams();
