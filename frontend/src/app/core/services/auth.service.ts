@@ -3,7 +3,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { HttpClient, HttpHeaders, HttpBackend } from '@angular/common/http';
 import { Observable, BehaviorSubject, from, of, throwError, combineLatest } from 'rxjs';
-import { map, catchError, switchMap, tap } from 'rxjs/operators';
+import { map, catchError, switchMap, tap, distinctUntilChanged } from 'rxjs/operators';
 import { UserManager, User, UserManagerSettings } from 'oidc-client-ts';
 
 export interface CurrentUser {
@@ -24,6 +24,7 @@ export class AuthService {
   private idTokenSubject = new BehaviorSubject<string | null>(null);
   private isInitializedSubject = new BehaviorSubject<boolean>(false);
   private simulationRoleSubject = new BehaviorSubject<string | null>(localStorage.getItem('simulationRole'));
+  private isHandlingUser = false;
 
   currentUser$ = combineLatest([
     this.currentUserSubject.asObservable(),
@@ -35,7 +36,8 @@ export class AuthService {
         return { ...user, role: simRole };
       }
       return user;
-    })
+    }),
+    distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b))
   );
   token$ = this.tokenSubject.asObservable();
   idToken$ = this.idTokenSubject.asObservable();
@@ -89,7 +91,12 @@ export class AuthService {
 
   private handleUser(user: User) {
     console.log('Handling loaded user...');
+    if (this.isHandlingUser) {
+      console.log('Already handling user, skipping duplicate call');
+      return;
+    }
     if (user && user.access_token) {
+      this.isHandlingUser = true;
       this.tokenSubject.next(user.access_token);
       this.idTokenSubject.next(user.id_token || null);
       
@@ -113,13 +120,17 @@ export class AuthService {
         is_hidden_admin: false // Default, will be updated by syncUserWithBackend
       };
       
-      this.currentUserSubject.next(currentUser);
-      
       // Sync with our backend /auth/me for any specific user linking/roles
       console.log('Syncing with backend...');
-      this.syncUserWithBackend().subscribe({
-        next: () => console.log('Backend sync successful'),
-        error: (err) => console.error('Backend sync failed:', err)
+      this.syncUserWithBackend(currentUser).subscribe({
+        next: () => {
+          console.log('Backend sync successful');
+          this.isHandlingUser = false;
+        },
+        error: (err) => {
+          console.error('Backend sync failed:', err);
+          this.isHandlingUser = false;
+        }
       });
     } else {
       console.warn('HandleUser called but no access token present');
@@ -143,13 +154,13 @@ export class AuthService {
     return role === 'teacher' || role === 'admin';
   }
 
-  public syncUserWithBackend(): Observable<any> {
+  public syncUserWithBackend(fallbackUser?: CurrentUser): Observable<any> {
     const token = this.getToken();
     if (!token) return of(null);
     
     return this.http.get<any>(`${this.apiBaseUrl}/auth/me`).pipe(
       tap(backendUser => {
-        const current = this.currentUserSubject.value;
+        const current = fallbackUser || this.currentUserSubject.value;
         if (current) {
           this.currentUserSubject.next({
             ...current,
@@ -162,6 +173,9 @@ export class AuthService {
         }
       }),
       catchError(err => {
+        if (fallbackUser) {
+          this.currentUserSubject.next(fallbackUser);
+        }
         // Silenced: console.error('Error syncing user with backend:', err);
         return of(null);
       })

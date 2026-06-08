@@ -438,3 +438,30 @@ async def clone_materials(data: dict, db: Session = Depends(get_db)):
     return id_mapping
 
 
+@router.delete("/by-subject/{subject_id}", status_code=200)
+async def delete_materials_by_subject(subject_id: UUID, db: Session = Depends(get_db)):
+    """Delete all materials for a subject and clean up files on disk"""
+    materials = db.query(Material).filter(Material.subject_id == subject_id).all()
+    count = len(materials)
+    
+    # Clean up files individually
+    for material in materials:
+        if os.path.exists(material.path):
+            try:
+                os.remove(material.path)
+            except Exception:
+                pass
+        
+    subject_dir = os.path.join(STORAGE_PATH, str(subject_id))
+    if os.path.exists(subject_dir):
+        try:
+            shutil.rmtree(subject_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+    for material in materials:
+        db.delete(material)
+    db.commit()
+    return {"message": f"Deleted {count} materials for subject {subject_id} and cleaned up files"}
+
+

@@ -13,6 +13,7 @@ import { ApiService } from './core/services/api.service';
 import { AuthService, CurrentUser } from './core/services/auth.service';
 import { Router } from '@angular/router';
 import { interval, Subscription } from 'rxjs';
+import { distinctUntilChanged } from 'rxjs/operators';
 
 @Component({
   selector: 'app-root',
@@ -70,77 +71,45 @@ import { interval, Subscription } from 'rxjs';
             </a>
           </ng-container>
 
-          <div class="nav-divider"></div>
-          
-          <!-- Block: Tests -->
-          <ng-container *ngIf="currentUser.role !== 'student'">
-            <div class="nav-block-header">ТЕСТЫ</div>
-            <a mat-list-item routerLink="/tests" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>quiz</mat-icon>
-              <span matListItemTitle>Тесты</span>
-            </a>
-            <a mat-list-item routerLink="/peer-review" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>rate_review</mat-icon>
-              <span matListItemTitle>Кросс-проверка</span>
-            </a>
-          </ng-container>
-
-          <!-- Block: Builders -->
-          <ng-container *ngIf="currentUser.role !== 'student'">
-            <div class="nav-divider"></div>
-            <div class="nav-block-header">КОНСТРУКТОРЫ</div>
-            <a mat-list-item routerLink="/tests/create" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>add_task</mat-icon>
-              <span matListItemTitle>Конструктор тестов</span>
-            </a>
-            <a mat-list-item routerLink="/course-builder" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>construction</mat-icon>
-              <span matListItemTitle>Конструктор курсов</span>
-            </a>
-            <a mat-list-item routerLink="/ai-test" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>psychology</mat-icon>
-              <span matListItemTitle>AI-генерация</span>
-            </a>
-          </ng-container>
-
-          <div class="nav-divider"></div>
-
-          <!-- Block: Analytics (Teachers Only) -->
+          <!-- Block: Management (Teachers/Admins Only) -->
           <ng-container *ngIf="currentUser.role === 'teacher' || currentUser.role === 'admin'">
-          <div class="nav-block-header">АНАЛИТИКА</div>
-          <a mat-list-item routerLink="/analytics" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>insights</mat-icon>
-            <span matListItemTitle>Аналитика</span>
-          </a>
-          <a mat-list-item routerLink="/activity-monitor" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>visibility</mat-icon>
-            <span matListItemTitle>Мониторинг</span>
-          </a>
-          <a mat-list-item routerLink="/submissions-management" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>assignment_turned_in</mat-icon>
-            <span matListItemTitle>Проверка работ</span>
-          </a>
-          <a mat-list-item routerLink="/feedback-results" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>reviews</mat-icon>
-            <span matListItemTitle>Отзывы</span>
-          </a>
-          <div class="nav-divider"></div>
+            <div class="nav-divider"></div>
+            <div class="nav-block-header">УПРАВЛЕНИЕ</div>
+            <a mat-list-item routerLink="/analytics" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>insights</mat-icon>
+              <span matListItemTitle>Аналитика</span>
+            </a>
+            <a mat-list-item routerLink="/activity-monitor" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>visibility</mat-icon>
+              <span matListItemTitle>Мониторинг</span>
+            </a>
+            <a mat-list-item routerLink="/news/manage" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>feed</mat-icon>
+              <span matListItemTitle>Новости</span>
+            </a>
+            <a mat-list-item routerLink="/admin/db" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>database</mat-icon>
+              <span matListItemTitle>База данных</span>
+            </a>
           </ng-container>
 
-          <!-- Block: Students -->
-          <div class="nav-block-header">СТУДЕНТАМ</div>
-          <a mat-list-item routerLink="/groups" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role !== 'student'">
-            <mat-icon matListItemIcon>groups</mat-icon>
-            <span matListItemTitle>Группы</span>
-          </a>
-          <a mat-list-item routerLink="/students" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role !== 'student'">
-            <mat-icon matListItemIcon>person_search</mat-icon>
-            <span matListItemTitle>Пользователи</span>
-          </a>
-          <a mat-list-item routerLink="/news/manage" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role === 'teacher' || currentUser.role === 'admin'">
-            <mat-icon matListItemIcon>feed</mat-icon>
-            <span matListItemTitle>Новости</span>
-          </a>
+          <!-- Block: Users (Teachers/Admins Only) -->
+          <ng-container *ngIf="currentUser.role === 'teacher' || currentUser.role === 'admin'">
+            <div class="nav-divider"></div>
+            <div class="nav-block-header">ПОЛЬЗОВАТЕЛИ</div>
+            <a mat-list-item routerLink="/students" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>person_search</mat-icon>
+              <span matListItemTitle>Пользователи</span>
+            </a>
+            <a mat-list-item routerLink="/groups" (click)="sidenav.close()" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>groups</mat-icon>
+              <span matListItemTitle>Группы</span>
+            </a>
+          </ng-container>
+
+          <!-- Block: Common Additional Sections -->
+          <div class="nav-divider"></div>
+          <div class="nav-block-header">ДОПОЛНИТЕЛЬНО</div>
           <a mat-list-item routerLink="/leaderboard" (click)="sidenav.close()" routerLinkActive="active-link">
             <mat-icon matListItemIcon>emoji_events</mat-icon>
             <span matListItemTitle>Лидерборд</span>
@@ -148,13 +117,6 @@ import { interval, Subscription } from 'rxjs';
           <a mat-list-item routerLink="/chat" (click)="sidenav.close()" routerLinkActive="active-link">
             <mat-icon matListItemIcon>smart_toy</mat-icon>
             <span matListItemTitle>Чат-ассистент</span>
-          </a>
-
-          <div class="nav-divider"></div>
-          
-          <a mat-list-item routerLink="/admin/db" (click)="sidenav.close()" routerLinkActive="active-link" *ngIf="currentUser.role === 'teacher' || currentUser.role === 'admin'">
-            <mat-icon matListItemIcon>database</mat-icon>
-            <span matListItemTitle>База данных</span>
           </a>
         </mat-nav-list>
       </mat-sidenav>
@@ -216,10 +178,10 @@ import { interval, Subscription } from 'rxjs';
           
           <button mat-button routerLink="/profile" class="profile-button">
             <div class="profile-content">
-              <div class="avatar-container" *ngIf="currentUser.avatar_url">
-                <img [src]="getAvatarUrl(currentUser.avatar_url)" alt="avatar" class="toolbar-avatar" (error)="currentUser.avatar_url = undefined">
+              <div class="avatar-container" *ngIf="currentUser.avatar_url && !avatarError">
+                <img [src]="getAvatarUrl(currentUser.avatar_url)" alt="avatar" class="toolbar-avatar" (error)="avatarError = true">
               </div>
-              <mat-icon *ngIf="!currentUser.avatar_url" class="toolbar-avatar-icon">person</mat-icon>
+              <mat-icon *ngIf="!currentUser.avatar_url || avatarError" class="toolbar-avatar-icon">person</mat-icon>
               <span class="toolbar-user-name">{{ currentUser.name }}</span>
             </div>
           </button>
@@ -495,6 +457,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private authSubscription?: Subscription;
   currentUser: CurrentUser | null = null;
   isInitialized = false;
+  avatarError = false;
   notifications: any[] = [];
   unreadCount: number = 0;
   private notificationCheckInterval?: Subscription;
@@ -515,9 +478,12 @@ export class AppComponent implements OnInit, OnDestroy {
     });
 
     // Подписываемся на изменения текущего пользователя
-    this.authSubscription = this.auth.currentUser$.subscribe(user => {
+    this.authSubscription = this.auth.currentUser$.pipe(
+      distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b))
+    ).subscribe(user => {
       const previouslyLoggedIn = !!this.currentUser;
       this.currentUser = user;
+      this.avatarError = false;
 
       if (user) {
         this.loadSidebarSubjects();

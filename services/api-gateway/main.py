@@ -383,9 +383,68 @@ async def clone_subject(subject_id: str, current_user: dict = Depends(get_curren
 
 @app.delete("/subjects/{subject_id}")
 async def delete_subject(subject_id: str, current_user: dict = Depends(get_current_teacher)):
+    # 1. Fetch all tests for this subject
+    tests, status, error = await proxy_request(TEST_SERVICE_URL, f"/tests?subject_id={subject_id}", "GET")
+    if status == 200 and isinstance(tests, list):
+        for test in tests:
+            test_id = test.get("id")
+            if test_id:
+                # Delete each test
+                await proxy_request(TEST_SERVICE_URL, f"/tests/{test_id}", "DELETE")
+    
+    # 2. Delete videos from video-service
+    await proxy_request(VIDEO_SERVICE_URL, f"/videos/by-subject/{subject_id}", "DELETE")
+    
+    # 3. Delete materials from material-service
+    await proxy_request(MATERIAL_SERVICE_URL, f"/materials/by-subject/{subject_id}", "DELETE")
+    
+    # 4. Delete the subject itself from subject-service
     data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}", "DELETE")
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to delete subject")
+    return data
+
+
+@app.post("/subjects/{subject_id}/lessons/{lesson_id}/view")
+async def view_lesson_proxy(
+    subject_id: str,
+    lesson_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Proxy view lesson progress to subject-service"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    encoded_name = quote(current_user["username"])
+    headers = {"X-User-Name": encoded_name}
+    data, status, error = await proxy_request(
+        SUBJECT_SERVICE_URL,
+        f"/subjects/{subject_id}/lessons/{lesson_id}/view",
+        "POST",
+        headers=headers
+    )
+    if status not in [200, 201]:
+        raise HTTPException(status_code=status, detail=error or "Failed to update lesson view progress")
+    return data
+
+
+@app.get("/subjects/{subject_id}/progress")
+async def get_subject_progress_proxy(
+    subject_id: str,
+    current_user: Optional[dict] = Depends(get_current_user)
+):
+    """Proxy get subject progress to subject-service"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    encoded_name = quote(current_user["username"])
+    headers = {"X-User-Name": encoded_name}
+    data, status, error = await proxy_request(
+        SUBJECT_SERVICE_URL,
+        f"/subjects/{subject_id}/progress",
+        "GET",
+        headers=headers
+    )
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to fetch lesson progress")
     return data
 
 

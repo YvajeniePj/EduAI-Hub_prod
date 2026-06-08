@@ -1,7 +1,7 @@
 """
 Database models for Subject Service
 """
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer, Float, Boolean
+from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer, Float, Boolean, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -179,5 +179,22 @@ class SubjectTeacher(Base):
 
     def __repr__(self):
         return f"<SubjectTeacher(id={self.id}, subject_id={self.subject_id}, user_name={self.user_name}, role={self.role})>"
+
+
+class LessonProgress(Base):
+    __tablename__ = "lesson_progress"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    lesson_id = Column(UUID(as_uuid=True), nullable=False)
+    user_name = Column(String, nullable=False)
+    viewed_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('user_name', 'lesson_id', name='_user_lesson_uc'),
+    )
+
+    def __repr__(self):
+        return f"<LessonProgress(id={self.id}, subject_id={self.subject_id}, lesson_id={self.lesson_id}, user_name={self.user_name})>"
 
 

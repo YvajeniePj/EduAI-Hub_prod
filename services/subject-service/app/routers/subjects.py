@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime
 from urllib.parse import unquote
 import os
 import shutil
@@ -13,7 +14,7 @@ import httpx
 import logging
 
 from app.database import get_db
-from app.models import Subject, CourseModule, CourseLesson, CourseContent, SubjectTeacher, Group, GroupMember
+from app.models import Subject, CourseModule, CourseLesson, CourseContent, SubjectTeacher, Group, GroupMember, LessonProgress
 from app.schemas import SubjectCreate, SubjectResponse, SubjectTeacherCreate, SubjectTeacherResponse
 
 router = APIRouter()
@@ -365,3 +366,81 @@ async def delete_subject_teacher(subject_id: UUID, user_name: str, db: Session =
     db.delete(teacher)
     db.commit()
     return {"message": "Teacher mapping deleted successfully"}
+
+
+@router.post("/{subject_id}/lessons/{lesson_id}/view", status_code=200)
+async def view_lesson(
+    subject_id: UUID,
+    lesson_id: UUID,
+    db: Session = Depends(get_db),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+):
+    """Mark a lesson as viewed for a user, or update the viewed time"""
+    if not x_user_name:
+        raise HTTPException(status_code=400, detail="X-User-Name header is required")
+    
+    try:
+        user_name = unquote(x_user_name)
+    except Exception:
+        user_name = x_user_name
+
+    # Check if subject exists
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    progress = db.query(LessonProgress).filter(
+        LessonProgress.user_name == user_name,
+        LessonProgress.lesson_id == lesson_id
+    ).first()
+
+    if progress:
+        progress.viewed_at = datetime.utcnow()
+        progress.subject_id = subject_id
+    else:
+        progress = LessonProgress(
+            subject_id=subject_id,
+            lesson_id=lesson_id,
+            user_name=user_name,
+            viewed_at=datetime.utcnow()
+        )
+        db.add(progress)
+    
+    db.commit()
+    db.refresh(progress)
+    
+    return {
+        "id": str(progress.id),
+        "subject_id": str(progress.subject_id),
+        "lesson_id": str(progress.lesson_id),
+        "user_name": progress.user_name,
+        "viewed_at": progress.viewed_at.isoformat()
+    }
+
+
+@router.get("/{subject_id}/progress", response_model=List[UUID])
+async def get_subject_progress(
+    subject_id: UUID,
+    db: Session = Depends(get_db),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+):
+    """Get list of lesson IDs that the user has viewed for a subject"""
+    if not x_user_name:
+        raise HTTPException(status_code=400, detail="X-User-Name header is required")
+    
+    try:
+        user_name = unquote(x_user_name)
+    except Exception:
+        user_name = x_user_name
+
+    # Check if subject exists
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    records = db.query(LessonProgress).filter(
+        LessonProgress.subject_id == subject_id,
+        LessonProgress.user_name == user_name
+    ).all()
+
+    return [record.lesson_id for record in records]

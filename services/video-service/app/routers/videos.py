@@ -128,3 +128,14 @@ async def delete_video(video_id: UUID, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Video deleted successfully"}
 
+
+@router.delete("/by-subject/{subject_id}", status_code=200)
+async def delete_videos_by_subject(subject_id: UUID, db: Session = Depends(get_db)):
+    """Delete all videos for a subject"""
+    videos = db.query(Video).filter(Video.subject_id == subject_id).all()
+    count = len(videos)
+    for video in videos:
+        db.delete(video)
+    db.commit()
+    return {"message": f"Deleted {count} videos for subject {subject_id}"}
+

@@ -64,6 +64,26 @@ export class ApiService {
     return this.http.post<any>(`${API_URL}/subjects/${subjectId}/cover`, formData);
   }
 
+  getSubjectTeachers(subjectId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/subjects/${subjectId}/teachers`);
+  }
+
+  addSubjectTeacher(subjectId: string, userName: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/subjects/${subjectId}/teachers`, { user_name: userName });
+  }
+
+  removeSubjectTeacher(subjectId: string, userName: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/subjects/${subjectId}/teachers/${userName}`);
+  }
+
+  markLessonViewed(subjectId: string, lessonId: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/subjects/${subjectId}/lessons/${lessonId}/view`, {});
+  }
+
+  getLessonProgress(subjectId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/subjects/${subjectId}/progress`);
+  }
+
   // Tests
   getTests(subjectId?: string): Observable<any[]> {
     let params = new HttpParams();
@@ -566,16 +586,4 @@ export class ApiService {
     });
   }
 
-  // Subject Teachers
-  getSubjectTeachers(subjectId: string): Observable<any[]> {
-    return this.http.get<any[]>(`${API_URL}/subjects/${subjectId}/teachers`);
-  }
-
-  addSubjectTeacher(subjectId: string, userName: string): Observable<any> {
-    return this.http.post<any>(`${API_URL}/subjects/${subjectId}/teachers`, { user_name: userName });
-  }
-
-  removeSubjectTeacher(subjectId: string, userName: string): Observable<any> {
-    return this.http.delete<any>(`${API_URL}/subjects/${subjectId}/teachers/${userName}`);
-  }
 }

@@ -21,7 +21,7 @@ import { MatDialogModule, MatDialog, MAT_DIALOG_DATA, MatDialogRef } from '@angu
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
+import { Subject, takeUntil, debounceTime, distinctUntilChanged, combineLatest, filter } from 'rxjs';
 import { CreateGroupDialogComponent } from '../groups/groups.component';
 import { UploadMaterialDialogComponent } from './upload-material-dialog.component';
 import { MaterialViewerComponent } from './material-viewer.component';
@@ -29,6 +29,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 interface TreeNode {
   id: string;
@@ -70,14 +71,29 @@ interface TreeNode {
     MatMenuModule,
     MatTooltipModule,
     RussianDatePipe,
-    MatAutocompleteModule
+    MatAutocompleteModule,
+    MatSnackBarModule
   ],
   template: `
     <div class="course-hub-container">
-      <div class="course-header" *ngIf="!loading">
-        <h1>{{ courseName }}</h1>
-        <div class="header-actions">
-             <!-- Actions like Edit Course could go here -->
+      <div class="course-header" *ngIf="!loading" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dadce0; background: white; padding: 12px 24px; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h1 style="margin: 0; font-size: 22px; font-weight: 400; color: #1e88e5;">{{ courseName }}</h1>
+          <!-- Small red pulse/dot indicator if stream is live -->
+          <div *ngIf="isStreamActive" class="live-pulse-dot" matTooltip="Трансляция в эфире!" style="width: 10px; height: 10px; border-radius: 50%; background-color: #d32f2f; box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); animation: pulse 1.2s infinite; margin-left: 8px;"></div>
+        </div>
+        <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
+          <ng-container *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+            <button mat-stroked-button [routerLink]="['/course-builder', subjectId]" style="height: 36px;">
+              ⚙️ Конструктор курса
+            </button>
+            <button mat-stroked-button [routerLink]="['/ai-test']" [queryParams]="{ subjectId: subjectId }" style="height: 36px;">
+              🤖 AI-тест
+            </button>
+            <button mat-raised-button color="warn" (click)="startStream()" style="height: 36px; display: flex; align-items: center; gap: 4px;">
+              <mat-icon>videocam</mat-icon> Начать трансляцию
+            </button>
+          </ng-container>
         </div>
       </div>
 
@@ -166,7 +182,27 @@ interface TreeNode {
 
                 <!-- Announcements Feed -->
                 <div class="announcements-feed">
-                  <div *ngIf="courseAnnouncements.length === 0" class="no-announcements">
+                  <!-- Bright LIVE card for students when stream is active -->
+                  <mat-card *ngIf="isStreamActive && currentUser?.role === 'student'" class="live-stream-card" style="background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%); color: white; margin-bottom: 24px; border-radius: 12px; box-shadow: 0 4px 15px rgba(255, 75, 43, 0.4); overflow: hidden; position: relative;">
+                    <div style="position: absolute; top: -20px; right: -20px; font-size: 100px; opacity: 0.15; pointer-events: none;">
+                      <mat-icon style="font-size: 100px; width: 100px; height: 100px; color: white;">live_tv</mat-icon>
+                    </div>
+                    <mat-card-content style="padding: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                      <div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                          <span style="background: white; color: #ff4b2b; font-weight: bold; font-size: 11px; padding: 2px 8px; border-radius: 4px; letter-spacing: 1px;">ЭФИР</span>
+                          <div class="live-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background-color: white; box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); animation: pulse-white 1.2s infinite; display: inline-block;"></div>
+                        </div>
+                        <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 500; color: white; border: none;">Трансляция уже началась!</h2>
+                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">Присоединяйтесь к онлайн-уроку прямо сейчас.</p>
+                      </div>
+                      <button mat-raised-button [routerLink]="['/courses', subjectId, 'stream']" style="background: white; color: #ff4b2b; font-weight: 600; padding: 8px 24px;">
+                        Войти в класс
+                      </button>
+                    </mat-card-content>
+                  </mat-card>
+
+                  <div *ngIf="courseAnnouncements.length === 0 && !isStreamActive" class="no-announcements">
                     <mat-icon class="feed-empty-icon">chat_bubble_outline</mat-icon>
                     <p>Здесь пока ничего нет. Объявления появятся в этой ленте.</p>
                   </div>
@@ -225,6 +261,17 @@ interface TreeNode {
               </div>
             </div>
 
+            <!-- Progress Bar for Students -->
+            <div class="student-progress-container" *ngIf="currentUser?.role === 'student'" style="margin-bottom: 24px; background: white; padding: 16px; border-radius: 8px; border: 1px solid #dadce0;">
+              <div class="progress-label" style="display: flex; justify-content: space-between; font-weight: 500; font-size: 14px; margin-bottom: 8px;">
+                <span>Пройдено {{ completedLessonsCount }} из {{ totalLessonsCount }} уроков</span>
+                <span>{{ totalLessonsCount > 0 ? mathRound((completedLessonsCount / totalLessonsCount) * 100) : 0 }}%</span>
+              </div>
+              <div class="progress-bar-bg" style="background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden; position: relative;">
+                <div class="progress-bar-fill" [style.width.%]="totalLessonsCount > 0 ? (completedLessonsCount / totalLessonsCount) * 100 : 0" style="background: #4caf50; height: 100%; transition: width 0.3s ease;"></div>
+              </div>
+            </div>
+
             <!-- Modules Accordion -->
             <mat-accordion multi="true" class="modules-accordion">
               <mat-expansion-panel *ngFor="let module of dataSource.data" [expanded]="true" class="module-panel">
@@ -236,7 +283,7 @@ interface TreeNode {
 
                 <div class="lessons-list">
                   <div *ngFor="let lesson of module.children" class="lesson-row" (click)="selectLessonFromOutline(lesson)">
-                    <mat-icon class="lesson-type-icon" [style.color]="getLessonIconColor(lesson.lessonType)">
+                    <mat-icon class="lesson-type-icon" [style.color]="getLessonIconColor(lesson)">
                       {{ getLessonTypeIcon(lesson.lessonType) }}
                     </mat-icon>
                     <span class="lesson-row-title">{{ lesson.title }}</span>
@@ -477,6 +524,16 @@ interface TreeNode {
                       <div *ngIf="!selectedLesson.content || (!selectedLesson.content.text_content && !selectedLesson.content.video_url && !selectedLesson.content.material_id && !selectedLesson.content.test_id)" class="empty-content">
                         <p>Содержимое урока пока не добавлено.</p>
                       </div>
+
+                      <!-- Lesson Navigation Buttons -->
+                      <div class="lesson-navigation-buttons" style="display: flex; justify-content: space-between; margin-top: 32px; border-top: 1px solid #dadce0; padding-top: 16px;">
+                        <button mat-button color="primary" [disabled]="!previousLesson" (click)="previousLesson && navigateToLesson(previousLesson)" style="display: flex; align-items: center; gap: 4px;">
+                          <mat-icon>navigate_before</mat-icon> Предыдущий урок
+                        </button>
+                        <button mat-button color="primary" [disabled]="!nextLesson" (click)="nextLesson && navigateToLesson(nextLesson)" style="display: flex; align-items: center; gap: 4px;">
+                          Следующий урок <mat-icon>navigate_next</mat-icon>
+                        </button>
+                      </div>
                   </div>
                 </div>
 
@@ -616,6 +673,111 @@ interface TreeNode {
                          </mat-card-content>
                     </mat-card>
                 </div>
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <!-- Tab 4: Проверка работ -->
+        <mat-tab *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+          <ng-template mat-tab-label>
+            <span>Проверка работ</span>
+            <span class="pending-badge" *ngIf="pendingSubmissionsCount > 0" style="background: #d32f2f; color: white; border-radius: 10px; padding: 2px 8px; font-size: 11px; margin-left: 8px; font-weight: bold;">
+              {{ pendingSubmissionsCount }}
+            </span>
+          </ng-template>
+
+          <div class="tab-content-container">
+            <div class="submissions-grading-header" style="display: flex; gap: 16px; margin-bottom: 24px; align-items: center; flex-wrap: wrap;">
+              <mat-form-field appearance="outline" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                <mat-label>Поиск по тесту</mat-label>
+                <input matInput [(ngModel)]="submissionFilterTest" (ngModelChange)="applySubmissionFilters()" placeholder="Название теста..." />
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" style="flex: 1; min-width: 150px; margin-bottom: 0;">
+                <mat-label>Статус</mat-label>
+                <mat-select [(ngModel)]="submissionFilterStatus" (selectionChange)="applySubmissionFilters()">
+                  <mat-option value="">Все статусы</mat-option>
+                  <mat-option value="pending">Ожидает проверки</mat-option>
+                  <mat-option value="approved">Одобрено</mat-option>
+                  <mat-option value="rejected">Отклонено</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                <mat-label>Поиск по ученику</mat-label>
+                <input matInput [(ngModel)]="submissionFilterStudent" (ngModelChange)="applySubmissionFilters()" placeholder="Имя ученика..." />
+              </mat-form-field>
+            </div>
+
+            <!-- Submissions Table -->
+            <div class="submissions-table-container" style="background: white; border-radius: 8px; border: 1px solid #dadce0; overflow: hidden;">
+              <table mat-table [dataSource]="filteredSubmissions" class="submissions-table" style="width: 100%;">
+                
+                <!-- Student Column -->
+                <ng-container matColumnDef="student">
+                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Ученик </th>
+                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <img *ngIf="s.user_avatar" [src]="getAvatarUrl(s.user_avatar)" class="person-avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" (error)="s.user_avatar = undefined" />
+                      <div *ngIf="!s.user_avatar" class="person-avatar-placeholder" style="width: 32px; height: 32px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <mat-icon style="font-size: 18px; width: 18px; height: 18px; line-height: 18px; margin: 0;">person</mat-icon>
+                      </div>
+                      <span style="font-weight: 500;">{{ s.user_name }}</span>
+                    </div>
+                  </td>
+                </ng-container>
+
+                <!-- Test Title Column -->
+                <ng-container matColumnDef="testTitle">
+                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Тест </th>
+                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left;">
+                    {{ getTestTitle(s.test_id) }}
+                  </td>
+                </ng-container>
+
+                <!-- Submission Date Column -->
+                <ng-container matColumnDef="date">
+                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Дата сдачи </th>
+                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left;">
+                    {{ s.finished_at | date:'short' }}
+                  </td>
+                </ng-container>
+
+                <!-- Score Column -->
+                <ng-container matColumnDef="score">
+                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Балл </th>
+                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left; font-weight: 600;">
+                    {{ s.total_score !== undefined && s.total_score !== null ? s.total_score : '—' }}
+                  </td>
+                </ng-container>
+
+                <!-- Status Column -->
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Статус </th>
+                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left;">
+                    <span class="status-badge" [ngClass]="getSubmissionStatusClass(s.status)">
+                      {{ getSubmissionStatusText(s.status) }}
+                    </span>
+                  </td>
+                </ng-container>
+
+                <!-- Action Column -->
+                <ng-container matColumnDef="action">
+                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Действие </th>
+                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left;">
+                    <button mat-raised-button color="primary" [routerLink]="['/submissions', s.id]" [queryParams]="{ returnTo: 'course', subjectId: subjectId }">
+                      Проверить
+                    </button>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="['student', 'testTitle', 'date', 'score', 'status', 'action']"></tr>
+                <tr mat-row *matRowDef="let row; columns: ['student', 'testTitle', 'date', 'score', 'status', 'action'];"></tr>
+              </table>
+
+              <div *ngIf="filteredSubmissions.length === 0" style="padding: 32px; text-align: center; color: #5f6368; font-style: italic;">
+                Нет сданных работ, соответствующих фильтрам.
               </div>
             </div>
           </div>
@@ -1644,6 +1806,59 @@ interface TreeNode {
       height: 20px;
       margin: 0;
     }
+    .live-pulse-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #d32f2f;
+      box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7);
+      animation: pulse 1.2s infinite;
+      display: inline-block;
+    }
+    @keyframes pulse {
+      0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7);
+      }
+      70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(211, 47, 47, 0);
+      }
+      100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(211, 47, 47, 0);
+      }
+    }
+    @keyframes pulse-white {
+      0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+      }
+      70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(255, 255, 255, 0);
+      }
+      100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+      }
+    }
+    .submission-pending {
+      background-color: #fef7e0;
+      color: #b06000;
+    }
+    .submission-approved {
+      background-color: #e6f4ea;
+      color: #137333;
+    }
+    .submission-rejected {
+      background-color: #fce8e6;
+      color: #c5221f;
+    }
+    .status-pending {
+      background-color: #fef7e0;
+      color: #b06000;
+    }
   `]
 })
 export class CourseViewComponent implements OnInit, OnDestroy {
@@ -1672,6 +1887,18 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   courseStudents: any[] = [];
   courseDescription: string = '';
 
+  // Submissions grading tab properties
+  allSubmissions: any[] = [];
+  filteredSubmissions: any[] = [];
+  pendingSubmissionsCount = 0;
+  submissionFilterTest = '';
+  submissionFilterStatus = '';
+  submissionFilterStudent = '';
+  private rawAllSubmissions: any[] = [];
+
+  // Lesson progress tracking property
+  lessonProgress: string[] = [];
+
   // Data for tabs
   lessonMetadata = {
     moduleName: '',
@@ -1699,7 +1926,8 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     private router: Router,
     private dialog: MatDialog,
     private cdr: ChangeDetectorRef,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private snackBar: MatSnackBar
   ) {
     this.announcementForm = this.fb.group({
       title: ['', Validators.required],
@@ -1711,36 +1939,35 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.authService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
+    combineLatest([
+      this.route.params,
+      this.authService.currentUser$.pipe(filter(user => user !== null && user !== undefined))
+    ]).pipe(
+      takeUntil(this.destroy$),
+      distinctUntilChanged((prev, curr) => {
+        return prev[0]['id'] === curr[0]['id'] && prev[1]?.name === curr[1]?.name && prev[1]?.role === curr[1]?.role;
+      })
+    ).subscribe(([params, user]) => {
+      this.subjectId = params['id'];
       this.currentUser = user;
-      
-      if (this.subjectId) {
-        if (this.currentUser?.role === 'student') {
+
+      if (this.subjectId && this.currentUser) {
+        this.loadCourse();
+        this.loadMaterials();
+        this.loadTests();
+        this.loadGroups();
+        this.loadAnnouncements();
+        this.loadParticipants();
+        this.loadUserSubmissions();
+        this.loadLessonProgress();
+        this.checkActiveStream();
+        
+        if (this.currentUser.role === 'student') {
           this.loadMyGroups();
           this.loadMyRequests();
         }
-        this.loadUserSubmissions();
-        this.loadAnnouncements();
-        this.loadParticipants();
       }
       this.cdr.markForCheck();
-    });
-
-    this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
-      this.subjectId = params['id'];
-      this.loadCourse();
-      
-      this.loadMaterials();
-      this.loadTests();
-      this.loadGroups();
-      this.loadAnnouncements();
-      this.loadUserSubmissions();
-      this.loadParticipants();
-      
-      if (this.currentUser?.role === 'student') {
-        this.loadMyGroups();
-        this.loadMyRequests();
-      }
     });
 
     this.addTeacherForm.get('username')?.valueChanges.pipe(
@@ -1762,8 +1989,6 @@ export class CourseViewComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       }
     });
-
-    this.checkActiveStream();
   }
 
   checkActiveStream() {
@@ -1848,6 +2073,113 @@ export class CourseViewComponent implements OnInit, OnDestroy {
 
   hasChild = (_: number, node: TreeNode) => !!node.children && node.children.length > 0;
 
+  loadLessonProgress() {
+    if (!this.currentUser) return;
+    this.apiService.getLessonProgress(this.subjectId).subscribe({
+      next: (progressList) => {
+        this.lessonProgress = progressList || [];
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error loading lesson progress:', err);
+      }
+    });
+  }
+
+  get flatLessons(): TreeNode[] {
+    const list: TreeNode[] = [];
+    if (this.dataSource.data) {
+      for (const module of this.dataSource.data) {
+        if (module.children) {
+          for (const lesson of module.children) {
+            list.push(lesson);
+          }
+        }
+      }
+    }
+    return list;
+  }
+
+  get totalLessonsCount(): number {
+    return this.flatLessons.length;
+  }
+
+  get completedLessonsCount(): number {
+    let count = 0;
+    const lessons = this.flatLessons;
+    for (const lesson of lessons) {
+      if (this.getLessonStatusText(lesson) === 'Сдано') {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  get previousLesson(): TreeNode | null {
+    if (!this.selectedLesson) return null;
+    const lessons = this.flatLessons;
+    const index = lessons.findIndex(l => l.id === this.selectedLesson?.id);
+    if (index > 0) {
+      return lessons[index - 1];
+    }
+    return null;
+  }
+
+  get nextLesson(): TreeNode | null {
+    if (!this.selectedLesson) return null;
+    const lessons = this.flatLessons;
+    const index = lessons.findIndex(l => l.id === this.selectedLesson?.id);
+    if (index >= 0 && index < lessons.length - 1) {
+      return lessons[index + 1];
+    }
+    return null;
+  }
+
+  navigateToLesson(lesson: TreeNode) {
+    this.selectLesson(lesson);
+    this.cdr.markForCheck();
+  }
+
+  mathRound(val: number): number {
+    return Math.round(val);
+  }
+
+  startStream() {
+    const teacherName = this.currentUser?.name || 'Преподаватель';
+    const roomName = `subject-${this.subjectId}`;
+    
+    const roomData = {
+      name: roomName,
+      subject_id: this.subjectId,
+      teacher_name: teacherName
+    };
+
+    this.apiService.createStreamingRoom(roomData).subscribe({
+      next: () => {
+        const announcementContent = `🔴 Преподаватель <strong>${teacherName}</strong> начал трансляцию! <br/><br/> <a href="/courses/${this.subjectId}/stream" class="mat-mdc-raised-button mat-warn" style="display: inline-block; text-decoration: none; padding: 8px 16px; border-radius: 4px; background-color: #f44336; color: white; font-weight: 500;">Присоединиться к трансляции</a>`;
+        
+        const newsData = {
+          title: '🔴 Прямой эфир',
+          content: announcementContent,
+          subject_id: this.subjectId
+        };
+        
+        this.apiService.createNews(newsData).subscribe({
+          next: () => {
+            this.router.navigate(['/courses', this.subjectId, 'stream']);
+          },
+          error: (err) => {
+            console.error('Error creating news for stream:', err);
+            this.router.navigate(['/courses', this.subjectId, 'stream']);
+          }
+        });
+      },
+      error: (err) => {
+        this.router.navigate(['/courses', this.subjectId, 'stream']);
+      }
+    });
+  }
+
   selectLesson(node: TreeNode) {
     this.selectedLesson = node;
     this.updateLessonMetadata(node);
@@ -1858,6 +2190,18 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     if (!viewedIds.includes(node.id)) {
       viewedIds.push(node.id);
       localStorage.setItem('viewed-lessons', JSON.stringify(viewedIds));
+    }
+
+    if (this.currentUser?.role === 'student') {
+      this.apiService.markLessonViewed(this.subjectId, node.id).subscribe({
+        next: () => {
+          if (!this.lessonProgress.includes(node.id)) {
+            this.lessonProgress.push(node.id);
+          }
+          this.cdr.markForCheck();
+        },
+        error: (err) => console.error('Error marking lesson viewed:', err)
+      });
     }
 
     this.checkActiveStream();
@@ -1972,8 +2316,11 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   loadTests() {
     this.apiService.getTests(this.subjectId).subscribe({
       next: (data) => {
-        this.tests = data;
+        this.tests = data || [];
         this.filterCourseDeadlines();
+        if (this.currentUser && (this.currentUser.role === 'teacher' || this.currentUser.role === 'admin' || this.currentUser.role === 'hidden_admin')) {
+          this.applySubmissionsSubjectFilter();
+        }
         this.cdr.markForCheck();
       },
       error: (err) => console.error('Error loading tests', err)
@@ -2292,19 +2639,11 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     }
   }
 
-  getLessonIconColor(lessonType?: string): string {
-    switch (lessonType?.toLowerCase()) {
-      case 'lecture':
-        return '#1a73e8';
-      case 'quiz':
-        return '#a142f4';
-      case 'video':
-        return '#ea4335';
-      case 'material':
-        return '#fbbc04';
-      default:
-        return '#5f6368';
-    }
+  getLessonIconColor(lesson: TreeNode): string {
+    const status = this.getLessonStatusText(lesson);
+    if (status === 'Сдано') return '#4caf50'; // Green
+    if (status === 'На проверке') return '#ffb300'; // Yellow/Pending
+    return '#9e9e9e'; // Gray/Unstarted
   }
 
   isTestFinished(testId: string): boolean {
@@ -2323,19 +2662,88 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     return dueDate < now && !this.isTestFinished(test.id);
   }
 
+  applySubmissionsSubjectFilter() {
+    if (!this.tests || this.tests.length === 0) {
+      this.allSubmissions = [];
+      this.pendingSubmissionsCount = 0;
+      this.applySubmissionFilters();
+      return;
+    }
+    this.allSubmissions = this.rawAllSubmissions.filter((s: any) => {
+      return this.tests.some(t => t.id === s.test_id);
+    });
+    this.pendingSubmissionsCount = this.allSubmissions.filter(s => s.status === 'pending').length;
+    this.applySubmissionFilters();
+  }
+
+  applySubmissionFilters() {
+    this.filteredSubmissions = this.allSubmissions.filter(s => {
+      const test = this.tests.find(t => t.id === s.test_id);
+      const testTitle = test ? test.title.toLowerCase() : '';
+      const filterTest = this.submissionFilterTest.toLowerCase();
+      if (filterTest && !testTitle.includes(filterTest)) return false;
+
+      if (this.submissionFilterStatus && s.status !== this.submissionFilterStatus) return false;
+
+      const studentName = s.user_name ? s.user_name.toLowerCase() : '';
+      const filterStudent = this.submissionFilterStudent.toLowerCase();
+      if (filterStudent && !studentName.includes(filterStudent)) return false;
+
+      return true;
+    });
+  }
+
+  getTestTitle(testId: string): string {
+    const t = this.tests.find(test => test.id === testId);
+    return t ? t.title : 'Неизвестный тест';
+  }
+
+  getSubmissionStatusText(status: string): string {
+    switch (status) {
+      case 'pending': return 'Ожидает проверки';
+      case 'approved': return 'Одобрено';
+      case 'rejected': return 'Отклонено';
+      default: return status;
+    }
+  }
+
+  getSubmissionStatusClass(status: string): string {
+    switch (status) {
+      case 'pending': return 'submission-pending';
+      case 'approved': return 'submission-approved';
+      case 'rejected': return 'submission-rejected';
+      default: return '';
+    }
+  }
+
   loadUserSubmissions() {
     if (!this.currentUser) return;
-    this.apiService.getSubmissions(undefined, this.currentUser.name).subscribe({
-      next: (subs) => {
-        this.userSubmissions = subs || [];
-        this.filterCourseDeadlines();
-        this.cdr.markForCheck();
-      },
-      error: (err) => {
-        console.error('Error loading user submissions', err);
-        this.cdr.markForCheck();
-      }
-    });
+    
+    if (this.currentUser.role === 'teacher' || this.currentUser.role === 'admin' || this.currentUser.role === 'hidden_admin') {
+      this.apiService.getSubmissions().subscribe({
+        next: (subs) => {
+          this.rawAllSubmissions = subs || [];
+          this.applySubmissionsSubjectFilter();
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          console.error('Error loading all submissions', err);
+          this.cdr.markForCheck();
+        }
+      });
+    } else {
+      this.apiService.getSubmissions(undefined, this.currentUser.name).subscribe({
+        next: (subs) => {
+          this.userSubmissions = subs || [];
+          this.filterCourseDeadlines();
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          console.error('Error loading user submissions', err);
+          this.cdr.markForCheck();
+        }
+      });
+    }
   }
 
   loadAnnouncements() {
@@ -2436,14 +2844,18 @@ export class CourseViewComponent implements OnInit, OnDestroy {
       const testId = lesson.content.test_id;
       const sub = this.userSubmissions.find(s => s.test_id === testId);
       if (sub) {
-        if (sub.status === 'approved') return 'Сдано';
-        return 'В процессе';
+        if (sub.status === 'approved' || (sub.total_score !== undefined && sub.total_score !== null && sub.total_score >= 0)) {
+          return 'Сдано';
+        }
+        if (sub.status === 'pending') {
+          return 'На проверке';
+        }
       }
       return 'Не начато';
     }
 
     const viewedIds = JSON.parse(localStorage.getItem('viewed-lessons') || '[]');
-    if (viewedIds.includes(lesson.id)) {
+    if (viewedIds.includes(lesson.id) || this.lessonProgress.includes(lesson.id)) {
       return 'Сдано';
     }
     return 'Не начато';
@@ -2452,7 +2864,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   getLessonStatusClass(lesson: TreeNode): string {
     const status = this.getLessonStatusText(lesson);
     if (status === 'Сдано') return 'status-completed';
-    if (status === 'В процессе') return 'status-progress';
+    if (status === 'На проверке') return 'status-pending';
     return 'status-not-started';
   }
 
@@ -2496,7 +2908,11 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   copyInviteLink(group: any) {
     const link = window.location.origin + '/invite/subject/' + this.subjectId + '/group/' + group.id;
     navigator.clipboard.writeText(link).then(() => {
-      alert('Ссылка скопирована в буфер обмена: ' + link);
+      this.snackBar.open('Ссылка скопирована в буфер обмена!', 'Закрыть', {
+        duration: 3000,
+        horizontalPosition: 'center',
+        verticalPosition: 'bottom'
+      });
     }).catch(err => {
       console.error('Could not copy text: ', err);
       // Fallback
@@ -2506,7 +2922,11 @@ export class CourseViewComponent implements OnInit, OnDestroy {
       textarea.select();
       try {
         document.execCommand('copy');
-        alert('Ссылка скопирована в буфер обмена: ' + link);
+        this.snackBar.open('Ссылка скопирована в буфер обмена!', 'Закрыть', {
+          duration: 3000,
+          horizontalPosition: 'center',
+          verticalPosition: 'bottom'
+        });
       } catch (e) {
         console.error(e);
       }

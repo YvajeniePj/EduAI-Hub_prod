@@ -28,13 +28,14 @@ def get_db():
 
 def init_db():
     """Initialize database tables"""
-    from app.models import Subject, News, Group, GroupMember, GroupRequest, CourseModule, CourseLesson, CourseContent, SubjectTeacher
+    from app.models import Subject, News, Group, GroupMember, GroupRequest, CourseModule, CourseLesson, CourseContent, SubjectTeacher, LessonProgress
     Base.metadata.create_all(bind=engine)
 
     try:
         from sqlalchemy import text
         with engine.connect() as conn:
             conn.execute(text("CREATE TABLE IF NOT EXISTS subject_teachers (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE, user_name VARCHAR NOT NULL, role VARCHAR NOT NULL DEFAULT 'teacher', UNIQUE(subject_id, user_name))"))
+            conn.execute(text("CREATE TABLE IF NOT EXISTS lesson_progress (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE, lesson_id UUID NOT NULL, user_name VARCHAR NOT NULL, viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_name, lesson_id))"))
             conn.commit()
     except Exception as e:
         import logging
