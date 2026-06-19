@@ -161,18 +161,36 @@ import { debounceTime } from 'rxjs/operators';
                       <div *ngIf="test.test_type === 'PROJECT' || test.test_type === 'project'" class="answer-section">
                         <div class="project-info">
                           <mat-icon>info</mat-icon>
-                          <span>Этот тест является проектом. Вы можете загрузить несколько файлов в качестве ответа и оставить текстовое описание.</span>
+                          <span>Этот тест является заданием/проектом. Вы можете загрузить несколько файлов, указать ссылку на проект (например, на GitHub) или на видеопрезентацию, а также оставить текстовое описание решения.</span>
                         </div>
                         
-                        <div class="project-text-answer" style="margin-bottom: 24px;">
+                        <div class="project-text-answer" style="margin-bottom: 16px;">
                           <mat-form-field appearance="outline" class="answer-field">
                             <mat-label>Описание проекта / Текстовый ответ</mat-label>
                             <textarea matInput 
-                                      [formControlName]="i" 
+                                      [value]="getProjectAnswer(i, 'text')"
+                                      (input)="updateProjectAnswer(i, 'text', $any($event.target).value)"
                                       rows="6" 
                                       placeholder="Введите описание вашего решения или текстовый ответ..."
-                                      class="answer-textarea"
-                                      (input)="onAnswerChange(i)"></textarea>
+                                      class="answer-textarea"></textarea>
+                          </mat-form-field>
+                        </div>
+
+                        <div class="project-links" style="display: flex; gap: 16px; margin-bottom: 24px;">
+                          <mat-form-field appearance="outline" style="flex: 1;">
+                            <mat-label>🔗 Ссылка на проект (GitHub, Google Drive и др.)</mat-label>
+                            <input matInput 
+                                   [value]="getProjectAnswer(i, 'external_link')"
+                                   (input)="updateProjectAnswer(i, 'external_link', $any($event.target).value)"
+                                   placeholder="https://github.com/username/project">
+                          </mat-form-field>
+
+                          <mat-form-field appearance="outline" style="flex: 1;">
+                            <mat-label>🎥 Ссылка на видео-презентацию (YouTube, Rutube, Vimeo)</mat-label>
+                            <input matInput 
+                                   [value]="getProjectAnswer(i, 'video_link')"
+                                   (input)="updateProjectAnswer(i, 'video_link', $any($event.target).value)"
+                                   placeholder="https://www.youtube.com/watch?v=...">
                           </mat-form-field>
                         </div>
                         
@@ -1363,7 +1381,61 @@ export class TestTakeComponent implements OnInit, OnDestroy {
   hasAnswer(index: number): boolean {
     if (!this.answerForm) return false;
     const answer = this.answerForm.value.answers[index];
-    return answer && answer.toString().trim() !== '';
+    if (!answer) return false;
+    const answerStr = answer.toString().trim();
+    if (answerStr === '') return false;
+
+    try {
+      const parsed = JSON.parse(answerStr);
+      if (parsed && typeof parsed === 'object') {
+        return !!(
+          (parsed.text && parsed.text.trim() !== '') ||
+          (parsed.external_link && parsed.external_link.trim() !== '') ||
+          (parsed.video_link && parsed.video_link.trim() !== '')
+        );
+      }
+    } catch (e) {
+      // Not JSON
+    }
+
+    return true;
+  }
+
+  getProjectAnswer(index: number, field: 'text' | 'external_link' | 'video_link'): string {
+    if (!this.answerForm) return '';
+    const answersArray = this.answerForm.get('answers') as FormArray;
+    const controlVal = answersArray?.at(index)?.value;
+    if (!controlVal) return '';
+    try {
+      const parsed = JSON.parse(controlVal);
+      if (parsed && typeof parsed === 'object') {
+        return parsed[field] || '';
+      }
+    } catch (e) {
+      if (field === 'text') return controlVal;
+    }
+    return '';
+  }
+
+  updateProjectAnswer(index: number, field: 'text' | 'external_link' | 'video_link', value: string) {
+    if (!this.answerForm) return;
+    const answersArray = this.answerForm.get('answers') as FormArray;
+    const control = answersArray?.at(index);
+    if (!control) return;
+
+    let currentObj = { text: '', external_link: '', video_link: '' };
+    try {
+      const parsed = JSON.parse(control.value || '{}');
+      if (parsed && typeof parsed === 'object') {
+        currentObj = { ...currentObj, ...parsed };
+      }
+    } catch (e) {
+      currentObj.text = control.value || '';
+    }
+
+    currentObj[field] = value;
+    control.setValue(JSON.stringify(currentObj));
+    this.onAnswerChange(index);
   }
 
   onAnswerChange(index: number) {

@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
@@ -230,7 +231,35 @@ import { Router } from '@angular/router';
               
               <div class="answer-section">
                 <div class="answer-label">Ваш ответ:</div>
-                <div class="answer-text">{{ result.answer || 'Ответ не предоставлен' }}</div>
+                
+                <!-- If JSON structure -->
+                <div *ngIf="isJsonAnswer(result.answer)" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                  <div *ngIf="parseJsonAnswer(result.answer).text" class="answer-text" style="white-space: pre-wrap;">
+                    {{ parseJsonAnswer(result.answer).text }}
+                  </div>
+                  <div *ngIf="parseJsonAnswer(result.answer).external_link" style="margin-top: 4px;">
+                    <strong>🔗 Ссылка на проект:</strong>
+                    <a [href]="parseJsonAnswer(result.answer).external_link" target="_blank" style="color: #1a73e8; margin-left: 8px; font-weight: 500;">
+                      {{ parseJsonAnswer(result.answer).external_link }}
+                    </a>
+                  </div>
+                  <div *ngIf="parseJsonAnswer(result.answer).video_link" style="margin-top: 8px;">
+                    <strong>🎥 Видео-презентация:</strong>
+                    <div class="video-container" style="margin-top: 4px; max-width: 500px;">
+                      <iframe 
+                        [src]="getSafeUrl(parseJsonAnswer(result.answer).video_link)" 
+                        frameborder="0" 
+                        allowfullscreen 
+                        style="width: 100%; height: 280px; border-radius: 8px;">
+                      </iframe>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- If regular text -->
+                <div *ngIf="!isJsonAnswer(result.answer)" class="answer-text" style="white-space: pre-wrap;">
+                  {{ result.answer || 'Ответ не предоставлен' }}
+                </div>
               </div>
               
               <div *ngIf="result.details && result.details.length > 0" class="details-section">
@@ -971,8 +1000,44 @@ export class SubmissionResultsComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private apiService: ApiService,
-    private auth: AuthService
+    private auth: AuthService,
+    private sanitizer: DomSanitizer
   ) {}
+
+  isJsonAnswer(answer: string): boolean {
+    if (!answer) return false;
+    try {
+      const parsed = JSON.parse(answer);
+      return typeof parsed === 'object' && parsed !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  parseJsonAnswer(answer: string): any {
+    try {
+      return JSON.parse(answer);
+    } catch {
+      return {};
+    }
+  }
+
+  getSafeUrl(url: string): SafeResourceUrl {
+    let embedUrl = '';
+    if (url.includes('youtube.com/watch') || url.includes('youtube.com/embed/')) {
+      const videoId = url.includes('v=') ? url.split('v=')[1]?.split('&')[0] : url.split('embed/')[1]?.split('?')[0];
+      embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`;
+    } else if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+      embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`;
+    } else if (url.includes('rutube.ru/video/')) {
+      const videoId = url.split('rutube.ru/video/')[1]?.split('/')[0];
+      embedUrl = `https://rutube.ru/play/embed/${videoId}`;
+    } else {
+      embedUrl = url;
+    }
+    return this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
+  }
 
   ngOnInit() {
     this.isTeacher = this.auth.getCurrentUser()?.role === 'teacher';

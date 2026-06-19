@@ -70,14 +70,21 @@ export class AuthService {
     this.userManager = new UserManager(settings);
     console.log('OIDC Settings initialized:', settings);
     
-    // Initialize from storage if exists
-    this.userManager.getUser().then(user => {
-      if (user && !user.expired) {
-        console.log('User loaded from storage:', user.profile.preferred_username);
-        this.handleUser(user);
+    const mockUserStr = localStorage.getItem('mockUser');
+    if (mockUserStr) {
+      try {
+        const mockData = JSON.parse(mockUserStr);
+        this.currentUserSubject.next(mockData.user);
+        this.tokenSubject.next(mockData.token);
+        this.isInitializedSubject.next(true);
+        console.log('Mock student user loaded from storage:', mockData.user.name);
+      } catch (e) {
+        localStorage.removeItem('mockUser');
+        this.loadOidcUser();
       }
-      this.isInitializedSubject.next(true);
-    });
+    } else {
+      this.loadOidcUser();
+    }
 
     this.userManager.events.addUserLoaded((user) => {
       console.log('UserLoaded event fired');
@@ -86,6 +93,16 @@ export class AuthService {
 
     this.userManager.events.addUserSignedOut(() => {
       this.logout();
+    });
+  }
+
+  private loadOidcUser() {
+    this.userManager.getUser().then(user => {
+      if (user && !user.expired) {
+        console.log('User loaded from storage:', user.profile.preferred_username);
+        this.handleUser(user);
+      }
+      this.isInitializedSubject.next(true);
     });
   }
 
@@ -212,14 +229,19 @@ export class AuthService {
       }).subscribe();
     }
     
+    const isMock = localStorage.getItem('mockUser') !== null;
+    localStorage.removeItem('mockUser');
+    
     this.tokenSubject.next(null);
     this.idTokenSubject.next(null);
     this.currentUserSubject.next(null);
     
-    const postLogoutUrl = window.location.origin; // Try standard origin
+    if (isMock) {
+      this.router.navigate(['/login']);
+      return;
+    }
     
-    // We only pass the spec-standard parameters: id_token_hint and post_logout_redirect_uri.
-    // Removing extraQueryParams to avoid conflicting with strict redirect policies.
+    const postLogoutUrl = window.location.origin;
     this.userManager.signoutRedirect({
       id_token_hint: this.idTokenSubject.value || undefined,
       post_logout_redirect_uri: postLogoutUrl
@@ -277,6 +299,22 @@ export class AuthService {
   register(name: string, role: string = 'student'): Observable<CurrentUser> {
     console.warn('register is deprecated for OIDC');
     return throwError(() => new Error('Registration should be handled via University SSO'));
+  }
+
+  loginAsMockStudent(name: string, token: string): Observable<any> {
+    const user: CurrentUser = {
+      id: '00000000-0000-0000-0000-000000000001',
+      name: name,
+      avatar_url: undefined,
+      role: 'student',
+      is_hidden_admin: false
+    };
+    
+    localStorage.setItem('mockUser', JSON.stringify({ user, token }));
+    this.tokenSubject.next(token);
+    this.currentUserSubject.next(user);
+    
+    return this.syncUserWithBackend(user);
   }
 }
 

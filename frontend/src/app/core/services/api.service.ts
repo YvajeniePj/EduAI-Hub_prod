@@ -84,6 +84,22 @@ export class ApiService {
     return this.http.get<any[]>(`${API_URL}/subjects/${subjectId}/progress`);
   }
 
+  enrollInSubject(subjectId: string, payload: { user_name: string }): Observable<any> {
+    return this.http.post<any>(`${API_URL}/subjects/${subjectId}/members`, payload);
+  }
+
+  getSubjectStudents(subjectId: string): Observable<string[]> {
+    return this.http.get<string[]>(`${API_URL}/subjects/${subjectId}/students`);
+  }
+
+  getStudentGroupMappings(subjectId: string): Observable<Record<string, { group_id: string, group_name: string }>> {
+    return this.http.get<Record<string, { group_id: string, group_name: string }>>(`${API_URL}/subjects/${subjectId}/student-group-mappings`);
+  }
+
+  assignStudentToGroup(subjectId: string, userName: string, groupId: string | null): Observable<any> {
+    return this.http.post<any>(`${API_URL}/subjects/${subjectId}/students/${userName}/assign-group`, { group_id: groupId });
+  }
+
   sendMessage(recipient: string, content: string): Observable<any> {
     return this.http.post<any>(`${API_URL}/messages`, { recipient_name: recipient, content });
   }

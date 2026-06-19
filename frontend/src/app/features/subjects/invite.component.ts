@@ -21,15 +21,18 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
   ],
   template: `
     <div class="invite-container">
-      <mat-card class="invite-card" *ngIf="subject && group && !isTeacherOfCourse">
+      <mat-card class="invite-card" *ngIf="subject && !isTeacherOfCourse">
         <mat-card-header>
           <mat-icon mat-card-avatar class="invite-icon">mail_outline</mat-icon>
           <mat-card-title>Приглашение на курс</mat-card-title>
           <mat-card-subtitle>Вас пригласили присоединиться к обучению</mat-card-subtitle>
         </mat-card-header>
         <mat-card-content class="invite-content">
-          <p class="invite-text">
+          <p class="invite-text" *ngIf="group">
             Вы приглашены на курс <strong class="highlight">{{ subject.name }}</strong> в группу <strong class="highlight">{{ group.name }}</strong>.
+          </p>
+          <p class="invite-text" *ngIf="!group">
+            Вы приглашены на курс <strong class="highlight">{{ subject.name }}</strong>.
           </p>
         </mat-card-content>
         <mat-card-actions align="end">
@@ -38,7 +41,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
         </mat-card-actions>
       </mat-card>
 
-      <mat-card class="invite-card" *ngIf="subject && group && isTeacherOfCourse">
+      <mat-card class="invite-card" *ngIf="subject && isTeacherOfCourse">
         <mat-card-header>
           <mat-icon mat-card-avatar class="invite-icon">info</mat-icon>
           <mat-card-title>Управление курсом</mat-card-title>
@@ -48,8 +51,11 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
           <p class="invite-text">
             Вы являетесь преподавателем на курсе <strong class="highlight">{{ subject.name }}</strong>.
           </p>
-          <p class="invite-text" style="margin-top: 8px;">
+          <p class="invite-text" *ngIf="group" style="margin-top: 8px;">
             Эта ссылка предназначена для приглашения учащихся в группу <strong class="highlight">{{ group.name }}</strong>.
+          </p>
+          <p class="invite-text" *ngIf="!group" style="margin-top: 8px;">
+            Эта ссылка предназначена для приглашения учащихся на курс напрямую.
           </p>
         </mat-card-content>
         <mat-card-actions align="end">
@@ -63,7 +69,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
         </mat-card-content>
       </mat-card>
 
-      <mat-card class="invite-card error-card" *ngIf="!loading && (!subject || !group)">
+      <mat-card class="invite-card error-card" *ngIf="!loading && !subject">
         <mat-card-content>
           <p>Не удалось загрузить данные приглашения. Ссылка может быть недействительной.</p>
         </mat-card-content>
@@ -134,7 +140,7 @@ export class InviteComponent implements OnInit {
   ngOnInit(): void {
     this.route.params.subscribe(params => {
       this.subjectId = params['subjectId'];
-      this.groupId = params['groupId'];
+      this.groupId = params['groupId'] || '';
       this.loadDetails();
     });
   }
@@ -143,34 +149,42 @@ export class InviteComponent implements OnInit {
     this.loading = true;
     const currentUser = this.authService.getCurrentUser();
     
-    this.apiService.getGroup(this.groupId).subscribe({
-      next: (group) => {
-        this.group = group;
-        this.apiService.getSubject(this.subjectId).subscribe({
-          next: (subject) => {
-            this.subject = subject;
-            
-            if (currentUser) {
-              this.apiService.getSubjectTeachers(this.subjectId).subscribe({
-                next: (teachers) => {
-                  const teachersList = teachers || [];
-                  this.isTeacherOfCourse = teachersList.some((t: any) => t.user_name === currentUser.name);
-                  this.loading = false;
-                },
-                error: (err) => {
-                  console.error(err);
-                  this.loading = false;
-                }
-              });
-            } else {
+    if (this.groupId) {
+      this.apiService.getGroup(this.groupId).subscribe({
+        next: (group) => {
+          this.group = group;
+          this.loadSubject(currentUser);
+        },
+        error: (err) => {
+          console.error(err);
+          this.loading = false;
+        }
+      });
+    } else {
+      this.loadSubject(currentUser);
+    }
+  }
+
+  loadSubject(currentUser: any): void {
+    this.apiService.getSubject(this.subjectId).subscribe({
+      next: (subject) => {
+        this.subject = subject;
+        
+        if (currentUser) {
+          this.apiService.getSubjectTeachers(this.subjectId).subscribe({
+            next: (teachers) => {
+              const teachersList = teachers || [];
+              this.isTeacherOfCourse = teachersList.some((t: any) => t.user_name === currentUser.name);
+              this.loading = false;
+            },
+            error: (err) => {
+              console.error(err);
               this.loading = false;
             }
-          },
-          error: (err) => {
-            console.error(err);
-            this.loading = false;
-          }
-        });
+          });
+        } else {
+          this.loading = false;
+        }
       },
       error: (err) => {
         console.error(err);
@@ -187,16 +201,29 @@ export class InviteComponent implements OnInit {
       return;
     }
 
-    this.apiService.addGroupMember(this.groupId, { user_name: user.name }).subscribe({
-      next: () => {
-        this.snackBar.open('Вы успешно присоединились к группе!', 'OK', { duration: 3000 });
-        this.router.navigate(['/courses', this.subjectId]);
-      },
-      error: (err) => {
-        console.error(err);
-        this.snackBar.open('Не удалось принять приглашение. Возможно, вы уже состоите в группе.', 'OK', { duration: 5000 });
-      }
-    });
+    if (this.groupId) {
+      this.apiService.addGroupMember(this.groupId, { user_name: user.name }).subscribe({
+        next: () => {
+          this.snackBar.open('Вы успешно присоединились к группе!', 'OK', { duration: 3000 });
+          this.router.navigate(['/courses', this.subjectId]);
+        },
+        error: (err) => {
+          console.error(err);
+          this.snackBar.open('Не удалось принять приглашение. Возможно, вы уже состоите в группе.', 'OK', { duration: 5000 });
+        }
+      });
+    } else {
+      this.apiService.enrollInSubject(this.subjectId, { user_name: user.name }).subscribe({
+        next: () => {
+          this.snackBar.open('Вы успешно присоединились к курсу!', 'OK', { duration: 3000 });
+          this.router.navigate(['/courses', this.subjectId]);
+        },
+        error: (err) => {
+          console.error(err);
+          this.snackBar.open('Не удалось принять приглашение. Возможно, вы уже записаны на этот курс.', 'OK', { duration: 5000 });
+        }
+      });
+    }
   }
 
   decline(): void {

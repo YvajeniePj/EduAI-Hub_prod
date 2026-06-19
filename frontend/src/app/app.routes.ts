@@ -42,6 +42,7 @@ export const routes: Routes = [
   { path: 'streaming', loadComponent: () => import('./features/streaming/stream-list.component').then(m => m.StreamListComponent), canActivate: [authGuard] },
   { path: 'tests', redirectTo: '', pathMatch: 'full' },
   { path: 'invite/subject/:subjectId/group/:groupId', component: InviteComponent, canActivate: [authGuard] },
+  { path: 'invite/subject/:subjectId', component: InviteComponent, canActivate: [authGuard] },
   { path: 'tests/create', component: TestCreateComponent, canActivate: [authGuard] },
   { path: 'tests/edit/:id', component: TestCreateComponent, canActivate: [authGuard] },
   { path: 'tests/:id', component: TestDetailComponent, canActivate: [authGuard] },

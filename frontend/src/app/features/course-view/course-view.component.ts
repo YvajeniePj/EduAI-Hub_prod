@@ -84,6 +84,9 @@ interface TreeNode {
         </div>
         <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
           <ng-container *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+            <button mat-stroked-button (click)="copyCourseInviteLink()" style="height: 36px;">
+              🔗 Приглашение на курс
+            </button>
             <button mat-stroked-button [routerLink]="['/course-builder', subjectId]" style="height: 36px;">
               ⚙️ Конструктор курса
             </button>
@@ -622,13 +625,32 @@ interface TreeNode {
                   <span class="people-count">{{ courseStudents.length }}</span>
                 </div>
                 <div class="people-list">
-                  <div *ngFor="let student of courseStudents" class="person-row">
-                    <div class="person-info">
+                  <div *ngFor="let student of courseStudents" class="person-row" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #f1f3f4;">
+                    <div class="person-info" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                       <img *ngIf="student.avatar_url" [src]="getAvatarUrl(student.avatar_url)" (error)="student.avatar_url = undefined" class="person-avatar" />
                       <div *ngIf="!student.avatar_url" class="person-avatar-placeholder">
                         <mat-icon>person</mat-icon>
                       </div>
-                      <span class="person-name">{{ student.name }}</span>
+                      <span class="person-name" style="font-weight: 500;">{{ student.name }}</span>
+                      
+                      <!-- Group status for non-teachers -->
+                      <span *ngIf="!(currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin')" 
+                            style="font-size: 13px; color: #5f6368; background-color: #f1f3f4; padding: 2px 8px; border-radius: 12px; margin-left: 12px;">
+                        Группа: {{ studentGroupMappings[student.name]?.group_name || 'Без группы' }}
+                      </span>
+                      
+                      <!-- Teacher group assignment dropdown -->
+                      <div *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'" 
+                           style="margin-left: 12px; display: flex; align-items: center; gap: 4px;">
+                        <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width: 160px; font-size: 13px;">
+                          <mat-select [value]="studentGroupMappings[student.name]?.group_id || ''" 
+                                      (selectionChange)="onGroupSelectedForStudent(student.name, $event.value)"
+                                      placeholder="Без группы">
+                            <mat-option value="">Без группы</mat-option>
+                            <mat-option *ngFor="let g of groups" [value]="g.id">{{ g.name }}</mat-option>
+                          </mat-select>
+                        </mat-form-field>
+                      </div>
                     </div>
                     <div class="person-actions">
                       <button mat-icon-button (click)="startChatWith(student.name)" title="Начать чат" *ngIf="student.name !== currentUser?.name">
@@ -1928,6 +1950,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   courseTeachers: any[] = [];
   suggestedTeachers: any[] = [];
   courseStudents: any[] = [];
+  studentGroupMappings: Record<string, { group_id: string, group_name: string }> = {};
   courseDescription: string = '';
 
   // Submissions grading tab properties
@@ -2837,8 +2860,26 @@ export class CourseViewComponent implements OnInit, OnDestroy {
                 avatar_url: matchingUser ? matchingUser.avatar_url : undefined
               };
             });
-            this.courseStudents = users.filter((u: any) => u.role === 'student');
-            this.cdr.markForCheck();
+
+            this.apiService.getSubjectStudents(this.subjectId).subscribe({
+              next: (enrolledUsernames) => {
+                this.apiService.getStudentGroupMappings(this.subjectId).subscribe({
+                  next: (mappings) => {
+                    this.studentGroupMappings = mappings || {};
+                    this.courseStudents = users.filter((u: any) => u.role === 'student' && enrolledUsernames.includes(u.name));
+                    this.cdr.markForCheck();
+                  },
+                  error: () => {
+                    this.courseStudents = users.filter((u: any) => u.role === 'student' && enrolledUsernames.includes(u.name));
+                    this.cdr.markForCheck();
+                  }
+                });
+              },
+              error: () => {
+                this.courseStudents = [];
+                this.cdr.markForCheck();
+              }
+            });
           },
           error: (err) => {
             console.error('Error loading users:', err);
@@ -2854,6 +2895,30 @@ export class CourseViewComponent implements OnInit, OnDestroy {
       error: (err) => {
         console.error('Error loading subject teachers:', err);
       }
+    });
+  }
+
+  onGroupSelectedForStudent(studentName: string, groupId: string) {
+    const targetGroupId = groupId ? groupId : null;
+    this.apiService.assignStudentToGroup(this.subjectId, studentName, targetGroupId).subscribe({
+      next: () => {
+        this.snackBar.open('Группа студента успешно обновлена!', 'OK', { duration: 3000 });
+        this.loadParticipants();
+      },
+      error: (err) => {
+        console.error('Error assigning group for student:', err);
+        this.snackBar.open('Не удалось обновить группу студента.', 'OK', { duration: 3000 });
+      }
+    });
+  }
+
+  copyCourseInviteLink() {
+    const inviteUrl = window.location.origin + '/invite/subject/' + this.subjectId;
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      this.snackBar.open('Ссылка для вступления на курс скопирована в буфер обмена!', 'OK', { duration: 3000 });
+    }).catch(err => {
+      console.error('Could not copy text: ', err);
+      this.snackBar.open('Не удалось скопировать ссылку в буфер обмена.', 'OK', { duration: 3000 });
     });
   }
 
@@ -3038,6 +3103,7 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    MatCardModule,
     ReactiveFormsModule
   ],
   template: `
@@ -3068,6 +3134,60 @@ export class CourseViewComponent implements OnInit, OnDestroy {
           <mat-icon>arrow_back</mat-icon> К списку работ
         </button>
         
+        <h3 style="margin-top: 16px;">Содержимое работы #{{ selectedSubmission.id.substring(0, 8) }}</h3>
+        
+        <mat-card style="margin-bottom: 24px; padding: 16px;">
+          <mat-card-content>
+            <div *ngFor="let ans of selectedSubmission.answers; let idx = index" style="margin-bottom: 16px;">
+              <div style="font-weight: 500; color: #5f6368; font-size: 13px; margin-bottom: 4px;">Ответ на вопрос #{{ idx + 1 }}:</div>
+              
+              <!-- If JSON structure -->
+              <div *ngIf="isJsonAnswer(ans.answer)" style="display: flex; flex-direction: column; gap: 8px;">
+                <div *ngIf="parseJsonAnswer(ans.answer).text" style="white-space: pre-wrap; font-size: 15px;">
+                  {{ parseJsonAnswer(ans.answer).text }}
+                </div>
+                <div *ngIf="parseJsonAnswer(ans.answer).external_link">
+                  <strong>🔗 Ссылка на проект:</strong>
+                  <a [href]="parseJsonAnswer(ans.answer).external_link" target="_blank" style="color: #1a73e8; margin-left: 8px; font-weight: 500;">
+                    {{ parseJsonAnswer(ans.answer).external_link }}
+                  </a>
+                </div>
+                <div *ngIf="parseJsonAnswer(ans.answer).video_link" style="margin-top: 8px;">
+                  <strong>🎥 Видео-презентация:</strong>
+                  <div class="video-container" style="margin-top: 4px; max-width: 500px;">
+                    <iframe 
+                      [src]="getSafeUrl(parseJsonAnswer(ans.answer).video_link)" 
+                      frameborder="0" 
+                      allowfullscreen 
+                      style="width: 100%; height: 280px; border-radius: 8px;">
+                    </iframe>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- If regular text -->
+              <div *ngIf="!isJsonAnswer(ans.answer)" style="white-space: pre-wrap; font-size: 15px;">
+                {{ ans.answer || 'Текстовый ответ пустой' }}
+              </div>
+            </div>
+            
+            <!-- Files section -->
+            <div *ngIf="selectedSubmission.files && selectedSubmission.files.length > 0" style="margin-top: 16px;">
+              <div style="font-weight: 500; color: #5f6368; font-size: 13px; margin-bottom: 8px;">Прикрепленные файлы ({{ selectedSubmission.files.length }}):</div>
+              <div *ngFor="let file of selectedSubmission.files" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: #f8f9fa; border-radius: 6px; margin-bottom: 6px;">
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                  <mat-icon style="color: #5f6368;">insert_drive_file</mat-icon>
+                  <span>{{ file.original_name }}</span>
+                  <span style="color: #70757a; font-size: 12px;">({{ (file.size / 1024).toFixed(1) }} KB)</span>
+                </div>
+                <a mat-stroked-button color="primary" [href]="'/api/submissions/' + selectedSubmission.id + '/files/' + file.id + '/download'" target="_blank">
+                  Скачать
+                </a>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+
         <h3>Оценка работы</h3>
         
         <form [formGroup]="reviewForm" (ngSubmit)="submitReview()" class="review-form">
@@ -3174,7 +3294,8 @@ export class PeerReviewDialogComponent implements OnInit {
     private dialogRef: MatDialogRef<PeerReviewDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: { testId: string; currentUser: string },
     private apiService: ApiService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private sanitizer: DomSanitizer
   ) {
     this.reviewForm = this.fb.group({
       relevance: [5, [Validators.required, Validators.min(1), Validators.max(5)]],
@@ -3235,5 +3356,40 @@ export class PeerReviewDialogComponent implements OnInit {
         this.submitting = false;
       }
     });
+  }
+
+  isJsonAnswer(answer: string): boolean {
+    if (!answer) return false;
+    try {
+      const parsed = JSON.parse(answer);
+      return typeof parsed === 'object' && parsed !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  parseJsonAnswer(answer: string): any {
+    try {
+      return JSON.parse(answer);
+    } catch {
+      return {};
+    }
+  }
+
+  getSafeUrl(url: string): SafeResourceUrl {
+    let embedUrl = '';
+    if (url.includes('youtube.com/watch') || url.includes('youtube.com/embed/')) {
+      const videoId = url.includes('v=') ? url.split('v=')[1]?.split('&')[0] : url.split('embed/')[1]?.split('?')[0];
+      embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`;
+    } else if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+      embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`;
+    } else if (url.includes('rutube.ru/video/')) {
+      const videoId = url.split('rutube.ru/video/')[1]?.split('/')[0];
+      embedUrl = `https://rutube.ru/play/embed/${videoId}`;
+    } else {
+      embedUrl = url;
+    }
+    return this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
   }
 }

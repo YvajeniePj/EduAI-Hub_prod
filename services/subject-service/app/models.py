@@ -26,6 +26,7 @@ class Subject(Base):
     groups = relationship("Group", back_populates="subject", cascade="all, delete-orphan")
     modules = relationship("CourseModule", back_populates="subject", cascade="all, delete-orphan", order_by="CourseModule.order_index")
     teachers = relationship("SubjectTeacher", back_populates="subject", cascade="all, delete-orphan")
+    members = relationship("SubjectMember", back_populates="subject", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Subject(id={self.id}, name={self.name})>"
@@ -196,5 +197,24 @@ class LessonProgress(Base):
 
     def __repr__(self):
         return f"<LessonProgress(id={self.id}, subject_id={self.subject_id}, lesson_id={self.lesson_id}, user_name={self.user_name})>"
+
+
+class SubjectMember(Base):
+    __tablename__ = "subject_members"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    user_name = Column(String, nullable=False)
+    joined_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    subject = relationship("Subject", back_populates="members")
+
+    __table_args__ = (
+        UniqueConstraint('subject_id', 'user_name', name='_subject_user_uc'),
+    )
+
+    def __repr__(self):
+        return f"<SubjectMember(id={self.id}, subject_id={self.subject_id}, user_name={self.user_name})>"
+
 
 

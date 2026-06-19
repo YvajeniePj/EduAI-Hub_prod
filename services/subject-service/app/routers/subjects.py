@@ -1,7 +1,7 @@
 """
 Subject router - CRUD operations for subjects
 """
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Header, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Header, BackgroundTasks, Body
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -14,7 +14,7 @@ import httpx
 import logging
 
 from app.database import get_db
-from app.models import Subject, CourseModule, CourseLesson, CourseContent, SubjectTeacher, Group, GroupMember, LessonProgress
+from app.models import Subject, CourseModule, CourseLesson, CourseContent, SubjectTeacher, Group, GroupMember, LessonProgress, SubjectMember
 from app.schemas import SubjectCreate, SubjectResponse, SubjectTeacherCreate, SubjectTeacherResponse
 
 router = APIRouter()
@@ -58,7 +58,10 @@ async def get_subjects(user_name: Optional[str] = None, role: Optional[str] = No
         return db.query(Subject).join(SubjectTeacher).filter(SubjectTeacher.user_name == user_name).all()
         
     if role == "student":
-        return db.query(Subject).join(Group).join(GroupMember).filter(GroupMember.user_name == user_name).all()
+        subjects_via_groups = db.query(Subject).join(Group).join(GroupMember).filter(GroupMember.user_name == user_name).all()
+        subjects_via_members = db.query(Subject).join(SubjectMember).filter(SubjectMember.user_name == user_name).all()
+        combined = {s.id: s for s in subjects_via_groups + subjects_via_members}
+        return list(combined.values())
         
     return []
 
@@ -444,3 +447,84 @@ async def get_subject_progress(
     ).all()
 
     return [record.lesson_id for record in records]
+
+
+@router.post("/{subject_id}/members", status_code=201)
+async def enroll_in_subject(subject_id: UUID, body: dict = Body(...), db: Session = Depends(get_db)):
+    """Enroll a student directly in a subject without a group"""
+    user_name = body.get("user_name")
+    if not user_name:
+        raise HTTPException(status_code=400, detail="user_name is required")
+    
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+        
+    existing = db.query(SubjectMember).filter(
+        SubjectMember.subject_id == subject_id,
+        SubjectMember.user_name == user_name
+    ).first()
+    if existing:
+        return {"message": "Already enrolled in this subject"}
+        
+    db_member = SubjectMember(subject_id=subject_id, user_name=user_name)
+    db.add(db_member)
+    db.commit()
+    return {"message": "Successfully enrolled in subject"}
+
+
+@router.get("/{subject_id}/students", response_model=List[str])
+async def get_subject_students(subject_id: UUID, db: Session = Depends(get_db)):
+    """Get all student usernames enrolled in this subject (either directly or via group)"""
+    via_groups = db.query(GroupMember.user_name).join(Group).filter(Group.subject_id == subject_id).distinct().all()
+    directly = db.query(SubjectMember.user_name).filter(SubjectMember.subject_id == subject_id).distinct().all()
+    
+    usernames = set([r[0] for r in via_groups] + [r[0] for r in directly])
+    return list(usernames)
+
+
+@router.get("/{subject_id}/student-group-mappings")
+async def get_student_group_mappings(subject_id: UUID, db: Session = Depends(get_db)):
+    """Get group mappings for all students in this subject"""
+    groups = db.query(Group).filter(Group.subject_id == subject_id).all()
+    group_map = {g.id: g.name for g in groups}
+    
+    if not group_map:
+        return {}
+        
+    members = db.query(GroupMember).filter(GroupMember.group_id.in_(list(group_map.keys()))).all()
+    
+    mapping = {}
+    for m in members:
+        mapping[m.user_name] = {
+            "group_id": str(m.group_id),
+            "group_name": group_map[m.group_id]
+        }
+    return mapping
+
+
+@router.post("/{subject_id}/students/{user_name}/assign-group")
+async def assign_student_to_group(subject_id: UUID, user_name: str, body: dict = Body(...), db: Session = Depends(get_db)):
+    """Assign or re-assign student to a group within a subject, or remove from all groups if group_id is null"""
+    group_id = body.get("group_id")
+    
+    subject_groups = db.query(Group).filter(Group.subject_id == subject_id).all()
+    subject_group_ids = [g.id for g in subject_groups]
+    
+    if subject_group_ids:
+        db.query(GroupMember).filter(
+            GroupMember.group_id.in_(subject_group_ids),
+            GroupMember.user_name == user_name
+        ).delete(synchronize_session=False)
+        
+    if group_id:
+        group = db.query(Group).filter(Group.id == group_id, Group.subject_id == subject_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found in this subject")
+            
+        new_member = GroupMember(group_id=group_id, user_name=user_name)
+        db.add(new_member)
+        
+    db.commit()
+    return {"message": "Group assignment updated successfully"}
+

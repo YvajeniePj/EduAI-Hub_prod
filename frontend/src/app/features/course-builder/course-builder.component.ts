@@ -1123,7 +1123,7 @@ export class InputDialogComponent {
   template: `
     <h2 mat-dialog-title>Загрузить материал</h2>
     <mat-dialog-content>
-      <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none" accept=".pdf,.doc,.docx,.txt">
+      <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none">
       <button mat-raised-button (click)="fileInput.click()" [disabled]="uploading">
         <mat-icon>attach_file</mat-icon>
         Выбрать файл

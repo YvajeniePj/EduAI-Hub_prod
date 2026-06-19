@@ -33,6 +33,10 @@ import { AuthService } from '../../core/services/auth.service';
             <span *ngIf="!loading">Войти через SSO ИТМО</span>
             <span *ngIf="loading">Перенаправление...</span>
           </button>
+
+          <button mat-stroked-button color="accent" class="mock-button" (click)="loginAsGena()" [disabled]="loading" style="margin-top: 12px; width: 100%; height: 50px; font-size: 16px; font-weight: 500; border-radius: 8px;">
+            <span>Войти как Тестик Гена</span>
+          </button>
         </mat-card-content>
         
         <mat-card-footer>
@@ -132,6 +136,21 @@ export class LoginComponent implements OnInit {
       this.loading = false;
       console.error('SSO Redirect error:', err);
       alert('Не удалось перенаправить на систему входа. Проверьте соединение.');
+    });
+  }
+
+  loginAsGena() {
+    this.loading = true;
+    this.auth.loginAsMockStudent('Тестик Гена', 'mock-token-test-gena').subscribe({
+      next: () => {
+        const targetUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
+        this.router.navigateByUrl(targetUrl);
+      },
+      error: (err) => {
+        this.loading = false;
+        console.error('Mock login failed:', err);
+        alert('Не удалось выполнить тестовый вход.');
+      }
     });
   }
 }

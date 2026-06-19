@@ -90,6 +90,14 @@ async def get_jwks():
 
 async def verify_jwt_token_keycloak(token: str) -> Optional[dict]:
     """Verify JWT token using Keycloak JWKS and return user data"""
+    if token == "mock-token-test-gena":
+        return {
+            "sub": "00000000-0000-0000-0000-000000000001",
+            "preferred_username": "test_gena",
+            "email": "gena@eduaihub.ru",
+            "name": "Тестик Гена",
+            "realm_access": {"roles": ["student"]}
+        }
     try:
         jwks = await get_jwks()
         unverified_header = jwt.get_unverified_header(token)
@@ -446,6 +454,51 @@ async def get_subject_progress_proxy(
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to fetch lesson progress")
     return data
+
+
+@app.post("/subjects/{subject_id}/members")
+async def enroll_in_subject_proxy(subject_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    """Proxy enrolling in a subject to subject-service"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    body = await request.json()
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}/members", "POST", body)
+    if status not in [200, 201]:
+        raise HTTPException(status_code=status, detail=error or "Failed to enroll in subject")
+    return data
+
+
+@app.get("/subjects/{subject_id}/students")
+async def get_subject_students_proxy(subject_id: str, current_user: dict = Depends(get_current_user)):
+    """Proxy getting subject students to subject-service"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}/students", "GET")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to get subject students")
+    return data
+
+
+@app.get("/subjects/{subject_id}/student-group-mappings")
+async def get_student_group_mappings_proxy(subject_id: str, current_user: dict = Depends(get_current_user)):
+    """Proxy getting student group mappings to subject-service"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}/student-group-mappings", "GET")
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to get student group mappings")
+    return data
+
+
+@app.post("/subjects/{subject_id}/students/{user_name}/assign-group")
+async def assign_student_to_group_proxy(subject_id: str, user_name: str, request: Request, current_user: dict = Depends(get_current_teacher)):
+    """Proxy group assignment to subject-service (teacher-only)"""
+    body = await request.json()
+    data, status, error = await proxy_request(SUBJECT_SERVICE_URL, f"/subjects/{subject_id}/students/{user_name}/assign-group", "POST", body)
+    if status not in [200, 201]:
+        raise HTTPException(status_code=status, detail=error or "Failed to assign student to group")
+    return data
+
 
 
 @app.put("/subjects/{subject_id}")
