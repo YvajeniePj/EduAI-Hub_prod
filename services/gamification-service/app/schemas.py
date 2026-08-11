@@ -31,4 +31,12 @@ class LeaderboardEntry(BaseModel):
     rank: int
     user: str
     points: int
+    streak_days: Optional[int] = 0
+
+
+class StreakResponse(BaseModel):
+    user: str
+    streak_days: int
+    bonus_xp: int
+    achievement_unlocked: Optional[str] = None
 

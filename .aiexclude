@@ -1,0 +1,25 @@
+# AI Context Exclusion File for EduAI-Hub
+# Exclude build artifacts, lockfiles, and dependencies to save context tokens
+
+# Node & Angular Build Outputs
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/package-lock.json
+
+# Python Virtual Envs & Cache
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.venv/
+**/venv/
+
+# Logs & Temporary Files
+**/*.log
+**/logs/
+**/tmp/
+**/.DS_Store
+
+# Static Big Media / Database Dumps (unless requested)
+database/*.dump
+database/*.sql.bak
