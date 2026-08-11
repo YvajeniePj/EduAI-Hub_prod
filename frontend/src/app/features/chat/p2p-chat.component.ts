@@ -585,13 +585,36 @@ export class P2pChatComponent implements OnInit, OnDestroy {
       });
     });
 
-    // Start background polling every 3 seconds
-    this.pollingSub = interval(3000).subscribe(() => {
+    // Connect WebSocket for instant real-time message delivery
+    this.connectWebSocket();
+
+    // Start background polling every 2 seconds as fallback
+    this.pollingSub = interval(2000).subscribe(() => {
       this.pollUpdates();
     });
   }
 
+  private socket?: WebSocket;
+
+  private connectWebSocket() {
+    if (!this.currentUser?.name) return;
+    try {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/chat?user=${encodeURIComponent(this.currentUser.name)}`;
+      this.socket = new WebSocket(wsUrl);
+      this.socket.onmessage = () => {
+        this.pollUpdates();
+      };
+      this.socket.onerror = () => {};
+    } catch (e) {
+      console.log('WebSocket fallback to HTTP polling active');
+    }
+  }
+
   ngOnDestroy() {
+    if (this.socket) {
+      try { this.socket.close(); } catch (e) {}
+    }
     if (this.pollingSub) this.pollingSub.unsubscribe();
     if (this.routeParamSub) this.routeParamSub.unsubscribe();
   }

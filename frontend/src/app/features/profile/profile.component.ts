@@ -94,9 +94,9 @@ import { HttpEventType } from '@angular/common/http';
               Проверить уведомления
             </button>
 
-            <button mat-raised-button *ngIf="isOwnProfile && (user?.is_hidden_admin || user?.role === 'admin')" color="warn" class="invisibility-toggle-button" (click)="toggleInvisibility()" style="margin-left: 8px;">
-              <mat-icon>{{ user?.is_hidden_admin ? 'visibility_off' : 'visibility' }}</mat-icon>
-              {{ user?.is_hidden_admin ? 'Отключить невидимость' : 'Включить невидимость' }}
+            <button mat-raised-button *ngIf="isOwnProfile && user && (user.is_hidden_admin || user.role === 'admin')" color="warn" class="invisibility-toggle-button" (click)="toggleInvisibility()" style="margin-left: 8px;">
+              <mat-icon>{{ user.is_hidden_admin ? 'visibility_off' : 'visibility' }}</mat-icon>
+              {{ user.is_hidden_admin ? 'Отключить невидимость' : 'Включить невидимость' }}
             </button>
 
             

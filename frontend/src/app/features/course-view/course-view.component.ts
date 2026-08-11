@@ -636,14 +636,14 @@ interface TreeNode {
                       <!-- Group status for non-teachers -->
                       <span *ngIf="!(currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin')" 
                             style="font-size: 13px; color: #5f6368; background-color: #f1f3f4; padding: 2px 8px; border-radius: 12px; margin-left: 12px;">
-                        Группа: {{ studentGroupMappings[student.name]?.group_name || 'Без группы' }}
+                        Группа: {{ (studentGroupMappings && studentGroupMappings[student.name]) ? studentGroupMappings[student.name].group_name : 'Без группы' }}
                       </span>
                       
                       <!-- Teacher group assignment dropdown -->
                       <div *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'" 
                            style="margin-left: 12px; display: flex; align-items: center; gap: 4px;">
                         <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width: 160px; font-size: 13px;">
-                          <mat-select [value]="studentGroupMappings[student.name]?.group_id || ''" 
+                          <mat-select [value]="(studentGroupMappings && studentGroupMappings[student.name]) ? studentGroupMappings[student.name].group_id : ''" 
                                       (selectionChange)="onGroupSelectedForStudent(student.name, $event.value)"
                                       placeholder="Без группы">
                             <mat-option value="">Без группы</mat-option>
