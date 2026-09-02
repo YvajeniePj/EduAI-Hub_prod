@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import asyncio
 import httpx
 from typing import List, Dict, Any, Optional, AsyncGenerator
 
@@ -31,11 +32,11 @@ async def check_connection() -> bool:
 async def chat_completion(
     messages: List[Dict[str, str]], 
     temperature: float = 0.2, 
-    max_tokens: int = 8000,
+    max_tokens: int = 4000,
     response_format: Optional[str] = None
 ) -> Optional[str]:
     """
-    Simple completion (drop-in replacement for gigachat_client.chat_completion).
+    Simple completion with retry on transient network errors.
     """
     payload = {
         "model": OLLAMA_MODEL,
@@ -49,15 +50,24 @@ async def chat_completion(
     if response_format:
         payload["format"] = response_format
     
-    try:
-        async with httpx.AsyncClient(timeout=600.0, headers=DEFAULT_HEADERS) as client:
-            response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
-            response.raise_for_status()
-            data = response.json()
-            return data.get("message", {}).get("content")
-    except Exception as e:
-        logger.error(f"Error in Ollama chat_completion: {e}")
-        return None
+    last_error = None
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=600.0, headers=DEFAULT_HEADERS) as client:
+                response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
+                response.raise_for_status()
+                data = response.json()
+                content = data.get("message", {}).get("content")
+                if content:
+                    return content
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Ollama chat_completion attempt {attempt+1} failed: {e}")
+            if attempt == 0:
+                await asyncio.sleep(2)
+    
+    logger.error(f"Error in Ollama chat_completion after retries: {last_error}")
+    return None
 
 async def chat_completion_with_tools(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], temperature: float = 0.2) -> Dict[str, Any]:
     """
