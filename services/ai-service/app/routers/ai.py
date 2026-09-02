@@ -413,7 +413,7 @@ async def generate_test(request: GenerateTestRequest):
                         material_data = response.json()
                         material_text = material_data.get("text", "")
                         if material_text and not material_text.startswith("Error"):
-                            materials_text += f"\n\n--- Материал {material_id} ---\n{material_text[:6000]}"  # Up to 6000 chars of body
+                            materials_text += f"\n\n--- Материал {material_id} ---\n{material_text[:3500]}"  # Up to 3500 chars of clean body
                             material_ids_list.append(material_id)
                 except Exception as e:
                     logger.warning(f"Failed to fetch material {material_id}: {e}")

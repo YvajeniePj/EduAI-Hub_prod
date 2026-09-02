@@ -32,16 +32,16 @@ async def check_connection() -> bool:
 async def chat_completion(
     messages: List[Dict[str, str]], 
     temperature: float = 0.2, 
-    max_tokens: int = 4000,
+    max_tokens: int = 3500,
     response_format: Optional[str] = None
 ) -> Optional[str]:
     """
-    Simple completion with retry on transient network errors.
+    Simple completion using active streaming socket reading to prevent idle tunnel dropouts.
     """
     payload = {
         "model": OLLAMA_MODEL,
         "messages": messages,
-        "stream": False,
+        "stream": True,
         "options": {
             "temperature": temperature,
             "num_predict": max_tokens
@@ -53,13 +53,21 @@ async def chat_completion(
     last_error = None
     for attempt in range(2):
         try:
+            chunks = []
             async with httpx.AsyncClient(timeout=600.0, headers=DEFAULT_HEADERS) as client:
-                response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
-                response.raise_for_status()
-                data = response.json()
-                content = data.get("message", {}).get("content")
-                if content:
-                    return content
+                async with client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if line:
+                            try:
+                                d = json.loads(line)
+                                c = d.get("message", {}).get("content", "")
+                                if c:
+                                    chunks.append(c)
+                            except Exception:
+                                pass
+            if chunks:
+                return "".join(chunks)
         except Exception as e:
             last_error = e
             logger.warning(f"Ollama chat_completion attempt {attempt+1} failed: {e}")

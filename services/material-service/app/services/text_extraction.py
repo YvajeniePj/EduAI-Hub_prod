@@ -95,7 +95,7 @@ def extract_text_from_file(file_path: str, mime_type: str) -> str:
                 try:
                     with open(file_path, 'r', encoding=encoding) as file:
                         raw = file.read()
-                        if file_path.lower().endswith(('.tex', '.latex')):
+                        if file_path.lower().endswith(('.tex', '.latex')) or '\\documentclass' in raw or '\\begin{document}' in raw or '\\section' in raw:
                             return clean_latex_text(raw)
                         return raw.strip()
                 except UnicodeDecodeError:
@@ -110,6 +110,8 @@ def extract_text_from_file(file_path: str, mime_type: str) -> str:
                     with open(file_path, 'r', encoding=encoding) as file:
                         content = file.read().strip()
                         if content:
+                            if '\\documentclass' in content or '\\begin{document}' in content or '\\section' in content:
+                                return clean_latex_text(content)
                             return content
                 except Exception:
                     continue
