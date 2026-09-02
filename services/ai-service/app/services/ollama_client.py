@@ -28,7 +28,12 @@ async def check_connection() -> bool:
         logger.error(f"Failed to connect to Ollama at {OLLAMA_BASE_URL}: {e}")
         return False
 
-async def chat_completion(messages: List[Dict[str, str]], temperature: float = 0.2, max_tokens: int = 1000) -> Optional[str]:
+async def chat_completion(
+    messages: List[Dict[str, str]], 
+    temperature: float = 0.2, 
+    max_tokens: int = 3000,
+    response_format: Optional[str] = None
+) -> Optional[str]:
     """
     Simple completion (drop-in replacement for gigachat_client.chat_completion).
     """
@@ -41,6 +46,8 @@ async def chat_completion(messages: List[Dict[str, str]], temperature: float = 0
             "num_predict": max_tokens
         }
     }
+    if response_format:
+        payload["format"] = response_format
     
     try:
         async with httpx.AsyncClient(timeout=120.0, headers=DEFAULT_HEADERS) as client:
