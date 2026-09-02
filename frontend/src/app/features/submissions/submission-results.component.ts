@@ -1040,7 +1040,13 @@ export class SubmissionResultsComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.isTeacher = this.auth.getCurrentUser()?.role === 'teacher';
+    const u = this.auth.getCurrentUser();
+    const role = u?.role;
+    this.isTeacher = role === 'teacher' || role === 'instructor' || role === 'admin' || u?.is_hidden_admin === true;
+    this.auth.currentUser$.subscribe(user => {
+      const r = user?.role;
+      this.isTeacher = r === 'teacher' || r === 'instructor' || r === 'admin' || user?.is_hidden_admin === true;
+    });
     this.source = this.route.snapshot.queryParamMap.get('source');
     const submissionId = this.route.snapshot.paramMap.get('id');
     if (submissionId) {

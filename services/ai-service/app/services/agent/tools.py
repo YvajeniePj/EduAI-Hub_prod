@@ -77,19 +77,20 @@ TOOL_DECLARATIONS: List[Dict[str, Any]] = [
         "function": {
             "name": "get_course_progress",
             "description": (
-                "Получить прогресс текущего студента по конкретному курсу. "
-                "Показывает количество просмотренных уроков и общее число уроков. "
-                "Используй когда студент спрашивает о своём прогрессе."
+                "Получить прогресс обучения текущего пользователя. "
+                "Если указан subject_id — возвращает прогресс по конкретному курсу, "
+                "если subject_id не указан — возвращает прогресс по ВСЕМ доступным курсам (пройдено уроков, всего уроков, процент). "
+                "ОБЯЗАТЕЛЬНО используй при любых вопросах о прогрессе, пройденных уроках или завершении курсов."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "subject_id": {
                         "type": "string",
-                        "description": "UUID идентификатор курса (предмета)"
+                        "description": "UUID идентификатор курса (опционально)"
                     }
                 },
-                "required": ["subject_id"]
+                "required": []
             }
         }
     },
@@ -187,10 +188,10 @@ def get_tool_declarations_for_role(role: str) -> List[Dict[str, Any]]:
 #  Tool Implementations
 # ============================================================================
 
-async def _http_get(url: str, params: Optional[Dict] = None) -> Any:
+async def _http_get(url: str, params: Optional[Dict] = None, headers: Optional[Dict] = None) -> Any:
     """Helper: perform a GET request to a microservice and return JSON."""
     async with httpx.AsyncClient(timeout=TOOL_HTTP_TIMEOUT) as client:
-        response = await client.get(url, params=params)
+        response = await client.get(url, params=params, headers=headers)
         response.raise_for_status()
         return response.json()
 
@@ -228,16 +229,82 @@ async def _execute_get_course_details(params: Dict, username: str, role: str) ->
 
 
 async def _execute_get_course_progress(params: Dict, username: str, role: str) -> Any:
-    """Get student progress for a specific course."""
+    """Get student progress for a specific course or across all available courses."""
+    from urllib.parse import quote
+    user = params.get("_forced_username") or username
+    auth_headers = {"X-User-Name": quote(user)}
     subject_id = params.get("subject_id")
-    if not subject_id:
-        return {"error": "subject_id is required"}
 
-    progress = await _http_get(
-        f"{SUBJECT_SERVICE_URL}/subjects/{subject_id}/progress",
-        params={"user_name": username}
-    )
-    return progress
+    if subject_id:
+        total_lessons = 0
+        try:
+            structure = await _http_get(f"{SUBJECT_SERVICE_URL}/subjects/{subject_id}/structure")
+            if isinstance(structure, dict):
+                for mod in structure.get("modules", []):
+                    total_lessons += len(mod.get("lessons", []))
+        except Exception:
+            total_lessons = 0
+
+        completed_count = 0
+        try:
+            viewed = await _http_get(
+                f"{SUBJECT_SERVICE_URL}/subjects/{subject_id}/progress",
+                headers=auth_headers
+            )
+            completed_count = len(viewed) if isinstance(viewed, list) else 0
+        except Exception:
+            completed_count = 0
+
+        percent = round(completed_count / total_lessons * 100) if total_lessons > 0 else 0
+        return {
+            "subject_id": subject_id,
+            "completed_lessons": completed_count,
+            "total_lessons": total_lessons,
+            "progress_percent": percent,
+            "status": "not_started" if completed_count == 0 else ("completed" if completed_count >= total_lessons and total_lessons > 0 else "in_progress")
+        }
+
+    # If no subject_id specified: fetch all courses and return progress for each
+    courses = await _http_get(f"{SUBJECT_SERVICE_URL}/subjects", params={"user_name": user, "role": role})
+    if not isinstance(courses, list) or not courses:
+        return {"courses_progress": [], "message": "На платформе пока нет курсов"}
+
+    results = []
+    for c in courses[:MAX_RESULT_ROWS]:
+        cid = c.get("id")
+        cname = c.get("name", "")
+        if not cid:
+            continue
+
+        total_lessons = 0
+        try:
+            structure = await _http_get(f"{SUBJECT_SERVICE_URL}/subjects/{cid}/structure")
+            if isinstance(structure, dict):
+                for mod in structure.get("modules", []):
+                    total_lessons += len(mod.get("lessons", []))
+        except Exception:
+            total_lessons = 0
+
+        completed_count = 0
+        try:
+            viewed = await _http_get(
+                f"{SUBJECT_SERVICE_URL}/subjects/{cid}/progress",
+                headers=auth_headers
+            )
+            completed_count = len(viewed) if isinstance(viewed, list) else 0
+        except Exception:
+            completed_count = 0
+
+        percent = round(completed_count / total_lessons * 100) if total_lessons > 0 else 0
+        results.append({
+            "course_name": cname,
+            "subject_id": cid,
+            "completed_lessons": completed_count,
+            "total_lessons": total_lessons,
+            "progress_percent": percent
+        })
+
+    return results
 
 
 async def _execute_list_tests(params: Dict, username: str, role: str) -> Any:

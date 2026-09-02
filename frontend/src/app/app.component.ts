@@ -714,6 +714,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
       try {
         const timerData = JSON.parse(timerDataStr);
+        if (!timerData || !timerData.startTime || typeof timerData.timeLimitMinutes !== 'number') {
+          this.activeTestTimer = null;
+          localStorage.removeItem('active_test_timer');
+          return;
+        }
         const startTime = new Date(timerData.startTime);
         const timeLimitMinutes = timerData.timeLimitMinutes;
         const endTime = new Date(startTime.getTime() + timeLimitMinutes * 60 * 1000);
