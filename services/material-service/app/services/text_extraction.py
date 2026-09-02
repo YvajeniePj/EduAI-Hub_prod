@@ -53,8 +53,16 @@ def extract_text_from_file(file_path: str, mime_type: str) -> str:
             except Exception as pptx_error:
                 return f"Error extracting text from PPTX: {str(pptx_error)}"
         
-        elif mime_type == "text/plain" or file_path.lower().endswith('.txt'):
-            # Try different encodings for TXT files
+        elif (
+            mime_type.startswith("text/")
+            or mime_type in ["application/x-tex", "application/x-latex", "application/json", "application/xml", "application/javascript"]
+            or any(file_path.lower().endswith(ext) for ext in [
+                '.txt', '.tex', '.latex', '.md', '.markdown', '.py', '.js', '.ts', 
+                '.html', '.htm', '.css', '.json', '.csv', '.xml', '.yaml', '.yml', 
+                '.rtf', '.rst', '.c', '.cpp', '.h', '.java', '.sql', '.sh'
+            ])
+        ):
+            # Try different encodings for text and source files
             encodings = ['utf-8', 'cp1251', 'latin1', 'utf-16']
             for encoding in encodings:
                 try:
@@ -65,6 +73,16 @@ def extract_text_from_file(file_path: str, mime_type: str) -> str:
             return "Error: could not determine text file encoding"
         
         else:
+            # Last fallback: attempt reading as plain text
+            encodings = ['utf-8', 'cp1251', 'latin1']
+            for encoding in encodings:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as file:
+                        content = file.read().strip()
+                        if content:
+                            return content
+                except Exception:
+                    continue
             return f"File format {mime_type} is not supported for text extraction"
     
     except Exception as e:
