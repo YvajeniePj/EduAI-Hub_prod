@@ -364,104 +364,49 @@ async def generate_test(request: GenerateTestRequest):
                     continue
         
         if not materials_text.strip():
-            if request.title or request.description:
-                materials_text = f"Тема теста: {request.title}\nОписание: {request.description or 'Базовые концепции и ключевые вопросы темы'}"
-            else:
-                raise HTTPException(status_code=400, detail="Не найден текст материалов и не указана тема теста")
+            materials_text = f"Тема теста: {request.title or 'Общие вопросы'}\nОписание: {request.description or 'Базовые концепции и ключевые вопросы темы'}"
         
+        system_msg = "Ты API генератор образовательных тестов. Запрещено рассуждать или писать пояснительный текст. Отвечай СРАЗУ валидным JSON объектом."
+
         # Base prompt based on test type
         if request.test_type == "keyword_based":
-            system_msg = (
-                "Ты - эксперт по созданию образовательных тестов. "
-                "Создай тест с вопросами, требующими развернутых ответов, на основе предоставленных материалов. "
-                "Для каждого вопроса определи ключевые слова, которые должны присутствовать в правильном ответе студента. "
-                "Вопросы должны проверять понимание материала, а не просто запоминание. "
-                "Отвечай строго в JSON формате."
-            )
-            
-            user_msg = f"""
-Создай тест со следующими параметрами:
-
-Название: {request.title}
-Описание: {request.description}
-Количество вопросов: {request.question_count}
-
-Материалы для генерации вопросов:
+            user_msg = f"""Создай тест из {request.question_count} вопросов с развернутыми ответами и ключевыми словами по материалам:
+Тема: {request.title}
 {materials_text}
 
-Требования:
-1. Создай {request.question_count} вопросов, требующих развернутых ответов
-2. Для каждого вопроса определи 3-5 ключевых слов/фраз, которые должны присутствовать в правильном ответе
-3. Каждому ключевому слову присвой количество баллов (всего баллов за вопрос должно быть 10-20)
-4. Вопросы должны быть разного уровня сложности
-5. Вопросы должны проверять понимание, а не запоминание
-6. Используй информацию из предоставленных материалов
-"""
-            
-            if request.additional_conditions:
-                user_msg += f"\n\nДополнительные требования:\n{request.additional_conditions}\n"
-            
-            user_msg += """
 Формат ответа (строго JSON):
-{
+{{
   "questions": [
-    {
+    {{
       "question_id": "q1",
       "title": "Текст вопроса",
       "max_points": 15,
       "keywords": [
-        {"word": "ключевое слово 1", "points": 5},
-        {"word": "ключевое слово 2", "points": 5},
-        {"word": "ключевое слово 3", "points": 5}
+        {{"word": "ключевое слово 1", "points": 5}},
+        {{"word": "ключевое слово 2", "points": 5}},
+        {{"word": "ключевое слово 3", "points": 5}}
       ]
-    }
+    }}
   ]
-}
+}}
 """
         else:  # multiple_choice
-            system_msg = (
-                "Ты - эксперт по созданию образовательных тестов. "
-                "Создай тест с вариантами ответов на основе предоставленных материалов. "
-                "Каждый вопрос должен иметь 4 варианта ответа, один из которых правильный. "
-                "Вопросы должны проверять понимание материала, а не просто запоминание. "
-                "Отвечай строго в JSON формате."
-            )
-            
-            user_msg = f"""
-Создай тест со следующими параметрами:
-
-Название: {request.title}
-Описание: {request.description}
-Количество вопросов: {request.question_count}
-
-Материалы для генерации вопросов:
+            user_msg = f"""Создай тест из {request.question_count} вопросов с вариантами ответов (A, B, C, D) по материалам:
+Тема: {request.title}
 {materials_text}
 
-Требования:
-1. Создай {request.question_count} вопросов с вариантами ответов
-2. Каждый вопрос должен иметь 4 варианта ответа (A, B, C, D)
-3. Один вариант должен быть правильным
-4. Вопросы должны быть разного уровня сложности
-5. Вопросы должны проверять понимание, а не запоминание
-6. Используй информацию из предоставленных материалов
-"""
-            
-            if request.additional_conditions:
-                user_msg += f"\n\nДополнительные требования:\n{request.additional_conditions}\n"
-            
-            user_msg += """
 Формат ответа (строго JSON):
-{
+{{
   "questions": [
-    {
+    {{
       "question_id": "q1",
       "title": "Текст вопроса",
       "options": ["Вариант A", "Вариант B", "Вариант C", "Вариант D"],
       "correct_answer": "Вариант A",
       "max_points": 10
-    }
+    }}
   ]
-}
+}}
 """
         
         messages = [
@@ -469,7 +414,7 @@ async def generate_test(request: GenerateTestRequest):
             {"role": "user", "content": user_msg}
         ]
         
-        result = await chat_completion(messages, temperature=0.3, max_tokens=3000, response_format="json")
+        result = await chat_completion(messages, temperature=0.1, max_tokens=2000, response_format="json")
         
         if not result:
             raise HTTPException(status_code=503, detail="AI service unavailable")
