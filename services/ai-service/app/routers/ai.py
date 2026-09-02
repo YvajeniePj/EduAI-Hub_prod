@@ -466,19 +466,20 @@ async def generate_test(request: GenerateTestRequest):
             {"role": "user", "content": user_msg}
         ]
         
-        result = await chat_completion(messages, temperature=0.7, max_tokens=4000)
+        result = await chat_completion(messages, temperature=0.3, max_tokens=1500)
         
         if not result:
             raise HTTPException(status_code=503, detail="AI service unavailable")
         
-        # Extract JSON from response
-        json_match = re.search(r'\{.*\}', result, re.DOTALL)
+        # Extract JSON from response (clean markdown code fences if present)
+        cleaned = re.sub(r'```(?:json)?', '', result).strip()
+        json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
         if json_match:
             json_str = json_match.group(0)
             try:
                 test_data = json.loads(json_str)
                 # Validate structure
-                if "questions" not in test_data:
+                if "questions" not in test_data or not isinstance(test_data["questions"], list):
                     raise HTTPException(status_code=500, detail="Invalid test structure from AI")
                 
                 # Return test data ready for Test Service
@@ -488,7 +489,7 @@ async def generate_test(request: GenerateTestRequest):
                     "material_ids": material_ids_list  # Store material IDs for feedback
                 }
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse AI response: {e}")
+                logger.error(f"Failed to parse AI response: {e}, raw: {result[:200]}")
                 raise HTTPException(status_code=500, detail="Failed to parse AI response")
         else:
             raise HTTPException(status_code=500, detail="No JSON found in AI response")

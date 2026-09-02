@@ -197,7 +197,7 @@ import { Router } from '@angular/router';
           </mat-card-content>
         </mat-card>
 
-        <div class="questions-section" *ngIf="isTeacher || results.submission.status === 'approved'">
+        <div class="questions-section">
           <h2 class="section-title">Детали по вопросам</h2>
           <mat-card *ngFor="let result of results.per_question_results; let i = index" class="result-card">
             <mat-card-header class="result-header">
@@ -269,8 +269,8 @@ import { Router } from '@angular/router';
                 </ul>
               </div>
 
-              <!-- AI Feedback for keyword-based tests -->
-              <div *ngIf="testType === 'keyword_based' && result.ai_feedback" class="ai-feedback-section">
+              <!-- AI Feedback for keyword-based / open-ended tests -->
+              <div *ngIf="(testType?.toLowerCase() === 'keyword_based' || testType?.toLowerCase() === 'open_ended') && result.ai_feedback" class="ai-feedback-section">
                 <div class="section-label">AI-оценка:</div>
                 <div class="ai-feedback-content">
                   <div *ngIf="result.ai_feedback.recommended_score !== undefined" class="feedback-item">
