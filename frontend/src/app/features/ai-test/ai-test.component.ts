@@ -138,38 +138,97 @@ import { ApiService } from '../../core/services/api.service';
         </mat-card-content>
       </mat-card>
 
-      <mat-card *ngIf="generatedTest">
-        <mat-card-header>
-          <mat-card-title>Сгенерированный тест</mat-card-title>
+      <!-- Generated Test (Interactive Editor) -->
+      <mat-card *ngIf="generatedTest" class="generated-test-card">
+        <mat-card-header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <mat-card-title style="color: #1a237e;">Сгенерированный тест ({{ generatedTest.questions.length }} вопр.)</mat-card-title>
+          <button mat-stroked-button color="primary" (click)="addQuestion()">
+            <mat-icon>add</mat-icon> Добавить вопрос
+          </button>
         </mat-card-header>
         <mat-card-content>
-          <div *ngFor="let question of generatedTest.questions; let i = index" style="margin-bottom: 20px;">
-            <h4>Вопрос {{ i + 1 }}: {{ question.title }}</h4>
-            <p><strong>Баллы:</strong> {{ question.max_points }}</p>
-            
-            <!-- Multiple Choice -->
-            <div *ngIf="generatedTest.test_type === 'multiple_choice'">
-              <p><strong>Варианты ответов:</strong></p>
-              <ul>
-                <li *ngFor="let option of question.options">{{ option }}</li>
-              </ul>
-              <p><strong>Правильный ответ:</strong> {{ question.correct_answer }}</p>
+          <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px;">
+            Вы можете отредактировать вопросы, варианты ответов, правильный ответ и баллы перед сохранением теста.
+          </p>
+
+          <div *ngFor="let question of generatedTest.questions; let i = index" class="question-edit-block">
+            <div class="question-edit-header">
+              <span class="question-badge">Вопрос {{ i + 1 }}</span>
+              <button mat-icon-button color="warn" (click)="removeQuestion(i)" title="Удалить этот вопрос">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
             </div>
-            
-            <!-- Keyword Based -->
-            <div *ngIf="generatedTest.test_type === 'keyword_based'">
-              <p><strong>Ключевые слова:</strong></p>
-              <ul>
-                <li *ngFor="let keyword of question.keywords">
-                  "{{ keyword.word }}" - {{ keyword.points }} баллов
-                </li>
-              </ul>
+
+            <div class="question-row">
+              <mat-form-field appearance="outline" style="flex: 1;">
+                <mat-label>Текст вопроса</mat-label>
+                <textarea matInput [(ngModel)]="question.title" rows="2" placeholder="Введите формулировку вопроса..."></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline" style="width: 120px;">
+                <mat-label>Баллы</mat-label>
+                <input matInput type="number" [(ngModel)]="question.max_points" min="1">
+              </mat-form-field>
+            </div>
+
+            <!-- Multiple Choice Editor -->
+            <div *ngIf="generatedTest.test_type === 'multiple_choice'" class="options-editor">
+              <label class="section-sublabel">Варианты ответов:</label>
+              <div *ngFor="let option of question.options; let optIdx = index; trackBy: trackByIndex" class="option-edit-row">
+                <mat-form-field appearance="outline" style="flex: 1;">
+                  <mat-label>Вариант {{ optIdx + 1 }}</mat-label>
+                  <input matInput [(ngModel)]="question.options[optIdx]">
+                </mat-form-field>
+                <button mat-icon-button color="warn" (click)="removeOption(question, optIdx)" [disabled]="question.options.length <= 2" title="Удалить вариант">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <div style="margin-top: 8px; margin-bottom: 12px;">
+                <button mat-stroked-button (click)="addOption(question)">
+                  <mat-icon>add</mat-icon> Добавить вариант
+                </button>
+              </div>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Правильный ответ</mat-label>
+                <mat-select [(ngModel)]="question.correct_answer">
+                  <mat-option *ngFor="let option of question.options" [value]="option">
+                    {{ option }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <!-- Keyword Based Editor -->
+            <div *ngIf="generatedTest.test_type === 'keyword_based'" class="keywords-editor">
+              <label class="section-sublabel">Ключевые слова и фразы для оценки:</label>
+              <div *ngFor="let kw of question.keywords; let kwIdx = index; trackBy: trackByIndex" class="keyword-edit-row">
+                <mat-form-field appearance="outline" style="flex: 1;">
+                  <mat-label>Ключевое слово / фраза</mat-label>
+                  <input matInput [(ngModel)]="kw.word">
+                </mat-form-field>
+                <mat-form-field appearance="outline" style="width: 100px;">
+                  <mat-label>Баллы</mat-label>
+                  <input matInput type="number" [(ngModel)]="kw.points" min="1">
+                </mat-form-field>
+                <button mat-icon-button color="warn" (click)="removeKeyword(question, kwIdx)" title="Удалить ключевое слово">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <div style="margin-top: 8px;">
+                <button mat-stroked-button (click)="addKeyword(question)">
+                  <mat-icon>add</mat-icon> Добавить ключевое слово
+                </button>
+              </div>
             </div>
           </div>
-          
-          <button mat-raised-button color="primary" (click)="saveTest()" [disabled]="saving">
-            {{ saving ? 'Сохранение...' : 'Сохранить тест' }}
-          </button>
+
+          <div class="save-actions" style="margin-top: 24px; display: flex; justify-content: space-between; align-items: center;">
+            <button mat-stroked-button color="accent" (click)="addQuestion()">
+              <mat-icon>add_circle</mat-icon> Добавить вопрос
+            </button>
+            <button mat-raised-button color="primary" (click)="saveTest()" [disabled]="saving || generatedTest.questions.length === 0">
+              {{ saving ? 'Сохранение...' : 'Сохранить тест (' + generatedTest.questions.length + ' вопр.)' }}
+            </button>
+          </div>
         </mat-card-content>
       </mat-card>
       </div>
@@ -255,6 +314,54 @@ import { ApiService } from '../../core/services/api.service';
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
       margin-top: 24px;
+    }
+
+    .question-edit-block {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-bottom: 20px;
+      background: #f8fafc;
+      transition: all 0.2s;
+    }
+
+    .question-edit-block:hover {
+      border-color: #cbd5e1;
+      background: #f1f5f9;
+    }
+
+    .question-edit-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .question-badge {
+      font-weight: 600;
+      color: #1e3a8a;
+      font-size: 1.05rem;
+    }
+
+    .question-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .section-sublabel {
+      display: block;
+      font-weight: 500;
+      color: #475569;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+
+    .option-edit-row, .keyword-edit-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 6px;
     }
 
     @media (max-width: 768px) {
@@ -524,6 +631,66 @@ export class AiTestComponent implements OnInit {
         alert('Ошибка при сохранении теста: ' + (err.error?.detail || err.message));
       }
     });
+  }
+
+  trackByIndex(index: number): number {
+    return index;
+  }
+
+  addQuestion() {
+    if (!this.generatedTest) return;
+    const qCount = this.generatedTest.questions.length + 1;
+    if (this.generatedTest.test_type === 'multiple_choice') {
+      this.generatedTest.questions.push({
+        question_id: 'q' + qCount,
+        title: 'Новый вопрос',
+        options: ['Вариант 1', 'Вариант 2', 'Вариант 3', 'Вариант 4'],
+        correct_answer: 'Вариант 1',
+        max_points: 10
+      });
+    } else {
+      this.generatedTest.questions.push({
+        question_id: 'q' + qCount,
+        title: 'Новый вопрос с развернутым ответом',
+        keywords: [{ word: 'ключевой термин', points: 5 }],
+        max_points: 15
+      });
+    }
+  }
+
+  removeQuestion(index: number) {
+    if (this.generatedTest && this.generatedTest.questions.length > 0) {
+      this.generatedTest.questions.splice(index, 1);
+    }
+  }
+
+  addOption(question: any) {
+    if (!question.options) question.options = [];
+    const optNum = question.options.length + 1;
+    question.options.push(`Вариант ${optNum}`);
+    if (!question.correct_answer) {
+      question.correct_answer = question.options[0];
+    }
+  }
+
+  removeOption(question: any, index: number) {
+    if (question.options && question.options.length > 2) {
+      const removed = question.options.splice(index, 1)[0];
+      if (question.correct_answer === removed) {
+        question.correct_answer = question.options[0] || '';
+      }
+    }
+  }
+
+  addKeyword(question: any) {
+    if (!question.keywords) question.keywords = [];
+    question.keywords.push({ word: '', points: 5 });
+  }
+
+  removeKeyword(question: any, index: number) {
+    if (question.keywords && question.keywords.length > 0) {
+      question.keywords.splice(index, 1);
+    }
   }
 }
 

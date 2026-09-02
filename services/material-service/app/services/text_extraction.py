@@ -5,6 +5,33 @@ import os
 from typing import Optional
 
 
+def clean_latex_text(raw_text: str) -> str:
+    """Strip LaTeX preamble, comments, and markup to leave clean educational text."""
+    import re
+    text = raw_text
+    # Extract body if \begin{document} is present
+    if '\\begin{document}' in text:
+        text = text.split('\\begin{document}', 1)[1]
+    if '\\end{document}' in text:
+        text = text.split('\\end{document}', 1)[0]
+    
+    # Remove comments
+    text = re.sub(r'(?m)^%.*$', '', text)
+    # Remove common formatting commands keeping inner text
+    text = re.sub(r'\\(?:textbf|textit|emph|underline|section|subsection|subsubsection|paragraph|caption)\{([^}]*)\}', r'\1', text)
+    # Remove inline math dollar signs
+    text = re.sub(r'\$([^$]+)\$', r'\1', text)
+    # Remove citations, refs, labels, packages
+    text = re.sub(r'\\(?:cite|ref|label|input|include|usepackage|documentclass)\{[^}]*\}', '', text)
+    # Remove remaining backslash commands
+    text = re.sub(r'\\[a-zA-Z]+(\[[^\]]*\])?(\{([^}]*)\})?', r' \3 ', text)
+    # Clean braces and excessive whitespace
+    text = text.replace('{', '').replace('}', '')
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n\s*\n+', '\n\n', text)
+    return text.strip()
+
+
 def extract_text_from_file(file_path: str, mime_type: str) -> str:
     """Extract text from file of different formats"""
     try:
@@ -67,7 +94,10 @@ def extract_text_from_file(file_path: str, mime_type: str) -> str:
             for encoding in encodings:
                 try:
                     with open(file_path, 'r', encoding=encoding) as file:
-                        return file.read().strip()
+                        raw = file.read()
+                        if file_path.lower().endswith(('.tex', '.latex')):
+                            return clean_latex_text(raw)
+                        return raw.strip()
                 except UnicodeDecodeError:
                     continue
             return "Error: could not determine text file encoding"

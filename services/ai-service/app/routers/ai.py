@@ -357,7 +357,7 @@ async def generate_test(request: GenerateTestRequest):
                         material_data = response.json()
                         material_text = material_data.get("text", "")
                         if material_text and not material_text.startswith("Error"):
-                            materials_text += f"\n\n--- Материал {material_id} ---\n{material_text[:2000]}"  # Limit each material
+                            materials_text += f"\n\n--- Материал {material_id} ---\n{material_text[:6000]}"  # Up to 6000 chars of body
                             material_ids_list.append(material_id)
                 except Exception as e:
                     logger.warning(f"Failed to fetch material {material_id}: {e}")
@@ -366,13 +366,21 @@ async def generate_test(request: GenerateTestRequest):
         if not materials_text.strip():
             materials_text = f"Тема теста: {request.title or 'Общие вопросы'}\nОписание: {request.description or 'Базовые концепции и ключевые вопросы темы'}"
         
-        system_msg = "Ты API генератор образовательных тестов. Запрещено рассуждать или писать пояснительный текст. Отвечай СРАЗУ валидным JSON объектом."
+        system_msg = "Ты API генератор образовательных тестов. Запрещено рассуждать или писать сопроводительный текст. Отвечай СРАЗУ валидным JSON объектом."
+        add_cond = f"\nДополнительные обязательные условия пользователя: {request.additional_conditions}" if request.additional_conditions else ""
 
         # Base prompt based on test type
         if request.test_type == "keyword_based":
-            user_msg = f"""Создай тест из {request.question_count} вопросов с развернутыми ответами и ключевыми словами по материалам:
+            user_msg = f"""Создай РОВНО {request.question_count} вопросов с развернутыми ответами и ключевыми словами по учебному материалу:
 Тема: {request.title}
 {materials_text}
+{add_cond}
+
+СТРОГИЕ ПРАВИЛА:
+1. Создай РОВНО {request.question_count} вопросов (не больше и не меньше).
+2. Все вопросы должны быть СТРОГО по учебному содержанию темы (определения, методы, алгоритмы, формулы, классификации).
+3. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО создавать вопросы об авторах, названии вуза, факультетах или технических атрибутах документа.
+4. К каждому вопросу укажи 3-5 ключевых слов/фраз с баллами.
 
 Формат ответа (строго JSON):
 {{
@@ -391,9 +399,17 @@ async def generate_test(request: GenerateTestRequest):
 }}
 """
         else:  # multiple_choice
-            user_msg = f"""Создай тест из {request.question_count} вопросов с вариантами ответов (A, B, C, D) по материалам:
+            user_msg = f"""Создай РОВНО {request.question_count} вопросов с вариантами ответов по учебному материалу:
 Тема: {request.title}
 {materials_text}
+{add_cond}
+
+СТРОГИЕ ПРАВИЛА:
+1. Создай РОВНО {request.question_count} вопросов (не больше и не меньше).
+2. Все вопросы должны быть СТРОГО по учебному содержанию темы (определения, методы, алгоритмы, формулы, классификации).
+3. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО создавать вопросы об авторах, названии вуза, факультетах или технических атрибутах документа.
+4. Правильный ответ (correct_answer) должен быть ТОЧНЫМ совпадением с одним из вариантов в списке options.
+5. Соблюдай все дополнительные условия пользователя (например: число вариантов ответа, краткость, отсутствие кода).
 
 Формат ответа (строго JSON):
 {{
@@ -401,8 +417,8 @@ async def generate_test(request: GenerateTestRequest):
     {{
       "question_id": "q1",
       "title": "Текст вопроса",
-      "options": ["Вариант A", "Вариант B", "Вариант C", "Вариант D"],
-      "correct_answer": "Вариант A",
+      "options": ["Вариант 1", "Вариант 2", "Вариант 3", "Вариант 4"],
+      "correct_answer": "Вариант 1",
       "max_points": 10
     }}
   ]
@@ -414,7 +430,7 @@ async def generate_test(request: GenerateTestRequest):
             {"role": "user", "content": user_msg}
         ]
         
-        result = await chat_completion(messages, temperature=0.1, max_tokens=2000, response_format="json")
+        result = await chat_completion(messages, temperature=0.1, max_tokens=3500, response_format="json")
         
         if not result:
             raise HTTPException(status_code=503, detail="AI service unavailable")
