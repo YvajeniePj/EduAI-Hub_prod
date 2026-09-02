@@ -1360,21 +1360,25 @@ async def agent_chat(request: Request, current_user=Depends(get_current_user)):
     }
 
     async def stream_proxy():
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream(
-                "POST",
-                f"{AI_SERVICE_URL}/ai/agent/chat",
-                json=body,
-            ) as response:
-                async for chunk in response.aiter_bytes():
-                    yield chunk
+        async with httpx.AsyncClient(timeout=180.0) as client:
+            try:
+                async with client.stream(
+                    "POST",
+                    f"{AI_SERVICE_URL}/ai/agent/chat",
+                    json=body,
+                ) as response:
+                    async for chunk in response.aiter_bytes():
+                        yield chunk
+            except Exception as e:
+                logger.error(f"Error in stream_proxy: {e}")
+                err_payload = json.dumps({"message": f"Ошибка связи с сервисом агента: {str(e)}"}, ensure_ascii=False)
+                yield f"event: error\ndata: {err_payload}\n\n".encode("utf-8")
 
     return StreamingResponse(
         stream_proxy(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
+            "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",
         },
     )
