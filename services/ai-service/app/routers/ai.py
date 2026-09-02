@@ -486,10 +486,13 @@ async def generate_test(request: GenerateTestRequest):
             {"role": "user", "content": user_msg}
         ]
         
-        result = await chat_completion(messages, temperature=0.1, max_tokens=4000, response_format="json")
+        result = await chat_completion(messages, temperature=0.1, max_tokens=3000, response_format="json")
         
         if not result:
-            raise HTTPException(status_code=503, detail="AI service unavailable (Ollama is unreachable or model timed out)")
+            from app.services.ollama_client import get_last_error
+            err_msg = get_last_error()
+            logger.error(f"Generate test failed: {err_msg}")
+            raise HTTPException(status_code=503, detail=f"AI service error: {err_msg}")
         
         questions = parse_ai_test_questions(result)
         if not questions:

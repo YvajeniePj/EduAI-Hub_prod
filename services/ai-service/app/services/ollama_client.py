@@ -15,10 +15,17 @@ DEFAULT_HEADERS = {
     "User-Agent": "EduAI-Hub-Agent/1.0"
 }
 
+_last_error_message: str = ""
+
+def get_last_error() -> str:
+    global _last_error_message
+    return _last_error_message or "Connection timed out or returned empty response"
+
 async def check_connection() -> bool:
     """
     Health check for Ollama API. Replaces gigachat_client get_access_token.
     """
+    global _last_error_message
     try:
         async with httpx.AsyncClient(timeout=10.0, headers=DEFAULT_HEADERS) as client:
             response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
@@ -26,7 +33,8 @@ async def check_connection() -> bool:
             logger.info(f"Successfully connected to Ollama at {OLLAMA_BASE_URL}")
             return True
     except Exception as e:
-        logger.error(f"Failed to connect to Ollama at {OLLAMA_BASE_URL}: {e}")
+        _last_error_message = f"Check connection failed: {type(e).__name__}: {str(e)} (URL: {OLLAMA_BASE_URL})"
+        logger.error(_last_error_message)
         return False
 
 async def chat_completion(
@@ -38,6 +46,7 @@ async def chat_completion(
     """
     Simple completion using active streaming socket reading to prevent idle tunnel dropouts.
     """
+    global _last_error_message
     payload = {
         "model": OLLAMA_MODEL,
         "messages": messages,
@@ -70,11 +79,13 @@ async def chat_completion(
                 return "".join(chunks)
         except Exception as e:
             last_error = e
+            _last_error_message = f"{type(e).__name__}: {str(e)} (URL: {OLLAMA_BASE_URL})"
             logger.warning(f"Ollama chat_completion attempt {attempt+1} failed: {e}")
             if attempt == 0:
                 await asyncio.sleep(2)
     
-    logger.error(f"Error in Ollama chat_completion after retries: {last_error}")
+    _last_error_message = f"{type(last_error).__name__}: {str(last_error)} (URL: {OLLAMA_BASE_URL})"
+    logger.error(f"Error in Ollama chat_completion after retries: {_last_error_message}")
     return None
 
 async def chat_completion_with_tools(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], temperature: float = 0.2) -> Dict[str, Any]:
