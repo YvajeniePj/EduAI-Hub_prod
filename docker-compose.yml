@@ -247,7 +247,7 @@ services:
     # ports:
     #   - "8008:8008"
     environment:
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-https://flying-pointed-frosty.ngrok-free.dev}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4:12b}
       - REDIS_URL=redis://redis:6379
       - SUBJECT_SERVICE_URL=http://subject-service:8001

@@ -19,8 +19,8 @@ dist/
 *.log
 
 # Environment
-.env
-.env.local
+# .env
+
 
 # IDE
 .vscode/
