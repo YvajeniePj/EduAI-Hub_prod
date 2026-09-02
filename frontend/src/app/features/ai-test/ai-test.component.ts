@@ -383,7 +383,8 @@ export class AiTestComponent implements OnInit {
       error: (err) => {
         this.generating = false;
         console.error('Error generating test:', err);
-        alert('Ошибка при генерации теста: ' + (err.error?.detail || err.message));
+        const detail = typeof err.error?.detail === 'string' ? err.error.detail : (typeof err.error === 'string' ? err.error : JSON.stringify(err.error?.detail || err.error || err.message));
+        alert('Ошибка при генерации теста: ' + detail);
       }
     });
   }

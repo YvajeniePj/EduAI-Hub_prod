@@ -364,7 +364,10 @@ async def generate_test(request: GenerateTestRequest):
                     continue
         
         if not materials_text.strip():
-            raise HTTPException(status_code=400, detail="No valid material text found")
+            if request.title or request.description:
+                materials_text = f"Тема теста: {request.title}\nОписание: {request.description or 'Базовые концепции и ключевые вопросы темы'}"
+            else:
+                raise HTTPException(status_code=400, detail="Не найден текст материалов и не указана тема теста")
         
         # Base prompt based on test type
         if request.test_type == "keyword_based":
