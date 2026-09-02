@@ -271,6 +271,84 @@ export class ApiService {
     return this.http.post<any>(`${API_URL}/ai/chat`, { question, subject_id: subjectId });
   }
 
+  agentChatStream(
+    question: string,
+    sessionId?: string,
+    subjectId?: string,
+    token?: string | null
+  ): Observable<{ type: string; data: any }> {
+    return new Observable(observer => {
+      const abortController = new AbortController();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      fetch(`${API_URL}/ai/agent/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          question,
+          session_id: sessionId || null,
+          subject_id: subjectId || null
+        }),
+        signal: abortController.signal
+      })
+        .then(async response => {
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `HTTP ${response.status}`);
+          }
+          if (!response.body) {
+            throw new Error('Response body is null');
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            let currentEvent = 'message';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('event:')) {
+                currentEvent = trimmed.substring(6).trim();
+              } else if (trimmed.startsWith('data:')) {
+                const dataStr = trimmed.substring(5).trim();
+                try {
+                  const parsedData = JSON.parse(dataStr);
+                  observer.next({ type: currentEvent, data: parsedData });
+                } catch (e) {
+                  observer.next({ type: currentEvent, data: dataStr });
+                }
+              }
+            }
+          }
+
+          observer.complete();
+        })
+        .catch(err => {
+          if (err.name !== 'AbortError') {
+            observer.error(err);
+          }
+        });
+
+      return () => {
+        abortController.abort();
+      };
+    });
+  }
+
   getTestFeedback(feedbackRequest: any): Observable<any> {
     return this.http.post<any>(`${API_URL}/ai/test-feedback`, feedbackRequest);
   }

@@ -1,5 +1,5 @@
 """
-AI router - AI functions endpoints
+AI router - Ollama functions endpoints
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -9,7 +9,7 @@ import re
 import os
 import httpx
 
-from app.services.gigachat_client import chat_completion, get_access_token
+from app.services.ollama_client import chat_completion, check_connection
 from app.services.guardrails import check_prompt_safety
 import logging
 
@@ -43,21 +43,20 @@ class GradeResponse(BaseModel):
 
 @router.get("/status")
 async def get_ai_status():
-    """Check if AI service (GigaChat) is available"""
+    """Check if AI service (Ollama) is available"""
     try:
-        # Try to get access token to verify connection
-        token = await get_access_token()
-        if token:
+        connected = await check_connection()
+        if connected:
             return {
                 "status": "connected",
                 "available": True,
-                "message": "GigaChat подключен"
+                "message": "Ollama подключен"
             }
         else:
             return {
                 "status": "disconnected",
                 "available": False,
-                "message": "GigaChat не подключен"
+                "message": "Ollama не подключен"
             }
     except Exception as e:
         logger.error(f"Error checking AI status: {e}")

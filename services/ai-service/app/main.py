@@ -1,17 +1,18 @@
 """
-AI Service - Handles AI functions using GigaChat
+AI Service - Handles AI functions using Ollama
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import ai
+from app.routers import ai, agent
+from app.services.ollama_client import check_connection
 
 import os
 import logging
 
 app = FastAPI(
     title="AI Service",
-    description="Service for AI functions using GigaChat",
+    description="Service for AI functions using Ollama",
     version="1.0.0"
 )
 
@@ -19,11 +20,13 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     logger = logging.getLogger("uvicorn")
-    api_key = os.getenv("GIGACHAT_API_KEY")
-    if not api_key:
-        logger.error("!!! GIGACHAT_API_KEY is not set. AI features will fail. !!!")
+    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    logger.info(f"Checking Ollama connection at {ollama_url}...")
+    connected = await check_connection()
+    if not connected:
+        logger.warning("Could not connect to Ollama. Ensure Ollama is running.")
     else:
-        logger.info(f"GIGACHAT_API_KEY found (length: {len(api_key)})")
+        logger.info("Successfully connected to Ollama")
 
 # CORS middleware
 app.add_middleware(
@@ -36,6 +39,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(ai.router, prefix="/ai", tags=["ai"])
+app.include_router(agent.router, prefix="/ai/agent", tags=["agent"])
 
 
 @app.get("/health")

@@ -1344,6 +1344,42 @@ async def chat_assistant(request: Request):
     return data
 
 
+@app.post("/ai/agent/chat")
+async def agent_chat(request: Request, current_user=Depends(get_current_user)):
+    """SSE proxy for the AI agent chat endpoint.
+    Injects user_context from JWT and streams the response."""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    body = await request.json()
+    # Inject authenticated user context into the request
+    body["user_context"] = {
+        "username": current_user["username"],
+        "role": current_user["role"],
+        "user_id": current_user.get("user_id", ""),
+    }
+
+    async def stream_proxy():
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream(
+                "POST",
+                f"{AI_SERVICE_URL}/ai/agent/chat",
+                json=body,
+            ) as response:
+                async for chunk in response.aiter_bytes():
+                    yield chunk
+
+    return StreamingResponse(
+        stream_proxy(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.post("/ai/generate-test")
 async def generate_test(request: Request):
     body = await request.json()

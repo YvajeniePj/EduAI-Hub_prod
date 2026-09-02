@@ -240,14 +240,24 @@ services:
       - eduai-network
     command: uvicorn app.main:app --host 0.0.0.0 --port 8007
 
-  # AI Service
+  # AI Service (Autonomous AI Agent with Ollama)
   ai-service:
     image: yvajeniepj12/eduai-ai-service:latest
     container_name: eduai-ai-service
     # ports:
     #   - "8008:8008"
     environment:
-      - GIGACHAT_API_KEY=${GIGACHAT_API_KEY:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4:12b}
+      - REDIS_URL=redis://redis:6379
+      - SUBJECT_SERVICE_URL=http://subject-service:8001
+      - TEST_SERVICE_URL=http://test-service:8002
+      - SUBMISSION_SERVICE_URL=http://submission-service:8003
+      - MATERIAL_SERVICE_URL=http://material-service:8004
+      - VIDEO_SERVICE_URL=http://video-service:8005
+      - GAMIFICATION_SERVICE_URL=http://gamification-service:8007
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8010
+      - FEEDBACK_SERVICE_URL=http://feedback-service:8011
       - PYTHONUNBUFFERED=1
     networks:
       - eduai-network

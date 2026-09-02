@@ -7,15 +7,20 @@ from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
-# Known prompt injection signatures
+# Known prompt injection & jailbreak signatures
 INJECTION_PATTERNS = [
     r"ignore\s+(all\s+)?(previous|prior|\w+\s+)?(instructions|rules|prompts)",
     r"forget\s+(all\s+)?(previous|prior|\w+\s+)?(rules|instructions|prompts)",
-    r"you\s+are\s+now\s+DAN",
+    r"you\s+are\s+now\s+(DAN|jailbroken|unfiltered|an unrestricted)",
     r"bypass\s+safety\s+filters",
-    r"system\s+prompt\s+override",
+    r"system\s+prompt\s+(override|reveal|leak|print)",
+    r"print\s+(your\s+)?(system\s+prompt|initial\s+instructions)",
+    r"покажи\s+(свой\s+)?(системный\s+промпт|инструкци)",
     r"забудь\s+.*инструкци",
     r"игнорируй\s+.*правил",
+    r"ты\s+теперь\s+(без\s+ограничений|DAN)",
+    r"отвечай\s+без\s+фильтров",
+    r"roleplay\s+as\s+an\s+unrestricted",
 ]
 
 def check_prompt_safety(text: str) -> Tuple[bool, str]:
@@ -32,3 +37,4 @@ def check_prompt_safety(text: str) -> Tuple[bool, str]:
             return False, "Обнаружена попытка обхода правил безопасности AI. Пожалуйста, задайте учебный вопрос по теме курса."
 
     return True, "OK"
+
