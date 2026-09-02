@@ -339,6 +339,62 @@ class GenerateTestRequest(BaseModel):
     additional_conditions: Optional[str] = ""  # Additional prompt conditions
 
 
+def parse_ai_test_questions(result: str) -> List[Dict]:
+    """Bulletproof extractor of questions from raw LLM output."""
+    if not result:
+        return []
+    
+    cleaned = re.sub(r'```(?:json)?', '', result).strip()
+    
+    # 1. Standard json.loads on { ... }
+    json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if json_match:
+        try:
+            data = json.loads(json_match.group(0))
+            if isinstance(data, dict) and "questions" in data and isinstance(data["questions"], list) and len(data["questions"]) > 0:
+                return data["questions"]
+            elif isinstance(data, list) and len(data) > 0:
+                return data
+        except Exception:
+            pass
+
+    # 2. Fix trailing commas and unescaped characters
+    if json_match:
+        try:
+            fixed = json_match.group(0)
+            fixed = re.sub(r',\s*([\]\}])', r'\1', fixed)
+            data = json.loads(fixed)
+            if isinstance(data, dict) and "questions" in data and isinstance(data["questions"], list) and len(data["questions"]) > 0:
+                return data["questions"]
+        except Exception:
+            pass
+
+    # 3. Extract individual question object blocks
+    questions = []
+    depth = 0
+    start = -1
+    for i, char in enumerate(cleaned):
+        if char == '{':
+            if depth == 0:
+                start = i
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if depth == 0 and start != -1:
+                chunk = cleaned[start:i+1]
+                if '"title"' in chunk or "'title'" in chunk:
+                    try:
+                        clean_chunk = re.sub(r',\s*([\]\}])', r'\1', chunk)
+                        q_obj = json.loads(clean_chunk)
+                        if isinstance(q_obj, dict) and "title" in q_obj:
+                            questions.append(q_obj)
+                    except Exception:
+                        pass
+                start = -1
+
+    return questions
+
+
 @router.post("/generate-test")
 async def generate_test(request: GenerateTestRequest):
     """Generate a test based on materials"""
@@ -435,28 +491,16 @@ async def generate_test(request: GenerateTestRequest):
         if not result:
             raise HTTPException(status_code=503, detail="AI service unavailable")
         
-        # Extract JSON from response (clean markdown code fences if present)
-        cleaned = re.sub(r'```(?:json)?', '', result).strip()
-        json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(0)
-            try:
-                test_data = json.loads(json_str)
-                # Validate structure
-                if "questions" not in test_data or not isinstance(test_data["questions"], list):
-                    raise HTTPException(status_code=500, detail="Invalid test structure from AI")
-                
-                # Return test data ready for Test Service
-                return {
-                    "test_type": request.test_type,
-                    "questions": test_data["questions"],
-                    "material_ids": material_ids_list  # Store material IDs for feedback
-                }
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse AI response: {e}, raw: {result[:200]}")
-                raise HTTPException(status_code=500, detail="Failed to parse AI response")
-        else:
-            raise HTTPException(status_code=500, detail="No JSON found in AI response")
+        questions = parse_ai_test_questions(result)
+        if not questions:
+            logger.error(f"Failed to parse AI response: {result[:500]}")
+            raise HTTPException(status_code=500, detail="Failed to parse AI response")
+        
+        return {
+            "test_type": request.test_type,
+            "questions": questions,
+            "material_ids": material_ids_list
+        }
             
     except HTTPException:
         raise
