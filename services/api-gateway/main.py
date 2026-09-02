@@ -1321,7 +1321,7 @@ async def get_ai_status():
 @app.post("/ai/annotate")
 async def annotate_material(request: Request):
     body = await request.json()
-    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/annotate", "POST", body, timeout=180.0)
+    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/annotate", "POST", body, timeout=600.0)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to create annotation")
     return data
@@ -1330,7 +1330,7 @@ async def annotate_material(request: Request):
 @app.post("/ai/grade")
 async def grade_answer(request: Request):
     body = await request.json()
-    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/grade", "POST", body, timeout=180.0)
+    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/grade", "POST", body, timeout=600.0)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to grade answer")
     return data
@@ -1339,7 +1339,7 @@ async def grade_answer(request: Request):
 @app.post("/ai/chat")
 async def chat_assistant(request: Request):
     body = await request.json()
-    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/chat", "POST", body, timeout=180.0)
+    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/chat", "POST", body, timeout=600.0)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to process chat")
     return data
@@ -1361,7 +1361,7 @@ async def agent_chat(request: Request, current_user=Depends(get_current_user)):
     }
 
     async def stream_proxy():
-        async with httpx.AsyncClient(timeout=180.0) as client:
+        async with httpx.AsyncClient(timeout=600.0) as client:
             try:
                 async with client.stream(
                     "POST",
@@ -1388,7 +1388,7 @@ async def agent_chat(request: Request, current_user=Depends(get_current_user)):
 @app.post("/ai/generate-test")
 async def generate_test(request: Request):
     body = await request.json()
-    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/generate-test", "POST", body, timeout=180.0)
+    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/generate-test", "POST", body, timeout=600.0)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to generate test")
     return data
@@ -1397,7 +1397,7 @@ async def generate_test(request: Request):
 @app.post("/ai/generate-course")
 async def generate_course(request: Request):
     body = await request.json()
-    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/generate-course", "POST", body, timeout=180.0)
+    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/generate-course", "POST", body, timeout=600.0)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to generate course")
     return data
@@ -1406,7 +1406,7 @@ async def generate_course(request: Request):
 @app.post("/ai/test-feedback")
 async def get_test_feedback(request: Request):
     body = await request.json()
-    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/test-feedback", "POST", body, timeout=180.0)
+    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/test-feedback", "POST", body, timeout=600.0)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to get test feedback")
     return data

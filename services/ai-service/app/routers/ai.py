@@ -430,7 +430,7 @@ async def generate_test(request: GenerateTestRequest):
             {"role": "user", "content": user_msg}
         ]
         
-        result = await chat_completion(messages, temperature=0.1, max_tokens=3500, response_format="json")
+        result = await chat_completion(messages, temperature=0.1, max_tokens=8000, response_format="json")
         
         if not result:
             raise HTTPException(status_code=503, detail="AI service unavailable")

@@ -31,7 +31,7 @@ async def check_connection() -> bool:
 async def chat_completion(
     messages: List[Dict[str, str]], 
     temperature: float = 0.2, 
-    max_tokens: int = 3000,
+    max_tokens: int = 8000,
     response_format: Optional[str] = None
 ) -> Optional[str]:
     """
@@ -50,7 +50,7 @@ async def chat_completion(
         payload["format"] = response_format
     
     try:
-        async with httpx.AsyncClient(timeout=120.0, headers=DEFAULT_HEADERS) as client:
+        async with httpx.AsyncClient(timeout=600.0, headers=DEFAULT_HEADERS) as client:
             response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
             response.raise_for_status()
             data = response.json()
@@ -74,7 +74,7 @@ async def chat_completion_with_tools(messages: List[Dict[str, Any]], tools: List
     }
     
     try:
-        async with httpx.AsyncClient(timeout=120.0, headers=DEFAULT_HEADERS) as client:
+        async with httpx.AsyncClient(timeout=600.0, headers=DEFAULT_HEADERS) as client:
             response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
             response.raise_for_status()
             data = response.json()
