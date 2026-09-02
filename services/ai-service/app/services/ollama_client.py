@@ -6,20 +6,26 @@ from typing import List, Dict, Any, Optional, AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:12b")
+
+DEFAULT_HEADERS = {
+    "ngrok-skip-browser-warning": "true",
+    "User-Agent": "EduAI-Hub-Agent/1.0"
+}
 
 async def check_connection() -> bool:
     """
     Health check for Ollama API. Replaces gigachat_client get_access_token.
     """
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, headers=DEFAULT_HEADERS) as client:
             response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
             response.raise_for_status()
+            logger.info(f"Successfully connected to Ollama at {OLLAMA_BASE_URL}")
             return True
     except Exception as e:
-        logger.error(f"Failed to connect to Ollama: {e}")
+        logger.error(f"Failed to connect to Ollama at {OLLAMA_BASE_URL}: {e}")
         return False
 
 async def chat_completion(messages: List[Dict[str, str]], temperature: float = 0.2, max_tokens: int = 1000) -> Optional[str]:
@@ -37,7 +43,7 @@ async def chat_completion(messages: List[Dict[str, str]], temperature: float = 0
     }
     
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=120.0, headers=DEFAULT_HEADERS) as client:
             response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
             response.raise_for_status()
             data = response.json()
@@ -61,7 +67,7 @@ async def chat_completion_with_tools(messages: List[Dict[str, Any]], tools: List
     }
     
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=120.0, headers=DEFAULT_HEADERS) as client:
             response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
             response.raise_for_status()
             data = response.json()
@@ -94,7 +100,7 @@ async def stream_chat_completion(messages: List[Dict[str, Any]], tools: Optional
         payload["tools"] = tools
         
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=120.0, headers=DEFAULT_HEADERS) as client:
             async with client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
@@ -110,3 +116,4 @@ async def stream_chat_completion(messages: List[Dict[str, Any]], tools: Optional
     except Exception as e:
         logger.error(f"Error in Ollama stream_chat_completion: {e}")
         yield " Произошла ошибка при потоковой генерации ответа."
+
