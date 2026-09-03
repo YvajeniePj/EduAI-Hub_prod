@@ -1,12 +1,11 @@
-import { Component, OnInit, Inject } from '@angular/core';
-import { MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { Component, OnInit, OnDestroy, Inject } from '@angular/core';
+import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
@@ -33,7 +32,8 @@ import { AuthService } from '../../core/services/auth.service';
       <!-- Header matching Home page style -->
       <div class="header">
         <h1 class="section-title">Онлайн пары</h1>
-        <button class="btn-live-action" (click)="openStartStreamDialog()" *ngIf="isTeacher">
+        <!-- Hidden if activeStreams.length === 0 as requested -->
+        <button class="btn-live-action" (click)="openStartStreamDialog()" *ngIf="isTeacher && activeStreams.length > 0">
           <mat-icon class="btn-icon">videocam</mat-icon>
           <span>НАЧАТЬ ТРАНСЛЯЦИЮ</span>
         </button>
@@ -63,7 +63,7 @@ import { AuthService } from '../../core/services/auth.service';
             <div class="stream-preview">
               <div class="live-badge">
                 <span class="live-dot"></span>
-                <span>В ЭФИРЕ</span>
+                <span>В ЭФИРЕ • {{ getStreamDuration(stream.created_at) }}</span>
               </div>
               <mat-icon class="preview-icon">play_circle_filled</mat-icon>
             </div>
@@ -77,6 +77,14 @@ import { AuthService } from '../../core/services/auth.service';
                 <div class="meta-row">
                   <mat-icon class="meta-icon">schedule</mat-icon>
                   <span>Начало: {{ stream.created_at | date:'HH:mm' }}</span>
+                </div>
+                <div class="meta-row">
+                  <mat-icon class="meta-icon">timer</mat-icon>
+                  <span>В эфире: <strong class="timer-bold">{{ getStreamDuration(stream.created_at) }}</strong></span>
+                </div>
+                <div class="meta-row" *ngIf="getStreamGroupsLabel(stream) as groupLabel">
+                  <mat-icon class="meta-icon">groups</mat-icon>
+                  <span class="group-target-text">{{ groupLabel }}</span>
                 </div>
               </div>
               <button class="btn-join" [routerLink]="['/courses', stream.subject_id, 'stream']">
@@ -332,6 +340,15 @@ import { AuthService } from '../../core/services/auth.service';
       height: 16px;
       color: #94a3b8;
     }
+    .timer-bold {
+      font-weight: 600;
+      color: #09090b;
+      font-variant-numeric: tabular-nums;
+    }
+    .group-target-text {
+      font-weight: 500;
+      color: #475569;
+    }
     .btn-join {
       margin-top: auto;
       height: 38px;
@@ -354,12 +371,13 @@ import { AuthService } from '../../core/services/auth.service';
     }
   `]
 })
-export class StreamListComponent implements OnInit {
+export class StreamListComponent implements OnInit, OnDestroy {
   activeStreams: any[] = [];
   subjects: any[] = [];
   loading = true;
-
   isTeacher = false;
+  currentUser: any = null;
+  private timerInterval?: any;
 
   constructor(
     private apiService: ApiService,
@@ -367,26 +385,51 @@ export class StreamListComponent implements OnInit {
     private dialog: MatDialog,
     private router: Router
   ) {
-    const user = this.auth.getCurrentUser();
-    this.isTeacher = user?.role === 'teacher' || user?.role === 'admin';
+    this.currentUser = this.auth.getCurrentUser();
+    this.isTeacher = this.currentUser?.role === 'teacher' || this.currentUser?.role === 'admin';
   }
 
   ngOnInit() {
     this.refresh();
+    this.timerInterval = setInterval(() => {
+      // Trigger change detection for live duration timers
+      if (this.activeStreams.length > 0) {
+        this.activeStreams = [...this.activeStreams];
+      }
+    }, 1000);
+  }
+
+  ngOnDestroy() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+    }
   }
 
   async refresh() {
     this.loading = true;
-    this.activeStreams = []; // Clear current list to avoid ghosts
+    this.activeStreams = [];
     try {
-      // Load both streams and subjects to show course names
       const [streams, subjects] = await Promise.all([
         this.apiService.getActiveStreamingRooms().toPromise(),
         this.apiService.getSubjects().toPromise()
       ]);
 
-      this.activeStreams = (streams || []).filter((s: any) => s && s.subject_id);
+      let validStreams = (streams || []).filter((s: any) => s && s.subject_id);
       this.subjects = subjects || [];
+
+      // If user is a student, filter out streams restricted to other groups
+      if (this.currentUser?.role === 'student') {
+        const myGroups = await this.apiService.getGroups(undefined, this.currentUser.name).toPromise().catch(() => []);
+        const myGroupNames = new Set((myGroups || []).map((g: any) => g.name?.trim().toLowerCase()));
+
+        validStreams = validStreams.filter((stream: any) => {
+          const tg = this.getStreamTargetGroups(stream);
+          if (tg.length === 0) return true; // Available for all groups
+          return tg.some((groupName: string) => myGroupNames.has(groupName.trim().toLowerCase()));
+        });
+      }
+
+      this.activeStreams = validStreams;
     } catch (err) {
       console.error('Error refreshing streams:', err);
     } finally {
@@ -400,15 +443,74 @@ export class StreamListComponent implements OnInit {
     return subject ? subject.name : 'Неизвестный курс';
   }
 
+  getStreamTargetGroups(stream: any): string[] {
+    if (stream.target_groups) {
+      try {
+        const parsed = typeof stream.target_groups === 'string' ? JSON.parse(stream.target_groups) : stream.target_groups;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        const split = String(stream.target_groups).split(',').map((s: string) => s.trim()).filter(Boolean);
+        if (split.length > 0) return split;
+      }
+    }
+    if (stream.room_name && stream.room_name.includes('__groups__')) {
+      try {
+        const part = stream.room_name.split('__groups__')[1].split('_')[0];
+        const decoded = decodeURIComponent(part).split(',').map((s: string) => s.trim()).filter(Boolean);
+        if (decoded.length > 0) return decoded;
+      } catch (e) {}
+    }
+    return [];
+  }
+
+  getStreamGroupsLabel(stream: any): string {
+    const groups = this.getStreamTargetGroups(stream);
+    if (groups.length === 0) {
+      return 'Для всех групп';
+    }
+    return `Группы: ${groups.join(', ')}`;
+  }
+
+  getStreamDuration(createdAt: string | Date): string {
+    if (!createdAt) return '00:00';
+    const start = new Date(createdAt).getTime();
+    const diff = Math.max(0, Math.floor((Date.now() - start) / 1000));
+    const hours = Math.floor(diff / 3600);
+    const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = diff % 60;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    if (hours > 0) {
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+    return `${pad(minutes)}:${pad(seconds)}`;
+  }
+
   openStartStreamDialog() {
     const dialogRef = this.dialog.open(StartStreamDialogComponent, {
-      width: '400px',
+      width: '460px',
       data: { subjects: this.subjects }
     });
 
-    dialogRef.afterClosed().subscribe(subjectId => {
-      if (subjectId) {
-        this.router.navigate(['/courses', subjectId, 'stream']);
+    dialogRef.afterClosed().subscribe((result: any) => {
+      if (result && result.subjectId) {
+        const targetGroups = result.targetGroups || [];
+        const groupSlug = targetGroups.length ? '__groups__' + encodeURIComponent(targetGroups.join(',')) : '';
+        const roomName = `room_${result.subjectId.slice(0, 8)}${groupSlug}_${Date.now()}`;
+
+        this.apiService.createStreamingRoom({
+          subject_id: result.subjectId,
+          teacher_name: this.currentUser?.name || 'Преподаватель',
+          room_name: roomName,
+          target_groups: targetGroups
+        }).subscribe({
+          next: () => {
+            this.router.navigate(['/courses', result.subjectId, 'stream']);
+          },
+          error: (err) => {
+            console.warn('Room may already exist or error occurred:', err);
+            this.router.navigate(['/courses', result.subjectId, 'stream']);
+          }
+        });
       }
     });
   }
@@ -422,18 +524,51 @@ export class StreamListComponent implements OnInit {
     <h2 mat-dialog-title class="dialog-title">Начать новую пару</h2>
     <mat-dialog-content class="dialog-content">
       <p class="dialog-desc">Выберите курс, по которому будет проходить трансляция:</p>
+      
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Курс</mat-label>
-        <mat-select [(ngModel)]="selectedSubjectId">
+        <mat-select [(ngModel)]="selectedSubjectId" (selectionChange)="onSubjectChange($event.value)">
           <mat-option *ngFor="let s of subjects" [value]="s.id">
             {{ s.name }}
           </mat-option>
         </mat-select>
       </mat-form-field>
+
+      <!-- Target Groups Option -->
+      <div class="groups-section" *ngIf="selectedSubjectId">
+        <div class="groups-section-title">Аудитория трансляции:</div>
+
+        <div class="radio-options">
+          <label class="radio-label">
+            <input type="radio" name="audience" [value]="true" [(ngModel)]="forAllGroups">
+            <span>Для всех групп курса</span>
+          </label>
+          <label class="radio-label" *ngIf="availableGroups.length > 0">
+            <input type="radio" name="audience" [value]="false" [(ngModel)]="forAllGroups">
+            <span>Выбрать конкретные группы</span>
+          </label>
+        </div>
+
+        <div class="groups-list" *ngIf="!forAllGroups && availableGroups.length > 0">
+          <div class="groups-chips">
+            <button type="button" *ngFor="let g of availableGroups" 
+              class="group-chip" 
+              [class.active]="isGroupSelected(g.name)" 
+              (click)="toggleGroup(g.name)">
+              <span class="chip-dot" *ngIf="isGroupSelected(g.name)">✓</span>
+              <span>{{ g.name }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="no-groups-hint" *ngIf="!loadingGroups && availableGroups.length === 0">
+          В этом курсе нет отдельных групп (эфир увидят все студенты курса).
+        </div>
+      </div>
     </mat-dialog-content>
     <mat-dialog-actions align="end" class="dialog-actions">
       <button mat-button [mat-dialog-close]="null" class="btn-cancel">Отмена</button>
-      <button mat-flat-button [mat-dialog-close]="selectedSubjectId" [disabled]="!selectedSubjectId" class="btn-submit">
+      <button mat-flat-button (click)="submit()" [disabled]="!canSubmit()" class="btn-submit">
         Начать
       </button>
     </mat-dialog-actions>
@@ -459,6 +594,70 @@ export class StreamListComponent implements OnInit {
     .full-width {
       width: 100%;
     }
+    .groups-section {
+      margin-top: 12px;
+      padding: 14px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+    }
+    .groups-section-title {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: #09090b;
+      margin-bottom: 10px;
+    }
+    .radio-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: #334155;
+      cursor: pointer;
+    }
+    .groups-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .group-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #475569;
+      font-family: 'Inter', sans-serif;
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .group-chip.active {
+      background: #09090b;
+      color: #ffffff;
+      border-color: #09090b;
+    }
+    .chip-dot {
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .no-groups-hint {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      color: #94a3b8;
+      font-style: italic;
+    }
     .dialog-actions {
       padding: 12px 24px 20px;
     }
@@ -483,9 +682,63 @@ export class StreamListComponent implements OnInit {
 export class StartStreamDialogComponent {
   subjects: any[] = [];
   selectedSubjectId: string = '';
+  availableGroups: any[] = [];
+  selectedGroups: string[] = [];
+  forAllGroups: boolean = true;
+  loadingGroups: boolean = false;
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: any) {
-    this.subjects = data.subjects;
+  constructor(
+    public dialogRef: MatDialogRef<StartStreamDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: any,
+    private apiService: ApiService
+  ) {
+    this.subjects = data.subjects || [];
+  }
+
+  onSubjectChange(subjectId: string) {
+    this.availableGroups = [];
+    this.selectedGroups = [];
+    this.forAllGroups = true;
+    if (!subjectId) return;
+
+    this.loadingGroups = true;
+    this.apiService.getGroups(subjectId).subscribe({
+      next: (groups) => {
+        this.availableGroups = groups || [];
+        this.loadingGroups = false;
+      },
+      error: () => {
+        this.availableGroups = [];
+        this.loadingGroups = false;
+      }
+    });
+  }
+
+  toggleGroup(name: string) {
+    const idx = this.selectedGroups.indexOf(name);
+    if (idx >= 0) {
+      this.selectedGroups.splice(idx, 1);
+    } else {
+      this.selectedGroups.push(name);
+    }
+  }
+
+  isGroupSelected(name: string): boolean {
+    return this.selectedGroups.includes(name);
+  }
+
+  canSubmit(): boolean {
+    if (!this.selectedSubjectId) return false;
+    if (!this.forAllGroups && this.selectedGroups.length === 0) return false;
+    return true;
+  }
+
+  submit() {
+    if (!this.canSubmit()) return;
+    this.dialogRef.close({
+      subjectId: this.selectedSubjectId,
+      targetGroups: this.forAllGroups ? [] : [...this.selectedGroups]
+    });
   }
 }
 

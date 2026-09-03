@@ -35,10 +35,14 @@ async def create_room(room_data: RoomCreate, db: Session = Depends(get_db)):
     # Generate room name if not provided
     room_name = room_data.room_name or f"room_{str(room_data.subject_id)[:8]}_{int(time.time())}"
     
+    import json
+    target_groups_str = json.dumps(room_data.target_groups) if room_data.target_groups else None
+
     new_room = StreamingRoom(
         subject_id=room_data.subject_id,
         room_name=room_name,
         teacher_name=room_data.teacher_name,
+        target_groups=target_groups_str,
         is_active=True
     )
     

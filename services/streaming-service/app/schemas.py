@@ -7,6 +7,7 @@ class RoomCreate(BaseModel):
     subject_id: UUID
     teacher_name: str
     room_name: Optional[str] = None
+    target_groups: Optional[List[str]] = None
 
 class JoinRequest(BaseModel):
     room_name: str
@@ -24,6 +25,7 @@ class RoomResponse(BaseModel):
     room_name: str
     teacher_name: str
     is_active: bool
+    target_groups: Optional[str] = None
     created_at: datetime
 
     class Config:

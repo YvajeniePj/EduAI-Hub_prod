@@ -12,5 +12,6 @@ class StreamingRoom(Base):
     room_name = Column(String, unique=True, index=True)
     teacher_name = Column(String)
     is_active = Column(Boolean, default=True)
+    target_groups = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     ended_at = Column(DateTime, nullable=True)
