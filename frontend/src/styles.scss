@@ -51,8 +51,16 @@
 
 body {
   font-family: 'Inter', 'Roboto', sans-serif;
-  background-color: #f8f9fc;
+  background-color: #faf9f6;
   color: #333;
+}
+
+/* Global transparent backgrounds so animated constellation canvas is visible across all pages */
+.sidenav-container,
+mat-sidenav-content,
+.mat-drawer-content,
+.mat-sidenav-content {
+  background-color: transparent !important;
 }
 
 .container, .page-container {

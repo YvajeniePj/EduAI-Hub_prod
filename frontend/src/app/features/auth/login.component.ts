@@ -1,102 +1,260 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatInputModule } from '@angular/material/input';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatCardModule, MatButtonModule, MatInputModule, MatFormFieldModule, RouterModule],
+  imports: [CommonModule, RouterModule],
   template: `
-    <div class="auth-container">
-      <mat-card class="auth-card">
-        <mat-card-header>
-          <mat-card-title>Добро пожаловать в EduAI Hub</mat-card-title>
-          <mat-card-subtitle>Единая система авторизации ИТМО</mat-card-subtitle>
-        </mat-card-header>
-        
-        <mat-card-content class="content">
-          <div class="logo-container">
-            <div class="ai-logo">AI</div>
+    <div class="auth-wrapper">
+      <!-- Minimalist Brand Header (Top Left) -->
+      <div class="header-logo">
+        ИТМО · EduAI Hub
+      </div>
+
+      <!-- Main Login Card -->
+      <div class="auth-card">
+        <!-- Floating AI Badge -->
+        <div class="ai-badge-container">
+          <div class="ai-badge">
+            <span class="ai-badge-text">AI</span>
           </div>
-          
-          <p class="description">
-            Для продолжения работы, пожалуйста, авторизуйтесь через университетскую учетную запись.
-          </p>
+        </div>
 
-          <button mat-raised-button color="primary" class="sso-button" (click)="login()" [disabled]="loading">
-            <span *ngIf="!loading">Войти через SSO ИТМО</span>
-            <span *ngIf="loading">Перенаправление...</span>
+        <!-- Headings -->
+        <h1 class="welcome-heading">Добро пожаловать</h1>
+        <div class="brand-heading">EduAI Hub</div>
+
+        <!-- Subtle Dash Divider -->
+        <div class="divider-dash"></div>
+
+        <!-- Subtitle -->
+        <p class="auth-subtitle">
+          Войдите через Телеграм аккаунт привязанный к университетским сервисам.
+        </p>
+
+        <!-- Actions -->
+        <div class="actions-container">
+          <button class="btn-sso" (click)="login()" [disabled]="loading">
+            <span *ngIf="!loading">ВОЙТИ ЧЕРЕЗ SSO ИТМО</span>
+            <span *ngIf="loading">ПЕРЕНАПРАВЛЕНИЕ...</span>
           </button>
 
-          <button mat-stroked-button color="accent" class="mock-button" (click)="loginAsGena()" [disabled]="loading" style="margin-top: 12px; width: 100%; height: 50px; font-size: 16px; font-weight: 500; border-radius: 8px;">
-            <span>Войти как Тестик Гена</span>
+          <button class="btn-mock" (click)="loginAsGena()" [disabled]="loading">
+            <span>ВОЙТИ КАК ТЕСТИК ГЕНА</span>
           </button>
-        </mat-card-content>
-        
-        <mat-card-footer>
-          <p class="footer-text">Входя в систему, вы соглашаетесь с правилами использования EduAI Hub</p>
-        </mat-card-footer>
-      </mat-card>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
-    .auth-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 80vh;
-      padding: 20px;
-    }
-    .auth-card {
-      max-width: 450px;
+    .auth-wrapper {
+      position: relative;
       width: 100%;
-      text-align: center;
-      padding: 16px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      border-radius: 12px;
-    }
-    .logo-container {
-      margin: 32px 0;
-    }
-    .ai-logo {
-      width: 80px;
-      height: 80px;
-      background: linear-gradient(135deg, #3f51b5, #00BCD4);
-      color: white;
-      font-size: 32px;
-      font-weight: bold;
+      min-height: 100vh;
       display: flex;
-      justify-content: center;
       align-items: center;
-      border-radius: 20px;
-      margin: 0 auto;
-      box-shadow: 0 5px 15px rgba(63, 81, 181, 0.4);
+      justify-content: center;
+      padding: 24px;
+      z-index: 2;
     }
-    .content {
-      padding: 0 24px 24px;
-    }
-    .description {
-      color: #666;
-      margin-bottom: 32px;
-      line-height: 1.6;
-    }
-    .sso-button {
-      width: 100%;
-      height: 50px;
-      font-size: 16px;
+
+    .header-logo {
+      position: fixed;
+      top: 28px;
+      left: 32px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, monospace, sans-serif;
+      font-size: 11px;
       font-weight: 500;
-      border-radius: 8px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      user-select: none;
+      z-index: 20;
     }
-    .footer-text {
+
+    .auth-card {
+      position: relative;
+      z-index: 10;
+      max-width: 440px;
+      width: 100%;
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 
+        0 20px 45px -15px rgba(0, 0, 0, 0.07),
+        0 0 0 1px rgba(0, 0, 0, 0.04);
+      padding: 48px 40px 44px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: box-shadow 0.3s ease;
+    }
+
+    .auth-card:hover {
+      box-shadow: 
+        0 24px 50px -15px rgba(0, 0, 0, 0.09),
+        0 0 0 1px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Floating AI Badge Animation */
+    .ai-badge-container {
+      margin-bottom: 22px;
+      display: inline-flex;
+      animation: aiFloat 4.2s ease-in-out infinite;
+    }
+
+    @keyframes aiFloat {
+      0%, 100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-8px);
+      }
+    }
+
+    .ai-badge {
+      width: 58px;
+      height: 58px;
+      background: #09090b;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.25);
+    }
+
+    .ai-badge-text {
+      font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+      font-size: 26px;
+      font-weight: 600;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+      user-select: none;
+    }
+
+    /* Typography */
+    .welcome-heading {
+      font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+      font-size: 34px;
+      font-weight: 500;
+      color: #18181b;
+      line-height: 1.15;
+      letter-spacing: -0.015em;
+      margin: 0;
+      user-select: none;
+    }
+
+    .brand-heading {
+      font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+      font-style: italic;
+      font-size: 30px;
+      font-weight: 600;
+      color: #09090b;
+      line-height: 1.2;
+      margin-top: 4px;
+      letter-spacing: -0.01em;
+      user-select: none;
+    }
+
+    .divider-dash {
+      width: 28px;
+      height: 1.5px;
+      background: #e4e4e7;
+      margin: 22px auto 20px;
+      border-radius: 2px;
+    }
+
+    .auth-subtitle {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13.5px;
+      font-weight: 400;
+      color: #71717a;
+      line-height: 1.55;
+      max-width: 320px;
+      margin: 0 auto 32px;
+      user-select: none;
+    }
+
+    /* Actions */
+    .actions-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .btn-sso {
+      width: 100%;
+      height: 48px;
+      background: #09090b;
+      color: #ffffff;
+      border: 1px solid #09090b;
+      border-radius: 8px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 12px;
-      color: #999;
-      margin: 16px 0;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+
+    .btn-sso:hover:not(:disabled) {
+      background: #27272a;
+      border-color: #27272a;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
+    }
+
+    .btn-sso:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn-sso:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-mock {
+      width: 100%;
+      height: 48px;
+      background: #ffffff;
+      color: #18181b;
+      border: 1px solid #e4e4e7;
+      border-radius: 8px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-mock:hover:not(:disabled) {
+      background: #f8fafc;
+      border-color: #d4d4d8;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .btn-mock:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn-mock:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
   `]
 })
@@ -115,13 +273,12 @@ export class LoginComponent implements OnInit {
       localStorage.setItem('auth_return_url', returnUrl);
     }
 
-    // If the user is already authenticated, don't show the login page
+    // If user is already authenticated, redirect
     if (this.auth.isAuthenticated()) {
       const targetUrl = returnUrl || '/';
       this.router.navigateByUrl(targetUrl);
     }
-    
-    // Also subscribe to changes in case the user authenticates while on this page
+
     this.auth.currentUser$.subscribe(user => {
       if (user) {
         const targetUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
@@ -154,4 +311,6 @@ export class LoginComponent implements OnInit {
     });
   }
 }
+
+
 

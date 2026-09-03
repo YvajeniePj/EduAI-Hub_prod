@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, NgZone, HostListener } from '@angular/core';
 import { RouterOutlet, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -14,6 +14,15 @@ import { AuthService, CurrentUser } from './core/services/auth.service';
 import { Router } from '@angular/router';
 import { interval, Subscription } from 'rxjs';
 import { distinctUntilChanged } from 'rxjs/operators';
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  baseAlpha: number;
+}
 
 @Component({
   selector: 'app-root',
@@ -32,6 +41,9 @@ import { distinctUntilChanged } from 'rxjs/operators';
     MatMenuModule
   ],
   template: `
+    <!-- Global Animated Constellation Canvas Background -->
+    <canvas #globalParticleCanvas class="global-particle-canvas"></canvas>
+
     <div *ngIf="!isInitialized" class="initial-loader">
       <div class="loader-content">
         <mat-icon class="loader-icon">school</mat-icon>
@@ -201,19 +213,36 @@ import { distinctUntilChanged } from 'rxjs/operators';
     </mat-sidenav-container>
     
     <ng-template #noAuth>
-      <div class="container">
+      <div class="no-auth-container">
         <router-outlet></router-outlet>
       </div>
     </ng-template>
   `,
   styles: [`
+    .global-particle-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .no-auth-container {
+      width: 100%;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      position: relative;
+      z-index: 1;
+    }
     .initial-loader {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: #f8faff;
+      background: #faf9f6;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -254,7 +283,9 @@ import { distinctUntilChanged } from 'rxjs/operators';
     }
     .sidenav-container {
       height: 100vh;
-      background: #f8f9fa;
+      background: transparent !important;
+      position: relative;
+      z-index: 1;
     }
     .app-sidenav {
       width: 320px;
@@ -451,7 +482,16 @@ import { distinctUntilChanged } from 'rxjs/operators';
     }
   `]
 })
-export class AppComponent implements OnInit, OnDestroy {
+export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild('globalParticleCanvas') canvasRef?: ElementRef<HTMLCanvasElement>;
+
+  private animationFrameId: number | null = null;
+  private particles: Particle[] = [];
+  private resizeListener?: () => void;
+  private mouseMoveListener?: (e: MouseEvent) => void;
+  private mouseLeaveListener?: () => void;
+  private mouse = { x: -1000, y: -1000, radius: 130 };
+
   sidebarSubjects: any[] = [];
   title = 'EduAI Hub';
   aiStatus: any = null;
@@ -470,7 +510,8 @@ export class AppComponent implements OnInit, OnDestroy {
   constructor(
     private apiService: ApiService,
     private auth: AuthService,
-    private router: Router
+    private router: Router,
+    private ngZone: NgZone
   ) { }
 
   ngOnInit() {
@@ -520,7 +561,25 @@ export class AppComponent implements OnInit, OnDestroy {
     this.startGlobalTimerCheck();
   }
 
+  ngAfterViewInit() {
+    this.ngZone.runOutsideAngular(() => {
+      this.initParticleCanvas();
+    });
+  }
+
   ngOnDestroy() {
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    if (this.resizeListener) {
+      window.removeEventListener('resize', this.resizeListener);
+    }
+    if (this.mouseMoveListener) {
+      window.removeEventListener('mousemove', this.mouseMoveListener);
+    }
+    if (this.mouseLeaveListener) {
+      window.removeEventListener('mouseleave', this.mouseLeaveListener);
+    }
     if (this.timerSubscription) {
       this.timerSubscription.unsubscribe();
     }
@@ -751,6 +810,121 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.activeTestTimer) {
       this.router.navigate(['/tests', this.activeTestTimer.testId, 'take']);
     }
+  }
+
+  private initParticleCanvas() {
+    if (!this.canvasRef) return;
+    const canvas = this.canvasRef.nativeElement;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const setupDimensions = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    setupDimensions();
+
+    this.resizeListener = () => {
+      setupDimensions();
+      this.createParticles(window.innerWidth, window.innerHeight);
+    };
+    window.addEventListener('resize', this.resizeListener);
+
+    this.mouseMoveListener = (e: MouseEvent) => {
+      this.mouse.x = e.clientX;
+      this.mouse.y = e.clientY;
+    };
+    window.addEventListener('mousemove', this.mouseMoveListener);
+
+    this.mouseLeaveListener = () => {
+      this.mouse.x = -1000;
+      this.mouse.y = -1000;
+    };
+    window.addEventListener('mouseleave', this.mouseLeaveListener);
+
+    this.createParticles(window.innerWidth, window.innerHeight);
+    this.renderCanvas(ctx);
+  }
+
+  private createParticles(width: number, height: number) {
+    const count = Math.min(70, Math.floor((width * height) / 20000) + 30);
+    this.particles = [];
+
+    for (let i = 0; i < count; i++) {
+      this.particles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: (Math.random() - 0.5) * 0.35,
+        radius: Math.random() * 1.4 + 1.1,
+        baseAlpha: Math.random() * 0.28 + 0.25
+      });
+    }
+  }
+
+  private renderCanvas(ctx: CanvasRenderingContext2D) {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const maxDistance = 145;
+
+    const loop = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      const len = this.particles.length;
+      for (let i = 0; i < len; i++) {
+        const p = this.particles[i];
+
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0) p.x = width;
+        else if (p.x > width) p.x = 0;
+        if (p.y < 0) p.y = height;
+        else if (p.y > height) p.y = 0;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(140, 140, 150, ${p.baseAlpha})`;
+        ctx.fill();
+
+        for (let j = i + 1; j < len; j++) {
+          const p2 = this.particles[j];
+          const dx = p.x - p2.x;
+          const dy = p.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < maxDistance) {
+            const alpha = (1 - dist / maxDistance) * 0.16;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = `rgba(160, 160, 175, ${alpha})`;
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+          }
+        }
+
+        const mdx = p.x - this.mouse.x;
+        const mdy = p.y - this.mouse.y;
+        const mDist = Math.sqrt(mdx * mdx + mdy * mdy);
+        if (mDist < this.mouse.radius) {
+          const mAlpha = (1 - mDist / this.mouse.radius) * 0.22;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(this.mouse.x, this.mouse.y);
+          ctx.strokeStyle = `rgba(120, 120, 140, ${mAlpha})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+
+      this.animationFrameId = requestAnimationFrame(loop);
+    };
+
+    loop();
   }
 }
 
