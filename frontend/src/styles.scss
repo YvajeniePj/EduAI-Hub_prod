@@ -78,28 +78,39 @@ mat-sidenav-content,
   color: #09090b !important;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+  z-index: 100 !important;
 }
 
 .app-toolbar button {
   color: #475569 !important;
 }
 
-/* Dynamic Sidebar custom styles with blur & cubic-bezier */
-.app-sidenav {
-  background: rgba(255, 255, 255, 0.88) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border-right: 1px solid rgba(0, 0, 0, 0.06) !important;
-  box-shadow: 10px 0 30px rgba(0, 0, 0, 0.03) !important;
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+/* Dynamic Sidebar styles: solid white with hardware acceleration */
+.app-sidenav,
+.mat-drawer.app-sidenav {
+  background: #ffffff !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 10px 0 40px rgba(0, 0, 0, 0.08) !important;
+  z-index: 1001 !important;
+  will-change: transform;
 }
 
 .mat-drawer-inner-container {
-  background: transparent !important;
+  background: #ffffff !important;
+}
+
+.mat-drawer-backdrop {
+  z-index: 1000 !important;
+}
+
+.mat-drawer-backdrop.mat-drawer-shown {
+  background-color: rgba(15, 23, 42, 0.18) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
 }
 
 .sidenav-header {
-  background: transparent !important;
+  background: #ffffff !important;
   color: #09090b !important;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }

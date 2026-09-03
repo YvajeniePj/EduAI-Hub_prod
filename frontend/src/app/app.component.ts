@@ -292,19 +292,18 @@ interface Particle {
     }
     .app-sidenav {
       width: 280px;
-      background: rgba(255, 255, 255, 0.88) !important;
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      border-right: 1px solid rgba(0, 0, 0, 0.06);
-      box-shadow: 10px 0 35px rgba(0, 0, 0, 0.03);
-      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      background: #ffffff !important;
+      border-right: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 10px 0 40px rgba(0, 0, 0, 0.08);
+      z-index: 1001 !important;
+      will-change: transform;
     }
     .sidenav-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 16px 20px;
-      background: transparent;
+      background: #ffffff;
       border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     }
     .close-sidenav-btn {
@@ -400,7 +399,7 @@ interface Particle {
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
       position: sticky;
       top: 0;
-      z-index: 1000;
+      z-index: 100;
     }
     .menu-hamburger-btn {
       background: transparent;
