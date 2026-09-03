@@ -55,116 +55,117 @@ interface Particle {
     <mat-sidenav-container class="sidenav-container" *ngIf="isInitialized && currentUser; else noAuth">
       <mat-sidenav #sidenav mode="over" class="app-sidenav">
         <div class="sidenav-header">
-          <mat-icon class="sidenav-logo-icon">school</mat-icon>
-          <span class="sidenav-logo-text">EduAI Hub</span>
-          <button mat-icon-button (click)="sidenav.close()">
-            <mat-icon>close</mat-icon>
+          <div class="brand-logo" (click)="sidenav.close()" routerLink="/">
+            <div class="ai-square-logo">
+              <span>AI</span>
+            </div>
+            <span class="brand-name">EduAI Hub</span>
+          </div>
+          <button class="close-sidenav-btn" (click)="sidenav.close()" aria-label="Закрыть меню">
+            <mat-icon style="font-size: 18px; width: 18px; height: 18px;">close</mat-icon>
           </button>
         </div>
         
-        <mat-nav-list>
+        <mat-nav-list class="sidenav-list">
           <!-- Home -->
-          <a mat-list-item routerLink="/" (click)="sidenav.close()" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">
-            <mat-icon matListItemIcon>home</mat-icon>
-            <span matListItemTitle>Главная</span>
+          <a mat-list-item routerLink="/" (click)="sidenav.close()" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}" class="nav-item">
+            <mat-icon matListItemIcon class="nav-icon">home</mat-icon>
+            <span matListItemTitle class="nav-title">Главная</span>
           </a>
-          <a mat-list-item routerLink="/calendar-news" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>calendar_month</mat-icon>
-            <span matListItemTitle>Календарь и новости</span>
+          <a mat-list-item routerLink="/calendar-news" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
+            <mat-icon matListItemIcon class="nav-icon">calendar_month</mat-icon>
+            <span matListItemTitle class="nav-title">Календарь и новости</span>
           </a>
 
           <!-- Dynamic Courses -->
           <ng-container *ngIf="sidebarSubjects && sidebarSubjects.length > 0">
-            <div class="nav-divider"></div>
             <div class="nav-block-header">МОИ КУРСЫ</div>
-            <a mat-list-item *ngFor="let subject of sidebarSubjects; let idx = index" [routerLink]="['/courses', subject.id]" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon [style.color]="'var(--course-' + ((idx % 6) + 1) + ')'">book</mat-icon>
-              <span matListItemTitle>{{ subject.name }}</span>
+            <a mat-list-item *ngFor="let subject of sidebarSubjects" [routerLink]="['/courses', subject.id]" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item nav-course-item">
+              <span class="course-dot">•</span>
+              <span matListItemTitle class="course-nav-title">{{ subject.name }}</span>
             </a>
           </ng-container>
 
           <!-- Block: Management (Teachers/Admins Only) -->
           <ng-container *ngIf="currentUser.role === 'teacher' || currentUser.role === 'admin'">
-            <div class="nav-divider"></div>
             <div class="nav-block-header">УПРАВЛЕНИЕ</div>
-            <a mat-list-item routerLink="/analytics" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>insights</mat-icon>
-              <span matListItemTitle>Аналитика</span>
+            <a mat-list-item routerLink="/analytics" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
+              <mat-icon matListItemIcon class="nav-icon">insights</mat-icon>
+              <span matListItemTitle class="nav-title">Аналитика</span>
             </a>
-            <a mat-list-item routerLink="/activity-monitor" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>visibility</mat-icon>
-              <span matListItemTitle>Мониторинг</span>
+            <a mat-list-item routerLink="/activity-monitor" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
+              <mat-icon matListItemIcon class="nav-icon">visibility</mat-icon>
+              <span matListItemTitle class="nav-title">Мониторинг</span>
             </a>
-            <a mat-list-item routerLink="/news/manage" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>feed</mat-icon>
-              <span matListItemTitle>Новости</span>
+            <a mat-list-item routerLink="/news/manage" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
+              <mat-icon matListItemIcon class="nav-icon">feed</mat-icon>
+              <span matListItemTitle class="nav-title">Новости</span>
             </a>
-            <a mat-list-item routerLink="/admin/db" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>database</mat-icon>
-              <span matListItemTitle>База данных</span>
+            <a mat-list-item routerLink="/admin/db" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
+              <mat-icon matListItemIcon class="nav-icon">database</mat-icon>
+              <span matListItemTitle class="nav-title">База данных</span>
             </a>
           </ng-container>
 
           <!-- Block: Users (Teachers/Admins Only) -->
           <ng-container *ngIf="currentUser.role === 'teacher' || currentUser.role === 'admin'">
-            <div class="nav-divider"></div>
             <div class="nav-block-header">ПОЛЬЗОВАТЕЛИ</div>
-            <a mat-list-item routerLink="/students" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>person_search</mat-icon>
-              <span matListItemTitle>Пользователи</span>
+            <a mat-list-item routerLink="/students" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
+              <mat-icon matListItemIcon class="nav-icon">person_search</mat-icon>
+              <span matListItemTitle class="nav-title">Пользователи</span>
             </a>
-            <a mat-list-item routerLink="/groups" (click)="sidenav.close()" routerLinkActive="active-link">
-              <mat-icon matListItemIcon>groups</mat-icon>
-              <span matListItemTitle>Группы</span>
+            <a mat-list-item routerLink="/groups" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
+              <mat-icon matListItemIcon class="nav-icon">groups</mat-icon>
+              <span matListItemTitle class="nav-title">Группы</span>
             </a>
           </ng-container>
 
           <!-- Block: Common Additional Sections -->
-          <div class="nav-divider"></div>
           <div class="nav-block-header">ДОПОЛНИТЕЛЬНО</div>
-          <a mat-list-item routerLink="/leaderboard" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>emoji_events</mat-icon>
-            <span matListItemTitle>Лидерборд</span>
+          <a mat-list-item routerLink="/leaderboard" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
+            <mat-icon matListItemIcon class="nav-icon">emoji_events</mat-icon>
+            <span matListItemTitle class="nav-title">Лидерборд</span>
           </a>
-          <a mat-list-item routerLink="/messages" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>forum</mat-icon>
-            <span matListItemTitle>Сообщения</span>
+          <a mat-list-item routerLink="/messages" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
+            <mat-icon matListItemIcon class="nav-icon">forum</mat-icon>
+            <span matListItemTitle class="nav-title">Сообщения</span>
           </a>
-          <a mat-list-item routerLink="/chat" (click)="sidenav.close()" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>smart_toy</mat-icon>
-            <span matListItemTitle>Чат-ассистент</span>
+          <a mat-list-item routerLink="/chat" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
+            <mat-icon matListItemIcon class="nav-icon">smart_toy</mat-icon>
+            <span matListItemTitle class="nav-title">Чат-ассистент</span>
           </a>
         </mat-nav-list>
       </mat-sidenav>
 
       <mat-sidenav-content>
-        <mat-toolbar color="primary" class="app-toolbar">
-          <button mat-icon-button (click)="sidenav.toggle()">
-            <mat-icon>menu</mat-icon>
+        <mat-toolbar class="app-toolbar">
+          <!-- 3-thin-lines Hamburger Menu -->
+          <button class="menu-hamburger-btn" (click)="sidenav.toggle()" aria-label="Открыть меню">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
           </button>
           
-          <mat-icon 
-            [class.status-connected]="aiStatus?.available"
-            [class.status-disconnected]="!aiStatus?.available"
-            [matTooltip]="aiStatus?.message || 'Проверка статуса...'"
-            style="margin-left: 16px; margin-right: 8px;">
-            {{ aiStatus?.available ? 'check_circle' : 'error' }}
-          </mat-icon>
-          
-          <span class="app-title">EduAI Hub</span>
+          <!-- Brand Logo: Black square with AI in Instrument Serif -->
+          <div class="brand-logo" routerLink="/">
+            <div class="ai-square-logo">
+              <span>AI</span>
+            </div>
+            <span class="brand-name">EduAI Hub</span>
+          </div>
 
           <!-- Active test timer widget -->
-          <div class="active-test-timer-toolbar" *ngIf="activeTestTimer" (click)="goToActiveTest()" matTooltip="Нажмите, чтобы вернуться к тесту" style="cursor: pointer; display: flex; align-items: center; background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; margin-left: 20px; gap: 8px; font-weight: 500;">
-            <mat-icon style="color: #ffd700; font-size: 20px; width: 20px; height: 20px; margin: 0;">timer</mat-icon>
-            <span style="font-size: 13px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff;">{{ activeTestTimer.testTitle }}</span>
-            <span style="font-size: 14px; font-family: monospace; background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 12px; color: #fff;">{{ activeTestTimer.displayTime }}</span>
+          <div class="active-test-timer-toolbar" *ngIf="activeTestTimer" (click)="goToActiveTest()" matTooltip="Нажмите, чтобы вернуться к тесту">
+            <mat-icon style="color: #ffd700; font-size: 18px; width: 18px; height: 18px; margin: 0;">timer</mat-icon>
+            <span style="font-size: 13px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1e293b;">{{ activeTestTimer.testTitle }}</span>
+            <span style="font-size: 13px; font-family: monospace; background: rgba(0,0,0,0.06); padding: 2px 8px; border-radius: 12px; color: #1e293b;">{{ activeTestTimer.displayTime }}</span>
           </div>
           
           <span class="spacer"></span>
           
           <!-- Notifications -->
-          <button mat-icon-button [matMenuTriggerFor]="notificationsMenu" class="notification-button">
-            <mat-icon [matBadge]="unreadCount" [matBadgeHidden]="unreadCount === 0" matBadgeColor="warn">notifications</mat-icon>
+          <button mat-icon-button [matMenuTriggerFor]="notificationsMenu" class="notification-button" aria-label="Уведомления">
+            <mat-icon [matBadge]="unreadCount" [matBadgeHidden]="unreadCount === 0" matBadgeColor="warn" style="font-size: 20px; width: 20px; height: 20px; color: #64748b;">notifications</mat-icon>
           </button>
           
           <mat-menu #notificationsMenu="matMenu" class="notifications-menu">
@@ -192,21 +193,23 @@ interface Particle {
             </div>
           </mat-menu>
           
+          <!-- Monogram avatar + User Name -->
           <button mat-button routerLink="/profile" class="profile-button">
             <div class="profile-content">
-              <div class="avatar-container" *ngIf="currentUser.avatar_url && !avatarError">
-                <img [src]="getAvatarUrl(currentUser.avatar_url)" alt="avatar" class="toolbar-avatar" (error)="avatarError = true">
+              <div class="user-monogram">
+                {{ getUserInitials(currentUser.name) }}
               </div>
-              <mat-icon *ngIf="!currentUser.avatar_url || avatarError" class="toolbar-avatar-icon">person</mat-icon>
               <span class="toolbar-user-name">{{ currentUser.name }}</span>
             </div>
           </button>
-          <button mat-icon-button (click)="logout()" matTooltip="Выйти">
-            <mat-icon>logout</mat-icon>
+
+          <!-- Logout Button -->
+          <button mat-icon-button (click)="logout()" matTooltip="Выйти" class="logout-icon-btn">
+            <mat-icon style="font-size: 20px; width: 20px; height: 20px; color: #64748b;">arrow_forward</mat-icon>
           </button>
         </mat-toolbar>
 
-        <div class="container main-content">
+        <div class="main-content">
           <router-outlet></router-outlet>
         </div>
       </mat-sidenav-content>
@@ -288,57 +291,206 @@ interface Particle {
       z-index: 1;
     }
     .app-sidenav {
-      width: 320px;
-      box-shadow: 4px 0 10px rgba(0,0,0,0.05);
-      border-right: none;
-      background: white;
+      width: 280px;
+      background: rgba(255, 255, 255, 0.88) !important;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-right: 1px solid rgba(0, 0, 0, 0.06);
+      box-shadow: 10px 0 35px rgba(0, 0, 0, 0.03);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
     .sidenav-header {
       display: flex;
       align-items: center;
-      padding: 20px 16px;
-      background: #3f51b5;
-      color: white;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: transparent;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     }
-    .sidenav-logo-icon {
-      font-size: 32px;
-      width: 32px;
-      height: 32px;
-      margin-right: 12px;
+    .close-sidenav-btn {
+      background: transparent;
+      border: none;
+      color: #64748b;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.15s, color 0.15s;
     }
-    .sidenav-logo-text {
-      font-size: 20px;
-      font-weight: 500;
-      flex-grow: 1;
+    .close-sidenav-btn:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+      color: #09090b;
     }
-    .nav-divider {
-      height: 1px;
-      background: #eee;
-      margin: 8px 0;
+    .sidenav-list {
+      padding: 12px 8px;
+    }
+    .nav-item {
+      border-radius: 8px !important;
+      margin: 2px 4px !important;
+      height: 40px !important;
+      transition: background-color 0.15s ease;
+    }
+    .nav-item:hover {
+      background-color: rgba(0, 0, 0, 0.04) !important;
+    }
+    .nav-icon {
+      font-size: 19px !important;
+      width: 19px !important;
+      height: 19px !important;
+      color: #64748b !important;
+      margin-right: 12px !important;
+    }
+    .nav-title {
+      font-family: 'Inter', sans-serif !important;
+      font-size: 13.5px !important;
+      font-weight: 400 !important;
+      color: #334155 !important;
     }
     .nav-block-header {
-      padding: 16px 16px 8px;
-      font-size: 11px;
+      padding: 18px 16px 6px;
+      font-family: 'Inter', sans-serif;
+      font-size: 10.5px;
       font-weight: 600;
-      letter-spacing: 1px;
-      color: #999;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
       text-transform: uppercase;
     }
-    .active-link {
-      background: rgba(63, 81, 181, 0.08);
-      color: #3f51b5;
-      border-left: 4px solid #3f51b5;
+    .nav-course-item {
+      padding-left: 14px !important;
     }
+    .course-dot {
+      color: #94a3b8;
+      font-size: 16px;
+      margin-right: 12px;
+      display: inline-block;
+      line-height: 1;
+    }
+    .course-nav-title {
+      font-family: 'Inter', sans-serif !important;
+      font-size: 13px !important;
+      color: #334155 !important;
+    }
+    .active-link {
+      background: #f1f5f9 !important;
+      color: #09090b !important;
+    }
+    .active-link .nav-icon {
+      color: #09090b !important;
+    }
+    .active-link .nav-title, .active-link .course-nav-title {
+      font-weight: 600 !important;
+      color: #09090b !important;
+    }
+    .active-link .course-dot {
+      color: #09090b !important;
+    }
+
+    /* Toolbar & Navbar Elements */
     .app-toolbar {
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-      z-index: 1000;
+      height: 60px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.78) !important;
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
       position: sticky;
       top: 0;
+      z-index: 1000;
     }
-    .app-title {
+    .menu-hamburger-btn {
+      background: transparent;
+      border: none;
+      padding: 8px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 3.5px;
+      border-radius: 6px;
+      margin-right: 8px;
+      transition: background-color 0.15s ease;
+    }
+    .menu-hamburger-btn:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+    .hamburger-line {
+      display: block;
+      width: 17px;
+      height: 1.5px;
+      background-color: #09090b;
+      border-radius: 1px;
+    }
+
+    /* Brand Logo */
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      cursor: pointer;
+      user-select: none;
+      text-decoration: none;
+    }
+    .ai-square-logo {
+      width: 28px;
+      height: 28px;
+      background: #09090b;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+    }
+    .ai-square-logo span {
+      font-family: 'Instrument Serif', 'Cormorant Garamond', Georgia, serif;
+      font-size: 16px;
       font-weight: 500;
-      letter-spacing: 0.5px;
+      color: #ffffff;
+      line-height: 1;
+      letter-spacing: -0.5px;
     }
+    .brand-name {
+      font-family: 'Instrument Serif', 'Cormorant Garamond', Georgia, serif;
+      font-size: 20px;
+      font-weight: 500;
+      color: #09090b;
+      letter-spacing: -0.01em;
+    }
+
+    .active-test-timer-toolbar {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 5px 12px;
+      border-radius: 20px;
+      margin-left: 20px;
+      gap: 8px;
+    }
+    .timer-title {
+      font-size: 13px;
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #334155;
+      font-weight: 500;
+    }
+    .timer-badge {
+      font-size: 13px;
+      font-family: monospace;
+      background: #e2e8f0;
+      padding: 1px 6px;
+      border-radius: 10px;
+      color: #1e293b;
+      font-weight: 600;
+    }
+
     .main-content {
       padding: 24px;
       min-height: calc(100vh - 64px);
@@ -347,39 +499,50 @@ interface Particle {
       max-width: 1400px;
       margin: 0 auto;
     }
-    .avatar-container {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      overflow: hidden;
-      margin-right: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #e0e0e0;
-    }
-    .toolbar-avatar {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+
+    /* Monogram Avatar & Profile */
     .profile-button {
-      padding: 0 12px;
+      border-radius: 20px !important;
+      padding: 4px 12px 4px 6px !important;
+      height: 40px !important;
+      margin-left: 4px;
+    }
+    .profile-button:hover {
+      background: rgba(0, 0, 0, 0.04) !important;
     }
     .profile-content {
       display: flex !important;
       align-items: center;
       gap: 8px;
     }
+    .user-monogram {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
     .toolbar-user-name {
-      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13.5px;
       font-weight: 500;
+      color: #334155;
     }
-    .toolbar-avatar-icon {
-        margin-right: 0 !important;
+    .logout-icon-btn {
+      color: #64748b !important;
+      margin-left: 2px;
     }
-    mat-icon.status-connected {
-      color: #4caf50;
+    .logout-icon-btn:hover {
+      color: #09090b !important;
     }
     mat-icon.status-disconnected {
       color: #f44336;
@@ -513,6 +676,15 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private router: Router,
     private ngZone: NgZone
   ) { }
+
+  getUserInitials(name?: string): string {
+    if (!name) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
 
   ngOnInit() {
     this.currentUser = this.auth.getCurrentUser();
