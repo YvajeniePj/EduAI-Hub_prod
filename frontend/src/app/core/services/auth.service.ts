@@ -118,14 +118,25 @@ export class AuthService {
       this.idTokenSubject.next(user.id_token || null);
       
       // In OIDC, profile info is in user.profile
-      const profile = user.profile;
+      const profile: any = user.profile;
       console.log('Token received, user profile:', profile.preferred_username);
       console.log('=== FULL KEYCLOAK PROFILE ===', JSON.stringify(profile, null, 2));
       
       const properName = profile.name ? (profile.name as string) : (profile.preferred_username as string);
       
-      // Robust avatar mapping: check picture, avatar, avatar_url in Keycloak profile
-      const properAvatar = (profile['picture'] || profile['avatar'] || profile['avatar_url']) as string | undefined;
+      // Robust avatar mapping: check photo_url (Telegram standard), picture, avatar, avatar_url, etc.
+      const attrs = profile.attributes as Record<string, any> | undefined;
+      const properAvatar = (
+        profile['photo_url'] ||
+        profile['picture'] ||
+        profile['avatar'] ||
+        profile['avatar_url'] ||
+        profile['telegram_photo_url'] ||
+        profile['tg_photo_url'] ||
+        profile['photo'] ||
+        profile['image'] ||
+        (attrs && (attrs['photo_url']?.[0] || attrs['picture']?.[0] || attrs['avatar']?.[0] || attrs['avatar_url']?.[0]))
+      ) as string | undefined;
       
       console.log('Properly mapped user data:', { name: properName, avatar: properAvatar });
       
@@ -179,14 +190,22 @@ export class AuthService {
       tap(backendUser => {
         const current = fallbackUser || this.currentUserSubject.value;
         if (current) {
+          const effectiveAvatar = backendUser.avatar_url || current.avatar_url;
           this.currentUserSubject.next({
             ...current,
             id: backendUser.user_id,
             name: backendUser.username || current.name,
             role: backendUser.role,
-            avatar_url: backendUser.avatar_url || current.avatar_url,
+            avatar_url: effectiveAvatar,
             is_hidden_admin: backendUser.is_hidden_admin || false
           });
+
+          // If backend has no avatar, but frontend got one from Keycloak profile, sync it to backend
+          if (!backendUser.avatar_url && current.avatar_url && backendUser.user_id) {
+            this.http.put(`${this.apiBaseUrl}/users/${backendUser.user_id}`, { avatar_url: current.avatar_url }).subscribe({
+              error: (e) => console.warn('Could not sync avatar to backend:', e)
+            });
+          }
         }
       }),
       catchError(err => {

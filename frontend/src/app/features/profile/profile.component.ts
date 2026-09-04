@@ -39,23 +39,34 @@ import { HttpEventType } from '@angular/common/http';
   ],
   template: `
     <div class="profile-container" *ngIf="user; else needLogin">
-      <div class="profile-header-card">
+      <!-- Hero Card профиля -->
+      <div class="profile-hero-card glass-panel">
         <div class="profile-header-content">
           <div class="avatar-section">
             <div class="profile-avatar-wrapper">
-              <img [src]="getAvatarUrl(user.avatar_url)" alt="avatar" class="profile-avatar" *ngIf="user.avatar_url" (error)="user.avatar_url = undefined">
-              <mat-icon class="profile-avatar-placeholder" *ngIf="!user.avatar_url">person</mat-icon>
-              <div class="avatar-overlay" *ngIf="isOwnProfile" (click)="fileInput.click()">
+              <img [src]="getAvatarUrl(user.avatar_url)" 
+                   alt="avatar" 
+                   class="profile-avatar" 
+                   *ngIf="user.avatar_url && !avatarError" 
+                   (error)="avatarError = true" 
+                   referrerpolicy="no-referrer">
+              
+              <!-- Монограмма с инициалами при отсутствии фото -->
+              <div class="profile-monogram" *ngIf="!user.avatar_url || avatarError">
+                {{ getUserInitials(user.name) }}
+              </div>
+
+              <div class="avatar-overlay" *ngIf="isOwnProfile" (click)="fileInput.click()" matTooltip="Загрузить фото">
                 <mat-icon>photo_camera</mat-icon>
               </div>
             </div>
             <input type="file" #fileInput (change)="onFileSelected($event)" accept="image/*" style="display: none;">
-            <mat-progress-bar mode="determinate" [value]="uploadProgress" *ngIf="uploading" style="margin-top: 8px;"></mat-progress-bar>
+            <mat-progress-bar mode="determinate" [value]="uploadProgress" *ngIf="uploading" class="upload-bar"></mat-progress-bar>
           </div>
 
-            <div class="user-info-section">
+          <div class="user-info-section">
             <div class="name-edit-wrapper" *ngIf="!isEditingName">
-              <h1>{{ user.name }}</h1>
+              <h1 class="profile-user-name">{{ user.name }}</h1>
               
               <!-- SuperAdmin Toggle Badge -->
               <span class="role-badge super-admin-badge" 
@@ -66,53 +77,59 @@ import { HttpEventType } from '@angular/common/http';
                 Администратор
               </span>
 
-              <!-- Regular Role Badge (hidden for SuperAdmin to avoid confusion) -->
+              <!-- Regular Role Badge -->
               <span class="role-badge" 
                     [class.teacher]="user.role === 'teacher' || user.role === 'instructor' || user.role === 'admin'"
                     *ngIf="!user?.is_hidden_admin">
                 {{ user.role === 'admin' ? 'Администратор' : (user.role === 'teacher' || user.role === 'instructor' ? 'Преподаватель' : 'Студент') }}
               </span>
 
-              <button mat-icon-button *ngIf="isOwnProfile" (click)="startEditName()" matTooltip="Изменить имя">
+              <button type="button" class="btn-icon-subtle" *ngIf="isOwnProfile" (click)="startEditName()" matTooltip="Изменить имя">
                 <mat-icon>edit</mat-icon>
               </button>
             </div>
 
-            <!-- Simulation Indicator -->
+            <!-- Редактирование имени -->
+            <div class="name-edit-form" *ngIf="isEditingName">
+              <mat-form-field appearance="outline" class="edit-name-field">
+                <mat-label>Имя профиля</mat-label>
+                <input matInput [(ngModel)]="newName" (keyup.enter)="saveName()">
+              </mat-form-field>
+              <div class="edit-actions">
+                <button type="button" class="btn-outline-pill" (click)="cancelEditName()">Отмена</button>
+                <button type="button" class="btn-solid-pill" (click)="saveName()" [disabled]="!newName.trim() || newName === user.name">Сохранить</button>
+              </div>
+            </div>
+
+            <!-- Индикатор симуляции роли -->
             <div class="simulation-hint" *ngIf="user?.is_hidden_admin && user.role === 'student'">
               <mat-icon>visibility</mat-icon>
               <span>Включен режим просмотра от лица студента</span>
             </div>
             
-            <button mat-stroked-button *ngIf="isOwnProfile" color="primary" class="feedback-button" (click)="openFeedbackDialog()">
-              <mat-icon>feedback</mat-icon>
-              Оставить отзыв
-            </button>
+            <!-- Кнопки действий -->
+            <div class="user-actions-row" *ngIf="isOwnProfile">
+              <button type="button" class="btn-profile-pill" (click)="openFeedbackDialog()">
+                <mat-icon>feedback</mat-icon>
+                <span>Оставить отзыв</span>
+              </button>
 
-            <button mat-raised-button *ngIf="isOwnProfile" color="accent" class="notification-trigger-button" (click)="sendTestNotification()" style="margin-left: 8px;">
-              <mat-icon>notifications_active</mat-icon>
-              Проверить уведомления
-            </button>
+              <button type="button" class="btn-profile-pill" (click)="sendTestNotification()">
+                <mat-icon>notifications_active</mat-icon>
+                <span>Проверить уведомления</span>
+              </button>
 
-            <button mat-raised-button *ngIf="isOwnProfile && user && (user.is_hidden_admin || user.role === 'admin')" color="warn" class="invisibility-toggle-button" (click)="toggleInvisibility()" style="margin-left: 8px;">
-              <mat-icon>{{ user.is_hidden_admin ? 'visibility_off' : 'visibility' }}</mat-icon>
-              {{ user.is_hidden_admin ? 'Отключить невидимость' : 'Включить невидимость' }}
-            </button>
-
-            
-            <div class="name-edit-form" *ngIf="isEditingName">
-              <mat-form-field appearance="outline">
-                <mat-label>Имя профиля</mat-label>
-                <input matInput [(ngModel)]="newName" (keyup.enter)="saveName()">
-              </mat-form-field>
-              <div class="edit-actions">
-                <button mat-button (click)="cancelEditName()">Отмена</button>
-                <button mat-raised-button color="primary" (click)="saveName()" [disabled]="!newName.trim() || newName === user.name">Сохранить</button>
-              </div>
+              <button type="button" *ngIf="user && (user.is_hidden_admin || user.role === 'admin')" 
+                      class="btn-profile-pill"
+                      (click)="toggleInvisibility()">
+                <mat-icon>{{ user.is_hidden_admin ? 'visibility_off' : 'visibility' }}</mat-icon>
+                <span>{{ user.is_hidden_admin ? 'Отключить невидимость' : 'Включить невидимость' }}</span>
+              </button>
             </div>
 
+            <!-- Бейджи групп -->
             <div class="user-badges" *ngIf="userGroups.length > 0">
-              <span class="group-badge" *ngFor="let group of userGroups">
+              <span class="group-pill-badge" *ngFor="let group of userGroups">
                 {{ group.name }}
               </span>
             </div>
@@ -120,96 +137,101 @@ import { HttpEventType } from '@angular/common/http';
         </div>
       </div>
 
-      <!-- Prominent Student Group Card -->
-      <mat-card class="student-group-card" *ngIf="userGroups.length > 0">
-        <mat-card-header>
-          <mat-icon mat-card-avatar class="group-icon">groups</mat-icon>
-          <mat-card-title>Учебные группы</mat-card-title>
-          <mat-card-subtitle>Группы, в которых вы состоите</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          <div class="profile-group-list">
-            <div *ngFor="let group of userGroups" class="profile-group-item">
-              <div class="group-name-wrapper">
-                <mat-icon>school</mat-icon>
-                <span class="group-name-text">{{ group.name }}</span>
-              </div>
-              <span class="group-role-badge">Студент</span>
-            </div>
+      <!-- Карточка учебных групп -->
+      <div class="student-group-card glass-panel" *ngIf="userGroups.length > 0">
+        <div class="group-card-header">
+          <div class="group-icon-circle">
+            <mat-icon>groups</mat-icon>
           </div>
-        </mat-card-content>
-      </mat-card>
+          <div>
+            <h3 class="section-card-title">Учебные группы</h3>
+            <p class="section-card-sub">Группы, в которых вы состоите</p>
+          </div>
+        </div>
+        <div class="profile-group-list">
+          <div *ngFor="let group of userGroups" class="profile-group-item">
+            <div class="group-name-wrapper">
+              <mat-icon>school</mat-icon>
+              <span class="group-name-text">{{ group.name }}</span>
+            </div>
+            <span class="group-role-badge">Студент</span>
+          </div>
+        </div>
+      </div>
 
+      <!-- Сетка профиля -->
       <div class="profile-grid" *ngIf="isOwnProfile || user.role === 'student'">
+        <!-- Основная колонка -->
         <div class="main-column">
+          <!-- Секция: Мои сдачи -->
           <section class="submissions-section">
-            <div class="section-header">
-              <mat-icon>assignment</mat-icon>
-              <h2>{{ isOwnProfile ? 'Мои сдачи' : 'Оценки студента' }}</h2>
+            <div class="section-title-bar">
+              <mat-icon class="section-icon">assignment</mat-icon>
+              <h2 class="section-heading">{{ isOwnProfile ? 'Мои сдачи' : 'Оценки студента' }}</h2>
             </div>
             
-            <div *ngIf="submissions.length === 0" class="empty-state">
+            <div *ngIf="submissions.length === 0" class="empty-state-card glass-panel">
               <mat-icon>assignment_late</mat-icon>
               <p>Пока нет сдач. Пройдите тест, чтобы увидеть результаты.</p>
             </div>
 
             <div class="submission-cards">
-              <mat-card *ngFor="let s of submissions" class="submission-card">
-                <mat-card-header>
-                  <mat-card-title>{{ getTestName(s.test_id) || s.test_id }}</mat-card-title>
-                  <mat-card-subtitle>Дата: {{ s.finished_at | date:'dd.MM.yyyy HH:mm' }}</mat-card-subtitle>
-                </mat-card-header>
-                <mat-card-content>
-                  <div class="score-display">
-                    <div class="score-circle" [class.excellent]="(s.total_score/s.total_max) >= 0.8" [class.good]="(s.total_score/s.total_max) >= 0.5">
-                      <span class="score-value">{{ s.total_score }}</span>
-                      <span class="score-max">/ {{ s.total_max }}</span>
-                    </div>
-                    <div class="score-label">Общий балл</div>
+              <div *ngFor="let s of submissions" class="submission-card glass-panel">
+                <div class="subm-header">
+                  <h4 class="subm-title">{{ getTestName(s.test_id) || s.test_id }}</h4>
+                  <span class="subm-date">Дата: {{ s.finished_at | date:'dd.MM.yyyy HH:mm' }}</span>
+                </div>
+                
+                <div class="score-display">
+                  <div class="score-circle" [class.excellent]="(s.total_score/s.total_max) >= 0.8" [class.good]="(s.total_score/s.total_max) >= 0.5">
+                    <span class="score-value">{{ s.total_score }}</span>
+                    <span class="score-max">/ {{ s.total_max }}</span>
                   </div>
-                </mat-card-content>
-                <mat-card-actions align="end" *ngIf="isOwnProfile || isTeacherOrAdmin">
-                  <button mat-button color="primary" [routerLink]="['/submissions', s.id, 'results']">
-                    ПОДРОБНЕЕ
-                  </button>
-                </mat-card-actions>
-              </mat-card>
+                  <div class="score-label">Общий балл</div>
+                </div>
+
+                <div class="subm-actions" *ngIf="isOwnProfile || isTeacherOrAdmin">
+                  <a class="btn-subm-details" [routerLink]="['/submissions', s.id, 'results']">
+                    <span>ПОДРОБНЕЕ</span>
+                    <mat-icon>arrow_forward</mat-icon>
+                  </a>
+                </div>
+              </div>
             </div>
           </section>
 
+          <!-- Секция: Мои оценки -->
           <section class="reviews-section" *ngIf="isOwnProfile || isTeacherOrAdmin">
-            <div class="section-header">
-              <mat-icon>rate_review</mat-icon>
-              <h2>{{ isOwnProfile ? 'Мои оценки' : 'Отзывы о студенте' }}</h2>
+            <div class="section-title-bar">
+              <mat-icon class="section-icon">rate_review</mat-icon>
+              <h2 class="section-heading">{{ isOwnProfile ? 'Мои оценки' : 'Отзывы о студенте' }}</h2>
             </div>
             
-            <mat-card class="filter-card">
-              <mat-card-content>
-                <div class="filter-row">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Курс</mat-label>
-                    <mat-select [(ngModel)]="selectedSubjectFilter" (selectionChange)="onFilterChange()">
-                      <mat-option [value]="null">Все курсы</mat-option>
-                      <mat-option *ngFor="let subject of subjects" [value]="subject.id">{{ subject.name }}</mat-option>
-                    </mat-select>
-                  </mat-form-field>
+            <div class="filter-card glass-panel">
+              <div class="filter-row">
+                <mat-form-field appearance="outline" class="select-field">
+                  <mat-label>Курс</mat-label>
+                  <mat-select [(ngModel)]="selectedSubjectFilter" (selectionChange)="onFilterChange()">
+                    <mat-option [value]="null">Все курсы</mat-option>
+                    <mat-option *ngFor="let subject of subjects" [value]="subject.id">{{ subject.name }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
 
-                  <mat-form-field appearance="outline">
-                    <mat-label>Тест</mat-label>
-                    <mat-select [(ngModel)]="selectedTestFilter" (selectionChange)="onFilterChange()" [disabled]="!selectedSubjectFilter">
-                      <mat-option [value]="null">Все тесты</mat-option>
-                      <mat-option *ngFor="let test of filteredTests" [value]="test.id">{{ test.title }}</mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                </div>
-              </mat-card-content>
-            </mat-card>
+                <mat-form-field appearance="outline" class="select-field">
+                  <mat-label>Тест</mat-label>
+                  <mat-select [(ngModel)]="selectedTestFilter" (selectionChange)="onFilterChange()" [disabled]="!selectedSubjectFilter">
+                    <mat-option [value]="null">Все тесты</mat-option>
+                    <mat-option *ngFor="let test of filteredTests" [value]="test.id">{{ test.title }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </div>
 
-            <div *ngIf="filteredReviews.length === 0" class="empty-state small">
+            <div *ngIf="filteredReviews.length === 0" class="empty-state-card glass-panel small">
               <p>У вас пока нет полученных отзывов</p>
             </div>
             
-            <mat-expansion-panel *ngFor="let review of filteredReviews" class="review-panel">
+            <mat-expansion-panel *ngFor="let review of filteredReviews" class="review-panel glass-panel">
               <mat-expansion-panel-header>
                 <mat-panel-title>Отзыв от {{ review.reviewer }}</mat-panel-title>
                 <mat-panel-description>
@@ -231,368 +253,718 @@ import { HttpEventType } from '@angular/common/http';
           </section>
         </div>
 
+        <!-- Правая колонка: Статистика -->
         <div class="side-column">
-          <mat-card class="actions-card" *ngIf="false">
-            <!-- Premium functions removed -->
-          </mat-card>
-
-          <mat-card class="stats-summary-card">
-            <mat-card-header>
-              <mat-card-title>Статистика</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="stat-item">
-                <span class="stat-label">Всего сдач:</span>
-                <span class="stat-value">{{ submissions.length }}</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-label">Отзывов:</span>
-                <span class="stat-value">{{ myReviews.length }}</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-label">Групп:</span>
-                <span class="stat-value">{{ userGroups.length }}</span>
-              </div>
-            </mat-card-content>
-          </mat-card>
+          <div class="stats-card glass-panel">
+            <h3 class="stats-heading">Статистика</h3>
+            <div class="stat-row">
+              <span class="stat-label">Всего сдач:</span>
+              <span class="stat-value">{{ submissions.length }}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Отзывов:</span>
+              <span class="stat-value">{{ myReviews.length }}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Групп:</span>
+              <span class="stat-value">{{ userGroups.length }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <ng-template #needLogin>
-      <div class="login-required">
+      <div class="login-required glass-panel">
         <mat-icon class="large-icon">lock</mat-icon>
         <h2>Доступ ограничен</h2>
         <p>Пожалуйста, войдите в систему, чтобы увидеть свой профиль.</p>
         <div class="login-actions">
           <button mat-raised-button color="primary" routerLink="/login">Войти</button>
-          <button mat-button color="accent" routerLink="/register">Регистрация</button>
         </div>
       </div>
     </ng-template>
   `,
   styles: [`
-    .student-group-card {
-      margin-bottom: 32px;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-      border: 1px solid #e0e0e0;
-      padding: 16px;
-    }
-    .group-icon {
-      color: #3f51b5;
-      font-size: 40px;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .profile-group-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-top: 16px;
-    }
-    .profile-group-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      border-left: 4px solid #3f51b5;
-    }
-    .group-name-wrapper {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .group-name-wrapper mat-icon {
-      color: #5c6bc0;
-    }
-    .group-name-text {
-      font-weight: 500;
-      font-size: 16px;
-      color: #2c3e50;
-    }
-    .group-role-badge {
-      font-size: 12px;
-      padding: 4px 8px;
-      background: #e8f5e9;
-      color: #2e7d32;
-      border-radius: 4px;
-      font-weight: 500;
-    }
     .profile-container {
-      max-width: 1200px;
+      max-width: 1160px;
       margin: 0 auto;
-      padding: 0;
+      padding: 16px 24px 48px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      box-sizing: border-box;
     }
-    .profile-header-card {
-      background: white;
-      border-radius: 16px;
+
+    /* Glassmorphism панели */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.76);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 18px;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+      box-sizing: border-box;
+    }
+
+    /* Hero Card */
+    .profile-hero-card {
       padding: 32px;
-      margin-bottom: 32px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+      margin-bottom: 28px;
     }
+
     .profile-header-content {
       display: flex;
-      gap: 32px;
+      gap: 28px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .avatar-section {
+      display: flex;
+      flex-direction: column;
       align-items: center;
     }
+
     .profile-avatar-wrapper {
       position: relative;
-      width: 120px;
-      height: 120px;
+      width: 96px;
+      height: 96px;
       border-radius: 50%;
-      background: #f0f2f5;
+      background: #f4f4f5;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      border: 4px solid white;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border: 2px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
     }
+
     .profile-avatar {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display: block;
     }
-    .profile-avatar-placeholder {
-      font-size: 64px;
-      width: 64px;
-      height: 64px;
-      color: #adb5bd;
+
+    .profile-monogram {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 32px;
+      font-weight: 600;
+      color: #18181b;
+      background: #f4f4f5;
+      letter-spacing: 0.02em;
     }
+
     .avatar-overlay {
       position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 40%;
-      background: rgba(0,0,0,0.5);
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
       cursor: pointer;
       opacity: 0;
-      transition: opacity 0.3s;
+      transition: opacity 0.2s ease;
+      border-radius: 50%;
     }
+
     .profile-avatar-wrapper:hover .avatar-overlay {
       opacity: 1;
     }
-    .user-info-section h1 {
-      margin: 0;
-      font-size: 32px;
-      font-weight: 600;
-      color: #2D3436;
+
+    .upload-bar {
+      width: 96px;
+      margin-top: 8px;
+      border-radius: 4px;
     }
+
+    .user-info-section {
+      flex: 1;
+      min-width: 280px;
+    }
+
     .name-edit-wrapper {
       display: flex;
       align-items: center;
-      gap: 8px;
-    }
-    .name-edit-form {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .edit-actions {
-      display: flex;
-      gap: 8px;
-    }
-    .user-badges {
-      margin-top: 12px;
-      display: flex;
-      gap: 8px;
+      gap: 12px;
       flex-wrap: wrap;
     }
-    .group-badge {
-      background: #E3F2FD;
-      color: #1976D2;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 500;
+
+    .profile-user-name {
+      margin: 0;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 32px;
+      font-weight: 400;
+      color: #18181b;
+      line-height: 1.15;
     }
+
     .role-badge {
-      font-size: 12px;
-      padding: 2px 8px;
-      border-radius: 12px;
-      background: #eee;
-      color: #666;
-      margin-left: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      font-weight: bold;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: #f4f4f5;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      color: #52525b;
     }
+
     .role-badge.teacher {
-      background: #e8f5e9;
-      color: #2e7d32;
+      background: rgba(34, 197, 94, 0.1);
+      color: #15803d;
+      border-color: rgba(34, 197, 94, 0.2);
     }
-    
+
     .super-admin-badge {
-      background: #ffebee;
-      color: #d32f2f;
-      border: 1px solid rgba(211, 47, 47, 0.2);
+      background: #18181b;
+      color: #fff;
+      border-color: #18181b;
     }
 
     .clickable {
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
     }
 
     .clickable:hover {
-      background: #ffcdd2;
+      opacity: 0.85;
       transform: translateY(-1px);
-      box-shadow: 0 2px 5px rgba(211, 47, 47, 0.2);
+    }
+
+    .btn-icon-subtle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: #71717a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-icon-subtle:hover {
+      background: rgba(0, 0, 0, 0.06);
+      color: #18181b;
+    }
+
+    .btn-icon-subtle mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
     }
 
     .simulation-hint {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-top: 4px;
-      color: #d32f2f;
-      font-size: 13px;
+      margin-top: 8px;
+      color: #ef4444;
+      font-size: 12px;
       font-weight: 500;
     }
 
     .simulation-hint mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+
+    .user-actions-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    .btn-profile-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: #fff;
+      color: #3f3f46;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-profile-pill:hover {
+      background: #fafafa;
+      border-color: rgba(0, 0, 0, 0.25);
+    }
+
+    .btn-profile-pill mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: #52525b;
+    }
+
+    .name-edit-form {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .edit-name-field {
+      min-width: 260px;
+    }
+
+    .btn-outline-pill {
+      padding: 6px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      background: #fff;
+      color: #3f3f46;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn-solid-pill {
+      padding: 6px 18px;
+      border-radius: 18px;
+      border: 1px solid #18181b;
+      background: #18181b;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .user-badges {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .group-pill-badge {
+      background: rgba(0, 0, 0, 0.04);
+      color: #52525b;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    /* Учебные группы */
+    .student-group-card {
+      padding: 24px;
+      margin-bottom: 28px;
+    }
+
+    .group-card-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .group-icon-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #18181b;
+    }
+
+    .section-card-title {
+      margin: 0;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 22px;
+      font-weight: 400;
+      color: #18181b;
+    }
+
+    .section-card-sub {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: #71717a;
+    }
+
+    .profile-group-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .profile-group-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .group-name-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #18181b;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .group-name-wrapper mat-icon {
+      color: #71717a;
       font-size: 18px;
       width: 18px;
       height: 18px;
     }
-    
-    .name-edit-wrapper h1 {
-      margin: 0;
+
+    .group-role-badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: #52525b;
+      background: #f4f4f5;
+      padding: 3px 8px;
+      border-radius: 10px;
     }
+
+    /* Двухколоночная сетка */
     .profile-grid {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 28px;
+      align-items: start;
+    }
+
+    .main-column {
       display: flex;
+      flex-direction: column;
       gap: 32px;
     }
-    .main-column {
-      flex: 1;
-    }
-    .side-column {
-      width: 300px;
-    }
-    .section-header {
+
+    .section-title-bar {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 24px;
+      gap: 10px;
+      margin-bottom: 16px;
     }
-    .section-header mat-icon {
-      color: #3f51b5;
-    }
-    .section-header h2 {
-      margin: 0;
+
+    .section-icon {
+      color: #18181b;
       font-size: 20px;
-      font-weight: 500;
+      width: 20px;
+      height: 20px;
     }
+
+    .section-heading {
+      margin: 0;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 24px;
+      font-weight: 400;
+      color: #18181b;
+    }
+
+    /* Карточки сдач */
     .submission-cards {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
-      margin-bottom: 40px;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
     }
+
     .submission-card {
-      border-radius: 12px;
-      transition: transform 0.3s, box-shadow 0.3s;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
+
     .submission-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px -4px rgba(0, 0, 0, 0.08);
     }
+
+    .subm-header {
+      margin-bottom: 14px;
+    }
+
+    .subm-title {
+      margin: 0 0 4px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #18181b;
+      line-height: 1.3;
+    }
+
+    .subm-date {
+      font-size: 11px;
+      color: #71717a;
+    }
+
     .score-display {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px 0;
+      padding: 16px 0;
     }
+
     .score-circle {
-      width: 80px;
-      height: 80px;
+      width: 72px;
+      height: 72px;
       border-radius: 50%;
-      border: 4px solid #eee;
+      border: 3px solid rgba(0, 0, 0, 0.08);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      margin-bottom: 8px;
+      background: #fff;
     }
-    .score-circle.excellent { border-color: #4CAF50; color: #4CAF50; }
-    .score-circle.good { border-color: #FFC107; color: #FFC107; }
-    .score-value { font-size: 24px; font-weight: 700; }
-    .score-max { font-size: 12px; opacity: 0.7; }
-    .score-label { font-size: 13px; color: #666; }
-    
+
+    .score-circle.excellent {
+      border-color: #18181b;
+    }
+
+    .score-circle.good {
+      border-color: rgba(0, 0, 0, 0.3);
+    }
+
+    .score-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #18181b;
+      line-height: 1;
+    }
+
+    .score-max {
+      font-size: 11px;
+      color: #71717a;
+      margin-top: 2px;
+    }
+
+    .score-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #71717a;
+      margin-top: 8px;
+    }
+
+    .subm-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-subm-details {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: #18181b;
+      text-decoration: none;
+      padding: 5px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      background: #fff;
+      transition: all 0.15s ease;
+    }
+
+    .btn-subm-details:hover {
+      background: #18181b;
+      color: #fff;
+      border-color: #18181b;
+    }
+
+    .btn-subm-details mat-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Мои оценки и фильтры */
     .filter-card {
-      margin-bottom: 20px;
-      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
     }
+
     .filter-row {
       display: flex;
       gap: 16px;
+      flex-wrap: wrap;
     }
+
+    .select-field {
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .empty-state-card {
+      padding: 40px 20px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      color: #71717a;
+    }
+
+    .empty-state-card.small {
+      padding: 24px;
+    }
+
+    .empty-state-card mat-icon {
+      font-size: 36px;
+      width: 36px;
+      height: 36px;
+      opacity: 0.5;
+    }
+
+    .empty-state-card p {
+      margin: 0;
+      font-size: 13px;
+    }
+
     .review-panel {
-      margin-bottom: 12px;
-      border-radius: 12px !important;
+      margin-bottom: 10px;
+      border-radius: 14px !important;
       overflow: hidden;
-      box-shadow: none !important;
-      border: 1px solid #eee;
     }
+
+    .avg-score {
+      font-size: 12px;
+      color: #18181b;
+      font-weight: 500;
+    }
+
+    .review-details {
+      padding: 12px 0 6px;
+    }
+
     .rating-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
     }
+
     .rating-item {
-      display: flex;
-      justify-content: space-between;
-      font-size: 14px;
+      font-size: 12px;
+      color: #52525b;
     }
-    .rating-item label { color: #666; }
-    .rating-item span { font-weight: 500; }
+
+    .rating-item span {
+      font-weight: 600;
+      color: #18181b;
+      margin-left: 4px;
+    }
+
     .comment-box {
-      padding: 12px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      font-size: 14px;
-      line-height: 1.5;
+      font-size: 13px;
+      color: #3f3f46;
+      background: rgba(0, 0, 0, 0.02);
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 0, 0, 0.05);
     }
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #999;
-      background: white;
-      border-radius: 16px;
-      border: 2px dashed #eee;
-    }
-    .empty-state.small { padding: 30px 20px; }
-    .empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }
-    
-    .actions-card, .stats-summary-card {
-      margin-bottom: 24px;
-      border-radius: 16px;
-    }
-    .full-width { width: 100%; }
-    .stat-item {
+
+    /* Карточка статистики */
+    .stats-card {
+      padding: 24px;
       display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: sticky;
+      top: 24px;
+    }
+
+    .stats-heading {
+      margin: 0 0 6px 0;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 24px;
+      font-weight: 400;
+      color: #18181b;
+    }
+
+    .stat-row {
+      display: flex;
+      align-items: center;
       justify-content: space-between;
       padding: 8px 0;
-      border-bottom: 1px solid #f0f0f0;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     }
-    .stat-label { color: #666; }
-    .stat-value { font-weight: 600; color: #3f51b5; }
+
+    .stat-row:last-child {
+      border-bottom: none;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: #71717a;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #18181b;
+    }
+
+    /* Не авторизован */
     .login-required {
+      padding: 80px 24px;
       text-align: center;
-      padding: 100px 20px;
+      max-width: 480px;
+      margin: 60px auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-    .large-icon { font-size: 80px; width: 80px; height: 80px; color: #3f51b5; margin-bottom: 24px; }
+
+    .large-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      color: #a1a1aa;
+      margin-bottom: 16px;
+    }
+
+    .login-required h2 {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 28px;
+      font-weight: 400;
+      color: #18181b;
+      margin: 0 0 8px 0;
+    }
+
+    .login-required p {
+      font-size: 14px;
+      color: #71717a;
+      margin: 0 0 20px 0;
+    }
+
+    @media (max-width: 860px) {
+      .profile-grid {
+        grid-template-columns: 1fr;
+      }
+      .stats-card {
+        position: static;
+      }
+    }
   `]
 })
 export class ProfileComponent implements OnInit {
@@ -607,6 +979,7 @@ export class ProfileComponent implements OnInit {
   selectedTestFilter: string | null = null;
   userGroups: any[] = [];
   isOwnProfile = true;
+  avatarError = false;
 
   // Edit states
   isEditingName = false;
@@ -623,6 +996,15 @@ export class ProfileComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router
   ) { }
+
+  getUserInitials(name?: string): string {
+    if (!name) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
 
   getAvatarUrl(url: string | undefined): string | undefined {
     if (!url) return undefined;
@@ -649,6 +1031,7 @@ export class ProfileComponent implements OnInit {
           this.isOwnProfile = false;
           this.api.getUserByName(usernameParam).subscribe({
             next: (userData) => {
+              this.avatarError = false;
               const role = userData.role === 'instructor' ? 'teacher' : userData.role;
               this.user = {
                 id: userData.id,
@@ -678,6 +1061,7 @@ export class ProfileComponent implements OnInit {
           });
         } else {
           this.isOwnProfile = true;
+          this.avatarError = false;
           this.user = currentUser;
           
           // Для собственного профиля загружаем все данные независимо от роли
@@ -753,6 +1137,7 @@ export class ProfileComponent implements OnInit {
       this.api.uploadAvatar(this.user!.id, formData).subscribe({
         next: (response: any) => {
           this.uploading = false;
+          this.avatarError = false;
           this.snackBar.open('Аватар успешно обновлен', 'OK', { duration: 3000 });
           // Sync global state to reflect change
           this.auth.syncUserWithBackend().subscribe(() => {

@@ -163,40 +163,59 @@ interface Particle {
           
           <span class="spacer"></span>
           
-          <!-- Notifications -->
-          <button mat-icon-button [matMenuTriggerFor]="notificationsMenu" class="notification-button" aria-label="Уведомления">
-            <mat-icon [matBadge]="unreadCount" [matBadgeHidden]="unreadCount === 0" matBadgeColor="warn" style="font-size: 20px; width: 20px; height: 20px; color: #64748b;">notifications</mat-icon>
-          </button>
-          
-          <mat-menu #notificationsMenu="matMenu" class="notifications-menu">
-            <div class="notifications-header">
-              <h3>Уведомления</h3>
-              <button mat-button *ngIf="unreadCount > 0" (click)="markAllRead()" class="mark-all-read">Отметить все прочитанными</button>
-            </div>
-            <div class="notifications-list">
-              <div *ngIf="notifications.length === 0" class="no-notifications">
-                Нет уведомлений
-              </div>
-              <div *ngFor="let notification of notifications" 
-                   class="notification-item" 
-                   [class.unread]="!notification.is_read"
-                   (click)="markAsRead(notification.id)">
-                <div class="notification-content">
-                  <div class="notification-title">{{ notification.title || notification.type || 'Уведомление' }}</div>
-                  <div class="notification-message">{{ notification.message }}</div>
-                  <div class="notification-time">{{ formatNotificationTime(notification.created_at) }}</div>
+          <!-- Notifications Dropdown (Centered & Symmetrical) -->
+          <div class="notifications-dropdown-container">
+            <button type="button" class="toolbar-icon-btn" (click)="toggleNotifications($event)" aria-label="Уведомления" matTooltip="Уведомления">
+              <mat-icon style="font-size: 20px; width: 20px; height: 20px; color: #52525b;">notifications</mat-icon>
+              <span class="notification-badge-dot" *ngIf="unreadCount > 0">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+            </button>
+
+            <!-- Centered Glassmorphic Panel -->
+            <div class="notifications-dropdown-panel" *ngIf="isNotificationsOpen" (click)="$event.stopPropagation()">
+              <div class="notifications-panel-header">
+                <div class="header-title-group">
+                  <h3 class="panel-title">Уведомления</h3>
+                  <span class="unread-pill" *ngIf="unreadCount > 0">{{ unreadCount }}</span>
                 </div>
-                <button mat-icon-button (click)="deleteNotification(notification.id, $event)" class="delete-notification">
-                  <mat-icon>close</mat-icon>
+                <button type="button" *ngIf="unreadCount > 0" (click)="markAllRead()" class="btn-mark-all">
+                  Отметить все
                 </button>
               </div>
+
+              <div class="notifications-scroll-area">
+                <div *ngIf="notifications.length === 0" class="no-notifications-state">
+                  <div class="no-notif-icon">
+                    <mat-icon>notifications_none</mat-icon>
+                  </div>
+                  <h4 class="no-notif-title">Нет уведомлений</h4>
+                  <p class="no-notif-sub">Здесь будут появляться оповещения о тестах, оценках и прямых эфирах</p>
+                </div>
+
+                <div *ngFor="let notification of notifications" 
+                     class="notif-card" 
+                     [class.unread]="!notification.is_read"
+                     (click)="markAsRead(notification.id)">
+                  <div class="notif-indicator" *ngIf="!notification.is_read"></div>
+                  <div class="notif-body">
+                    <div class="notif-title">{{ notification.title || notification.type || 'Уведомление' }}</div>
+                    <div class="notif-message">{{ notification.message }}</div>
+                    <div class="notif-time">{{ formatNotificationTime(notification.created_at) }}</div>
+                  </div>
+                  <button type="button" class="btn-delete-notif" (click)="deleteNotification(notification.id, $event)" matTooltip="Удалить">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              </div>
             </div>
-          </mat-menu>
+          </div>
           
-          <!-- Monogram avatar + User Name -->
+          <!-- Avatar / Monogram + User Name -->
           <button mat-button routerLink="/profile" class="profile-button">
             <div class="profile-content">
-              <div class="user-monogram">
+              <div class="avatar-circle-box" *ngIf="currentUser.avatar_url && !avatarError">
+                <img [src]="getAvatarUrl(currentUser.avatar_url)" alt="avatar" class="toolbar-avatar-img" (error)="avatarError = true" referrerpolicy="no-referrer">
+              </div>
+              <div class="user-monogram" *ngIf="!currentUser.avatar_url || avatarError">
                 {{ getUserInitials(currentUser.name) }}
               </div>
               <span class="toolbar-user-name">{{ currentUser.name }}</span>
@@ -546,101 +565,291 @@ interface Particle {
     mat-icon.status-disconnected {
       color: #f44336;
     }
-    .notification-button {
+    /* Notifications Dropdown (Centered & Symmetrical) */
+    .notifications-dropdown-container {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
       margin-right: 8px;
     }
-    ::ng-deep .notifications-menu {
-      max-width: 400px;
-      min-width: 350px;
-      margin-top: 10px;
-      border-radius: 8px !important;
-    }
-    .notifications-header {
+
+    .toolbar-icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 12px 16px;
-      border-bottom: 1px solid #f0f0f0;
-      background: #fff;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s ease;
     }
-    .notifications-header h3 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 600;
-      color: #333;
+
+    .toolbar-icon-btn:hover {
+      background: #f4f4f5;
+      border-color: rgba(0, 0, 0, 0.15);
     }
-    .mark-all-read {
-      font-size: 11px;
-      line-height: normal;
-      color: #3f51b5;
-    }
-    .notifications-list {
-      max-height: 400px;
-      overflow-y: auto;
-    }
-    .no-notifications {
-      padding: 32px 16px;
+
+    .notification-badge-dot {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      min-width: 18px;
+      height: 18px;
+      line-height: 18px;
+      border-radius: 9px;
       text-align: center;
-      color: #999;
-      font-size: 14px;
+      padding: 0 4px;
+      box-sizing: border-box;
+      box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4);
+      border: 2px solid #fff;
     }
-    .notification-item {
+
+    /* Centered Symmetrical Panel directly under the bell */
+    .notifications-dropdown-panel {
+      position: absolute;
+      top: calc(100% + 12px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 380px;
+      max-width: calc(100vw - 32px);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 18px;
+      box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+      z-index: 1000;
+      overflow: hidden;
+      animation: dropdownFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes dropdownFadeIn {
+      from {
+        opacity: 0;
+        transform: translate(-50%, -6px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1);
+      }
+    }
+
+    .notifications-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .header-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 22px;
+      font-weight: 400;
+      color: #18181b;
+      line-height: 1;
+    }
+
+    .unread-pill {
+      background: #18181b;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+
+    .btn-mark-all {
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      background: #fff;
+      color: #52525b;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-mark-all:hover {
+      background: #f4f4f5;
+      color: #18181b;
+    }
+
+    .notifications-scroll-area {
+      max-height: 420px;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .no-notifications-state {
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      color: #71717a;
+    }
+
+    .no-notif-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      color: #a1a1aa;
+    }
+
+    .no-notif-icon mat-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+
+    .no-notif-title {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 20px;
+      font-weight: 400;
+      color: #18181b;
+      margin: 0 0 4px 0;
+    }
+
+    .no-notif-sub {
+      font-size: 12px;
+      color: #71717a;
+      max-width: 260px;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .notif-card {
       display: flex;
       align-items: flex-start;
-      padding: 12px 16px;
-      border-bottom: 1px solid #f9f9f9;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: transparent;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
       position: relative;
     }
-    .notification-item:hover {
-      background-color: #fafafa;
+
+    .notif-card:hover {
+      background: rgba(0, 0, 0, 0.03);
     }
-    .notification-item.unread {
-      background-color: #f0f7ff;
-      border-left: 3px solid #3f51b5;
+
+    .notif-card.unread {
+      background: rgba(0, 0, 0, 0.02);
     }
-    .notification-item.unread:hover {
-      background-color: #e8f0fe;
+
+    .notif-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #18181b;
+      margin-top: 6px;
+      flex-shrink: 0;
     }
-    .notification-content {
+
+    .notif-body {
       flex: 1;
       min-width: 0;
-      padding-right: 8px;
     }
-    .notification-title {
+
+    .notif-title {
+      font-size: 13px;
       font-weight: 600;
-      margin-bottom: 4px;
-      color: #2c3e50;
-      font-size: 14px;
+      color: #18181b;
+      margin-bottom: 2px;
       line-height: 1.3;
     }
-    .notification-message {
-      font-size: 13px;
-      color: #555;
-      margin-bottom: 6px;
+
+    .notif-message {
+      font-size: 12px;
+      color: #52525b;
       line-height: 1.4;
-      word-wrap: break-word;
+      margin-bottom: 4px;
+      word-break: break-word;
     }
-    .notification-time {
+
+    .notif-time {
       font-size: 11px;
-      color: #999;
+      color: #a1a1aa;
+    }
+
+    .btn-delete-notif {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: #a1a1aa;
       display: flex;
       align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.15s ease;
+      padding: 0;
+      flex-shrink: 0;
     }
-    .delete-notification {
-      width: 28px;
-      height: 28px;
-      line-height: 28px;
-      opacity: 0.2;
-      transition: opacity 0.2s;
-    }
-    .notification-item:hover .delete-notification {
-      opacity: 0.6;
-    }
-    .delete-notification:hover {
+
+    .notif-card:hover .btn-delete-notif {
       opacity: 1;
-      color: #f44336;
+    }
+
+    .btn-delete-notif:hover {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+    }
+
+    .btn-delete-notif mat-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Toolbar Avatar circle */
+    .avatar-circle-box {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f4f4f5;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      flex-shrink: 0;
+    }
+
+    .toolbar-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
   `]
 })
@@ -666,6 +875,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   avatarError = false;
   notifications: any[] = [];
   unreadCount: number = 0;
+  isNotificationsOpen = false;
   private notificationCheckInterval?: Subscription;
   private sessionStartTime: number = Date.now();
 
@@ -675,6 +885,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     private router: Router,
     private ngZone: NgZone
   ) { }
+
+  toggleNotifications(event: MouseEvent) {
+    event.stopPropagation();
+    this.isNotificationsOpen = !this.isNotificationsOpen;
+  }
+
+  @HostListener('document:click')
+  onDocumentClick() {
+    this.isNotificationsOpen = false;
+  }
 
   getUserInitials(name?: string): string {
     if (!name) return 'U';

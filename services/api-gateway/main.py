@@ -166,6 +166,21 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         # Not found by ID, try finding by name
         user_data, status, _ = await proxy_request(SUBMISSION_SERVICE_URL, f"/users/by-name/{username}", "GET")
         
+    # Extract avatar from token (supports Telegram photo_url, picture, avatar_url, etc.)
+    token_avatar = (
+        payload.get("photo_url") or
+        payload.get("picture") or
+        payload.get("avatar_url") or
+        payload.get("avatar") or
+        payload.get("telegram_photo_url") or
+        payload.get("tg_photo_url") or
+        payload.get("photo") or
+        payload.get("image") or
+        (payload.get("attributes", {}).get("photo_url", [None])[0] if isinstance(payload.get("attributes"), dict) else None) or
+        (payload.get("attributes", {}).get("picture", [None])[0] if isinstance(payload.get("attributes"), dict) else None) or
+        (payload.get("attributes", {}).get("avatar", [None])[0] if isinstance(payload.get("attributes"), dict) else None)
+    )
+
     if status == 404:
         # Still not found, create it
         # Extract role from token
@@ -180,7 +195,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
             "id": external_id,
             "name": username,
             "role": role,
-            "avatar_url": None
+            "avatar_url": token_avatar
         }
         user_data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, "/users", "POST", body=create_body)
         if status not in [200, 201]:
@@ -189,7 +204,8 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
             return {
                 "user_id": external_id,
                 "username": username,
-                "role": "student"
+                "role": "student",
+                "avatar_url": token_avatar
             }
             
     # Success finding or creating
@@ -202,6 +218,11 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         if internal_name != user_data["name"]:
             await proxy_request(SUBMISSION_SERVICE_URL, f"/users/{external_id}", "PUT", body={"name": internal_name})
 
+    # Sync avatar from token if DB doesn't have it
+    if token_avatar and not user_data.get("avatar_url"):
+        user_data["avatar_url"] = token_avatar
+        await proxy_request(SUBMISSION_SERVICE_URL, f"/users/{external_id}", "PUT", body={"avatar_url": token_avatar})
+
     # Normalize 'instructor' to 'teacher' for frontend compatibility
     role = user_data["role"]
     if role == "instructor":
@@ -211,7 +232,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         "user_id": str(user_data["id"]),
         "username": internal_name,
         "role": role,
-        "avatar_url": user_data.get("avatar_url"),
+        "avatar_url": user_data.get("avatar_url") or token_avatar,
         "is_hidden_admin": user_data.get("is_hidden_admin", False)
     }
     
