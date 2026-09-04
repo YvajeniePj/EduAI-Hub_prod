@@ -618,8 +618,8 @@ interface Particle {
       top: calc(100% + 12px);
       left: 50%;
       transform: translateX(-50%);
-      width: 380px;
-      max-width: calc(100vw - 32px);
+      width: 320px;
+      max-width: calc(100vw - 24px);
       background: rgba(255, 255, 255, 0.88);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
@@ -646,7 +646,7 @@ interface Particle {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 20px;
+      padding: 14px 18px;
       border-bottom: 1px solid rgba(0, 0, 0, 0.06);
       background: rgba(255, 255, 255, 0.5);
     }
@@ -693,16 +693,17 @@ interface Particle {
     }
 
     .notifications-scroll-area {
-      max-height: 420px;
+      min-height: 150px;
+      max-height: 480px;
       overflow-y: auto;
-      padding: 8px;
+      padding: 10px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
     }
 
     .no-notifications-state {
-      padding: 40px 20px;
+      padding: 36px 16px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -711,8 +712,8 @@ interface Particle {
     }
 
     .no-notif-icon {
-      width: 48px;
-      height: 48px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       background: rgba(0, 0, 0, 0.04);
       display: flex;
@@ -723,9 +724,9 @@ interface Particle {
     }
 
     .no-notif-icon mat-icon {
-      font-size: 24px;
-      width: 24px;
-      height: 24px;
+      font-size: 22px;
+      width: 22px;
+      height: 22px;
     }
 
     .no-notif-title {
@@ -733,35 +734,40 @@ interface Particle {
       font-size: 20px;
       font-weight: 400;
       color: #18181b;
-      margin: 0 0 4px 0;
+      margin: 0 0 6px 0;
     }
 
     .no-notif-sub {
       font-size: 12px;
       color: #71717a;
-      max-width: 260px;
+      max-width: 100%;
       margin: 0;
-      line-height: 1.4;
+      line-height: 1.45;
+      padding: 0 8px;
     }
 
     .notif-card {
       display: flex;
       align-items: flex-start;
-      gap: 12px;
+      gap: 10px;
       padding: 12px 14px;
       border-radius: 12px;
-      background: transparent;
+      background: rgba(0, 0, 0, 0.015);
+      border: 1px solid rgba(0, 0, 0, 0.04);
       cursor: pointer;
       transition: all 0.15s ease;
       position: relative;
     }
 
     .notif-card:hover {
-      background: rgba(0, 0, 0, 0.03);
+      background: rgba(0, 0, 0, 0.04);
+      border-color: rgba(0, 0, 0, 0.08);
     }
 
     .notif-card.unread {
-      background: rgba(0, 0, 0, 0.02);
+      background: rgba(255, 255, 255, 0.9);
+      border-color: rgba(0, 0, 0, 0.08);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
     }
 
     .notif-indicator {
@@ -769,7 +775,7 @@ interface Particle {
       height: 6px;
       border-radius: 50%;
       background: #18181b;
-      margin-top: 6px;
+      margin-top: 5px;
       flex-shrink: 0;
     }
 
@@ -782,16 +788,18 @@ interface Particle {
       font-size: 13px;
       font-weight: 600;
       color: #18181b;
-      margin-bottom: 2px;
-      line-height: 1.3;
+      margin-bottom: 3px;
+      line-height: 1.35;
+      word-break: break-word;
     }
 
     .notif-message {
-      font-size: 12px;
+      font-size: 12.5px;
       color: #52525b;
-      line-height: 1.4;
+      line-height: 1.45;
       margin-bottom: 4px;
       word-break: break-word;
+      white-space: normal;
     }
 
     .notif-time {
@@ -1210,9 +1218,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!ctx) return;
 
     const setupDimensions = () => {
+      if (!this.canvasRef) return;
+      const canvas = this.canvasRef.nativeElement;
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
@@ -1257,13 +1267,20 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private renderCanvas(ctx: CanvasRenderingContext2D) {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const maxDistance = 145;
-
     const loop = () => {
-      ctx.clearRect(0, 0, width, height);
+      const canvas = this.canvasRef?.nativeElement;
+      if (!canvas) return;
 
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      // Always clear the entire physical canvas buffer cleanly to prevent trails
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      const maxDistance = 145;
       const len = this.particles.length;
       for (let i = 0; i < len; i++) {
         const p = this.particles[i];

@@ -500,6 +500,7 @@ import { HttpEventType } from '@angular/common/http';
       font-weight: 500;
       cursor: pointer;
       transition: all 0.15s ease;
+      white-space: nowrap;
     }
 
     .btn-profile-pill:hover {
