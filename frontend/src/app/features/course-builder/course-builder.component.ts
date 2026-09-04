@@ -58,270 +58,321 @@ interface TreeNode {
   ],
   template: `
     <div class="builder-container">
-      <div class="builder-header">
-        <h1>Конструктор курса: {{ courseName }}</h1>
-        <button mat-raised-button color="primary" (click)="saveStructure()" [disabled]="saving">
-          <mat-icon>save</mat-icon>
-          Сохранить
-        </button>
+      <!-- Верхняя панель навигации и статуса -->
+      <div class="builder-topbar">
+        <div class="topbar-left">
+          <button type="button" class="btn-back" (click)="goBack()" matTooltip="Назад к курсу">
+            <mat-icon>arrow_back</mat-icon>
+          </button>
+          <div class="topbar-titles">
+            <span class="topbar-category">КОНСТРУКТОР КУРСА</span>
+            <h1 class="topbar-course-title">{{ courseName || 'Курс' }}</h1>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <div class="save-status-badge" *ngIf="justSaved">
+            <mat-icon>check_circle</mat-icon>
+            <span>Сохранено</span>
+          </div>
+          <button type="button" class="btn-save-course" (click)="saveStructure()" [disabled]="saving">
+            <mat-icon>save</mat-icon>
+            <span>Сохранить курс</span>
+          </button>
+        </div>
       </div>
 
-      <div class="builder-content">
-        <div class="sidebar">
-          <mat-card class="structure-card">
-            <mat-card-header>
-              <mat-card-title>Структура курса</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <button mat-raised-button color="primary" (click)="addModule()" class="add-button">
-                <mat-icon>add</mat-icon>
-                Добавить модуль
-              </button>
-              
+      <!-- Основная двухколоночная сетка -->
+      <div class="builder-grid">
+        <!-- Левая колонка: Структура курса -->
+        <div class="structure-column">
+          <div class="structure-card glass-panel">
+            <div class="structure-header">
+              <span class="structure-label">СТРУКТУРА КУРСА</span>
+              <span class="modules-pill">
+                {{ getModulesCount() }} {{ getModulesCount() === 1 ? 'модуль' : (getModulesCount() >= 2 && getModulesCount() <= 4 ? 'модуля' : 'модулей') }}
+              </span>
+            </div>
+
+            <div class="tree-scroll-container">
               <mat-tree [dataSource]="dataSource" [treeControl]="treeControl" class="structure-tree">
-                <!-- Узлы без детей (Lessons) -->
+                <!-- Листовые узлы: Уроки или пустые модули -->
                 <mat-tree-node *matTreeNodeDef="let node" matTreeNodePadding>
-                  <button mat-icon-button (click)="selectNode(node)">
-                    <mat-icon>{{ getNodeIcon(node.type) }}</mat-icon>
-                  </button>
-                  <span class="node-title">{{ node.title }}</span>
-                  <!-- Кнопки для модулей, которые пока без детей -->
-                  <ng-container *ngIf="node.type === 'module'">
-                    <button mat-icon-button (click)="addSubModule(node)" class="add-btn" matTooltip="Добавить подмодуль">
-                      <mat-icon>folder</mat-icon>
-                    </button>
-                    <button mat-icon-button (click)="addLesson(node)" class="add-btn" matTooltip="Добавить урок">
-                      <mat-icon>add</mat-icon>
-                    </button>
-                  </ng-container>
-                  <button mat-icon-button (click)="deleteNode(node)" color="warn" class="delete-btn">
-                    <mat-icon>delete</mat-icon>
-                  </button>
+                  <!-- Пустой модуль без дочерних уроков -->
+                  <div *ngIf="node.type === 'module'" class="tree-node-row module-row" [class.selected]="selectedNode?.id === node.id" (click)="selectNode(node)">
+                    <span class="toggle-placeholder"></span>
+                    <mat-icon class="node-icon folder-icon">folder_open</mat-icon>
+                    <span class="node-title" [title]="node.title">{{ getModuleIndex(node) }}. {{ node.title }}</span>
+                    <div class="node-actions" (click)="$event.stopPropagation()">
+                      <button type="button" class="action-btn add-btn" (click)="addLesson(node)" matTooltip="Добавить урок">
+                        <mat-icon>add</mat-icon>
+                      </button>
+                      <button type="button" class="action-btn delete-btn" (click)="deleteNode(node)" matTooltip="Удалить модуль">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Урок -->
+                  <div *ngIf="node.type === 'lesson'" class="tree-node-row lesson-row" [class.selected]="selectedNode?.id === node.id" (click)="selectNode(node)">
+                    <mat-icon class="node-icon lesson-icon">{{ getNodeIcon(node.lessonType || 'lecture') }}</mat-icon>
+                    <span class="node-title" [title]="node.title">{{ getLessonIndex(node) }}. {{ node.title }}</span>
+                    <div class="node-actions" (click)="$event.stopPropagation()">
+                      <button type="button" class="action-btn delete-btn" (click)="deleteNode(node)" matTooltip="Удалить урок">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </div>
+                  </div>
                 </mat-tree-node>
 
-                <!-- Узлы с детьми (Modules) -->
+                <!-- Вложенные узлы: Модули с дочерними уроками -->
                 <mat-nested-tree-node *matTreeNodeDef="let node; when: hasChild" matTreeNodePadding>
-                  <div class="mat-tree-node">
-                    <button mat-icon-button matTreeNodeToggle [attr.aria-label]="'Toggle ' + node.title">
-                      <mat-icon class="mat-icon-rtl-mirror">
-                        {{ treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
-                      </mat-icon>
+                  <div class="tree-node-row module-row" [class.selected]="selectedNode?.id === node.id" (click)="selectNode(node)">
+                    <button type="button" class="toggle-btn" matTreeNodeToggle [attr.aria-label]="'Toggle ' + node.title" (click)="$event.stopPropagation()">
+                      <mat-icon>{{ treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}</mat-icon>
                     </button>
-                    <button mat-icon-button (click)="selectNode(node)">
-                      <mat-icon>{{ getNodeIcon(node.type) }}</mat-icon>
-                    </button>
-                    <span class="node-title">{{ node.title }}</span>
-                    <button mat-icon-button (click)="addSubModule(node)" class="add-btn" matTooltip="Добавить подмодуль">
-                      <mat-icon>folder</mat-icon>
-                    </button>
-                    <button mat-icon-button (click)="addLesson(node)" class="add-btn" matTooltip="Добавить урок">
-                      <mat-icon>add</mat-icon>
-                    </button>
-                    <button mat-icon-button (click)="deleteNode(node)" color="warn" class="delete-btn">
-                      <mat-icon>delete</mat-icon>
-                    </button>
+                    <mat-icon class="node-icon folder-icon">folder_open</mat-icon>
+                    <span class="node-title" [title]="node.title">{{ getModuleIndex(node) }}. {{ node.title }}</span>
+                    <div class="node-actions" (click)="$event.stopPropagation()">
+                      <button type="button" class="action-btn add-btn" (click)="addLesson(node)" matTooltip="Добавить урок">
+                        <mat-icon>add</mat-icon>
+                      </button>
+                      <button type="button" class="action-btn delete-btn" (click)="deleteNode(node)" matTooltip="Удалить модуль">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </div>
                   </div>
-                  <div [class.example-tree-invisible]="!treeControl.isExpanded(node)" role="group" class="nested-group">
+                  <div [class.tree-hidden]="!treeControl.isExpanded(node)" role="group" class="tree-nested-group">
                     <ng-container matTreeNodeOutlet></ng-container>
                   </div>
                 </mat-nested-tree-node>
               </mat-tree>
-            </mat-card-content>
-          </mat-card>
+            </div>
+
+            <!-- Пунктирная ghost-кнопка добавления модуля -->
+            <button type="button" class="btn-add-module-dashed" (click)="addModule()">
+              <mat-icon>add</mat-icon>
+              <span>Добавить модуль</span>
+            </button>
+          </div>
         </div>
 
-        <div class="content-area">
-          <mat-card *ngIf="selectedNode" class="editor-card">
-            <mat-card-header>
-              <mat-card-title>
-                {{ selectedNode.type === 'module' ? 'Редактирование модуля' : 'Редактирование урока' }}
-              </mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <form [formGroup]="editForm" (ngSubmit)="saveNode()">
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Название</mat-label>
-                  <input matInput formControlName="title" required>
-                </mat-form-field>
+        <!-- Правая колонка: Панель редактирования -->
+        <div class="editor-column">
+          <div *ngIf="selectedNode" class="editor-panel glass-panel">
+            <!-- Шапка панели редактирования -->
+            <div class="editor-header">
+              <div class="editor-header-info">
+                <span class="type-badge">
+                  {{ selectedNode.type === 'module' ? ('МОДУЛЬ ' + getModuleIndex(selectedNode)) : ('УРОК ' + getLessonIndex(selectedNode)) }}
+                </span>
+                <h2 class="editor-item-title">
+                  {{ editForm.get('title')?.value || (selectedNode.type === 'module' ? 'Модуль' : 'Урок') }}
+                </h2>
+              </div>
+              <div class="editor-header-actions">
+                <button type="button" class="btn-outline-cancel" (click)="cancelEdit()">Отмена</button>
+                <button type="button" class="btn-solid-save" (click)="saveNode()" [disabled]="!editForm.valid">Сохранить</button>
+              </div>
+            </div>
 
-                <mat-form-field *ngIf="selectedNode.type === 'lesson'" appearance="outline" class="full-width">
-                  <mat-label>Тип урока</mat-label>
-                  <mat-select formControlName="lessonType">
-                    <mat-option value="lecture">Лекция</mat-option>
-                    <mat-option value="quiz">Опрос</mat-option>
-                    <mat-option value="video">Видео</mat-option>
-                    <mat-option value="material">Материал</mat-option>
-                    <mat-option value="exercise">Упражнение</mat-option>
-                  </mat-select>
-                </mat-form-field>
+            <!-- Форма редактирования -->
+            <form [formGroup]="editForm" (ngSubmit)="saveNode()" class="editor-form">
+              <!-- Секция: Редактирование модуля -->
+              <div *ngIf="selectedNode.type === 'module'" class="form-section">
+                <div class="form-field-group">
+                  <label class="field-label">НАЗВАНИЕ *</label>
+                  <input class="field-input" formControlName="title" placeholder="Введите название модуля" required>
+                </div>
+                <div class="form-field-group">
+                  <label class="field-label">ОПИСАНИЕ</label>
+                  <textarea class="field-textarea" formControlName="description" rows="5" placeholder="Краткое описание целей модуля..."></textarea>
+                </div>
+              </div>
 
-                <div *ngIf="selectedNode.type === 'lesson'" class="content-editor">
-                  <h3>Контент урока</h3>
-                  
-                  <!-- Лекция - текстовый контент -->
-                  <!-- Текстовый контент (для всех типов) -->
-                  <div class="content-section">
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Текст / Описание</mat-label>
-                      <textarea matInput formControlName="textContent" rows="15" placeholder="Введите текст лекции или описание к уроку..."></textarea>
-                    </mat-form-field>
+              <!-- Секция: Редактирование урока -->
+              <div *ngIf="selectedNode.type === 'lesson'" class="form-section">
+                <div class="form-field-group">
+                  <label class="field-label">НАЗВАНИЕ *</label>
+                  <input class="field-input" formControlName="title" placeholder="Введите название урока" required>
+                </div>
+
+                <!-- Pill-переключатель типа урока -->
+                <div class="form-field-group">
+                  <label class="field-label">ТИП УРОКА</label>
+                  <div class="lesson-type-pills">
+                    <button type="button" class="pill-btn" 
+                            [class.active]="editForm.get('lessonType')?.value === 'material' || editForm.get('lessonType')?.value === 'lecture'" 
+                            (click)="setLessonType('material')">
+                      <mat-icon>description</mat-icon>
+                      <span>Материал</span>
+                    </button>
+                    <button type="button" class="pill-btn" 
+                            [class.active]="editForm.get('lessonType')?.value === 'quiz'" 
+                            (click)="setLessonType('quiz')">
+                      <mat-icon>quiz</mat-icon>
+                      <span>Опрос</span>
+                    </button>
+                    <button type="button" class="pill-btn" 
+                            [class.active]="editForm.get('lessonType')?.value === 'video'" 
+                            (click)="setLessonType('video')">
+                      <mat-icon>smart_display</mat-icon>
+                      <span>Видео</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="form-field-group">
+                  <label class="field-label">ТЕКСТ / ОПИСАНИЕ</label>
+                  <textarea class="field-textarea" formControlName="textContent" rows="5" placeholder="Введите текст урока или методические указания..."></textarea>
+                </div>
+
+                <!-- Контентный блок: Материал -->
+                <div *ngIf="editForm.get('lessonType')?.value === 'material' || editForm.get('lessonType')?.value === 'lecture'" class="sub-section">
+                  <div class="sub-section-header">
+                    <label class="field-label">МАТЕРИАЛ ДЛЯ УРОКА</label>
+                    <div class="sub-actions">
+                      <button type="button" class="btn-sub-action" (click)="openMaterialUploadDialog()">
+                        <mat-icon>file_download</mat-icon>
+                        <span>Загрузить новый</span>
+                      </button>
+                      <button type="button" class="btn-sub-action" (click)="loadMaterials()">
+                        <mat-icon>refresh</mat-icon>
+                        <span>Обновить список</span>
+                      </button>
+                    </div>
                   </div>
 
-                  <!-- Видео -->
-                  <div *ngIf="editForm.get('lessonType')?.value === 'video'" class="content-section">
-                    <div class="video-selector">
-                      <h4>Выберите существующее видео или добавьте ссылку:</h4>
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Существующие видео предмета</mat-label>
-                        <mat-select (selectionChange)="onVideoSelect($event.value)">
-                          <mat-option *ngFor="let video of availableVideos" [value]="video.url">
-                            {{ video.title }} <span *ngIf="video.note">({{ video.note }})</span>
-                          </mat-option>
-                        </mat-select>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>URL видео (YouTube/Rutube)</mat-label>
-                        <input matInput formControlName="videoUrl" placeholder="https://www.youtube.com/watch?v=... или https://rutube.ru/video/...">
-                        <mat-hint>Вставьте ссылку на видео с YouTube или Rutube</mat-hint>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Название этого видео (метка)</mat-label>
-                        <input matInput formControlName="videoTitle" placeholder="Например: Введение в курс">
-                        <mat-hint>Это название будет отображаться в списке видео</mat-hint>
-                      </mat-form-field>
-                    </div>
-                    
-                    <div *ngIf="editForm.get('videoUrl')?.value" class="video-preview">
-                      <iframe 
-                        *ngIf="safeVideoUrl"
-                        [src]="safeVideoUrl" 
-                        frameborder="0" 
-                        loading="lazy"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                        allowfullscreen
-                        style="width: 100%; height: 400px; border-radius: 8px;">
-                      </iframe>
-                    </div>
-                  </div>
-
-                  <!-- Материал -->
-                  <div *ngIf="editForm.get('lessonType')?.value === 'material'" class="content-section">
-                    <div class="material-selector">
-                      <h4>Выберите материал:</h4>
-                      <div class="material-actions">
-                        <button mat-raised-button color="accent" (click)="loadMaterials()" type="button">
-                          <mat-icon>refresh</mat-icon>
-                          Обновить список
-                        </button>
-                        <button mat-raised-button color="primary" (click)="openMaterialUploadDialog()" type="button">
-                          <mat-icon>cloud_upload</mat-icon>
-                          Загрузить новый материал
-                        </button>
-                      </div>
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Материал</mat-label>
-                        <mat-select formControlName="materialId">
-                          <mat-option *ngFor="let material of availableMaterials" [value]="material.id">
-                            {{ material.original_name || material.name }}
-                            <span *ngIf="material.note"> - {{ material.note }}</span>
-                          </mat-option>
-                        </mat-select>
-                      </mat-form-field>
-                      <div *ngIf="editForm.get('materialId')?.value" class="selected-material">
+                  <div class="cards-list" *ngIf="availableMaterials.length > 0; else noMaterialsTpl">
+                    <div *ngFor="let material of availableMaterials" 
+                         class="selectable-card"
+                         [class.selected]="editForm.get('materialId')?.value === material.id"
+                         (click)="selectMaterial(material.id)">
+                      <div class="card-icon-box">
                         <mat-icon>description</mat-icon>
-                        <span>Выбран материал: {{ getMaterialName(editForm.get('materialId')?.value) }}</span>
+                      </div>
+                      <div class="card-text">
+                        <span class="card-main-title">{{ material.original_name || material.name }}</span>
+                        <span class="card-sub-info">
+                          {{ getFileExt(material.original_name || material.name) }} • {{ formatFileSize(material.file_size) }}
+                          <span *ngIf="material.note"> • {{ material.note }}</span>
+                        </span>
+                      </div>
+                      <div class="checkmark-badge" *ngIf="editForm.get('materialId')?.value === material.id">
+                        <mat-icon>check</mat-icon>
                       </div>
                     </div>
                   </div>
+                  <ng-template #noMaterialsTpl>
+                    <div class="empty-cards-placeholder">
+                      <mat-icon>cloud_upload</mat-icon>
+                      <span>Нет загруженных материалов. Нажмите «Загрузить новый».</span>
+                    </div>
+                  </ng-template>
+                </div>
 
-                  <!-- Тест/Опрос -->
-                  <div *ngIf="editForm.get('lessonType')?.value === 'quiz'" class="content-section">
-                    <div class="test-selector">
-                      <h4>Выберите или создайте тест:</h4>
-                      <div class="test-actions">
-                        <button mat-raised-button color="accent" (click)="loadTests()" type="button">
-                          <mat-icon>refresh</mat-icon>
-                          Обновить список
-                        </button>
-                        <button mat-raised-button color="primary" (click)="openCreateTestDialog()" type="button">
-                          <mat-icon>add</mat-icon>
-                          Создать тест
-                        </button>
-                        <button mat-raised-button color="primary" (click)="openGenerateTestDialog()" type="button">
-                          <mat-icon>auto_awesome</mat-icon>
-                          Сгенерировать через AI
-                        </button>
-                      </div>
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Тест</mat-label>
-                        <mat-select formControlName="testId">
-                          <mat-option *ngFor="let test of availableTests" [value]="test.id">
-                            {{ test.title }}
-                            <span *ngIf="test.description"> - {{ test.description }}</span>
-                          </mat-option>
-                        </mat-select>
-                      </mat-form-field>
-                      <div *ngIf="editForm.get('testId')?.value" class="selected-test" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                          <mat-icon>quiz</mat-icon>
-                          <span>Выбран тест: {{ getTestName(editForm.get('testId')?.value) }}</span>
-                          <button mat-icon-button (click)="viewTest(editForm.get('testId')?.value)" type="button" matTooltip="Просмотр теста">
-                            <mat-icon>open_in_new</mat-icon>
-                          </button>
-                        </div>
-                        <button mat-raised-button color="accent" (click)="editTestQuestions(editForm.get('testId')?.value)" type="button">
-                          Редактировать вопросы
-                        </button>
-                      </div>
+                <!-- Контентный блок: Видео -->
+                <div *ngIf="editForm.get('lessonType')?.value === 'video'" class="sub-section">
+                  <div class="form-field-group" *ngIf="availableVideos.length > 0">
+                    <label class="field-label">СУЩЕСТВУЮЩИЕ ВИДЕО ПРЕДМЕТА</label>
+                    <div class="chips-row">
+                      <button type="button" *ngFor="let video of availableVideos" class="chip-item"
+                              [class.active]="editForm.get('videoUrl')?.value === video.url"
+                              (click)="onVideoSelect(video.url)">
+                        <mat-icon>play_circle_outline</mat-icon>
+                        <span>{{ video.title }}</span>
+                      </button>
                     </div>
                   </div>
 
-                  <!-- Упражнение -->
-                  <div *ngIf="editForm.get('lessonType')?.value === 'exercise'" class="content-section">
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Описание упражнения</mat-label>
-                      <textarea matInput formControlName="textContent" rows="10" placeholder="Опишите задание для упражнения..."></textarea>
-                    </mat-form-field>
+                  <div class="form-field-group">
+                    <label class="field-label">URL ВИДЕО (YOUTUBE / RUTUBE)</label>
+                    <input class="field-input" formControlName="videoUrl" (ngModelChange)="updateSafeVideoUrl($event)" placeholder="https://www.youtube.com/watch?v=... или https://rutube.ru/video/...">
+                  </div>
+
+                  <div class="form-field-group">
+                    <label class="field-label">НАЗВАНИЕ ВИДЕО (МЕТКА)</label>
+                    <input class="field-input" formControlName="videoTitle" placeholder="Например: Введение в курс">
+                  </div>
+
+                  <div *ngIf="safeVideoUrl" class="video-embed-box">
+                    <iframe 
+                      [src]="safeVideoUrl" 
+                      frameborder="0" 
+                      loading="lazy"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                      allowfullscreen
+                      class="video-iframe">
+                    </iframe>
                   </div>
                 </div>
 
-                <!-- Редактирование модуля -->
-                <div *ngIf="selectedNode.type === 'module'" class="module-editor">
-                  <mat-form-field appearance="outline" class="full-width">
-                    <mat-label>Описание модуля</mat-label>
-                    <textarea matInput formControlName="description" rows="5" placeholder="Добавьте описание модуля (опционально)"></textarea>
-                  </mat-form-field>
-                  
-                  <div class="module-actions">
-                    <h4>Быстрые действия:</h4>
-                    <div class="quick-actions">
-                      <button mat-raised-button color="accent" (click)="addSubModule(selectedNode)" type="button">
-                        <mat-icon>folder</mat-icon>
-                        Добавить подмодуль
-                      </button>
-                      <button mat-raised-button color="primary" (click)="addLesson(selectedNode)" type="button">
+                <!-- Контентный блок: Опрос / Тест -->
+                <div *ngIf="editForm.get('lessonType')?.value === 'quiz'" class="sub-section">
+                  <div class="sub-section-header">
+                    <label class="field-label">ВЫБЕРИТЕ ИЛИ СОЗДАЙТЕ ТЕСТ</label>
+                    <div class="sub-actions">
+                      <button type="button" class="btn-sub-action" (click)="openCreateTestDialog()">
                         <mat-icon>add</mat-icon>
-                        Добавить урок
+                        <span>Создать тест</span>
+                      </button>
+                      <button type="button" class="btn-sub-action highlight" (click)="openGenerateTestDialog()">
+                        <mat-icon>auto_awesome</mat-icon>
+                        <span>AI-генерация</span>
+                      </button>
+                      <button type="button" class="btn-sub-action" (click)="loadTests()">
+                        <mat-icon>refresh</mat-icon>
+                        <span>Обновить</span>
                       </button>
                     </div>
                   </div>
-                </div>
 
-                <div class="form-actions">
-                  <button mat-raised-button color="primary" type="submit" [disabled]="!editForm.valid">
-                    Сохранить
-                  </button>
-                  <button mat-button type="button" (click)="cancelEdit()">Отмена</button>
-                </div>
-              </form>
-            </mat-card-content>
-          </mat-card>
+                  <div class="cards-list" *ngIf="availableTests.length > 0; else noTestsTpl">
+                    <div *ngFor="let test of availableTests"
+                         class="selectable-card"
+                         [class.selected]="editForm.get('testId')?.value === test.id"
+                         (click)="selectTest(test.id)">
+                      <div class="card-icon-box quiz-box">
+                        <mat-icon>quiz</mat-icon>
+                      </div>
+                      <div class="card-text">
+                        <span class="card-main-title">{{ test.title }}</span>
+                        <span class="card-sub-info">{{ test.description || 'Тестирование знаний' }}</span>
+                      </div>
+                      <div class="checkmark-badge" *ngIf="editForm.get('testId')?.value === test.id">
+                        <mat-icon>check</mat-icon>
+                      </div>
+                    </div>
+                  </div>
+                  <ng-template #noTestsTpl>
+                    <div class="empty-cards-placeholder">
+                      <mat-icon>quiz</mat-icon>
+                      <span>Нет доступных тестов. Создайте новый или сгенерируйте с помощью AI.</span>
+                    </div>
+                  </ng-template>
 
-          <div *ngIf="!selectedNode" class="empty-state">
-            <mat-icon>edit</mat-icon>
-            <p>Выберите модуль или урок для редактирования</p>
+                  <div *ngIf="editForm.get('testId')?.value" class="test-toolbar-strip">
+                    <div class="test-toolbar-name">
+                      <mat-icon>check_circle</mat-icon>
+                      <span>Выбран тест: <strong>{{ getTestName(editForm.get('testId')?.value) }}</strong></span>
+                    </div>
+                    <div class="test-toolbar-buttons">
+                      <button type="button" class="btn-sub-action" (click)="viewTest(editForm.get('testId')?.value)">Просмотр теста</button>
+                      <button type="button" class="btn-sub-action" (click)="editTestQuestions(editForm.get('testId')?.value)">Редактировать вопросы</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Пустое состояние, когда ничего не выбрано -->
+          <div *ngIf="!selectedNode" class="empty-panel glass-panel">
+            <div class="empty-icon-circle">
+              <mat-icon>edit_note</mat-icon>
+            </div>
+            <h3 class="empty-title">Выберите модуль или урок для редактирования</h3>
+            <p class="empty-description">Нажмите на нужный элемент в структуре курса слева или создайте новый модуль</p>
           </div>
         </div>
       </div>
@@ -330,281 +381,894 @@ interface TreeNode {
   styles: [`
     .builder-container {
       min-height: 100vh;
-      background: #f5f5f5;
-      padding: 24px;
+      background: transparent;
+      padding: 24px 32px 48px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      box-sizing: border-box;
     }
 
-    .builder-header {
+    /* Верхняя панель */
+    .builder-topbar {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       margin-bottom: 24px;
+      padding: 6px 0;
     }
 
-    .builder-content {
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .btn-back {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #18181b;
+      transition: all 0.2s ease;
+    }
+
+    .btn-back:hover {
+      background: #18181b;
+      color: #fff;
+      transform: translateX(-2px);
+    }
+
+    .btn-back mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    .topbar-titles {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .topbar-category {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #71717a;
+      text-transform: uppercase;
+    }
+
+    .topbar-course-title {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 26px;
+      font-weight: 400;
+      color: #18181b;
+      margin: 0;
+      line-height: 1.15;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .save-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(22, 163, 74, 0.1);
+      border: 1px solid rgba(22, 163, 74, 0.25);
+      color: #15803d;
+      font-size: 13px;
+      font-weight: 500;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .save-status-badge mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+
+    .btn-save-course {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 20px;
+      border-radius: 22px;
+      background: #18181b;
+      color: #fff;
+      border: 1px solid #18181b;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    .btn-save-course:hover:not(:disabled) {
+      background: #27272a;
+      transform: translateY(-1px);
+    }
+
+    .btn-save-course:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-save-course mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Сетка страницы */
+    .builder-grid {
       display: grid;
-      grid-template-columns: 350px 1fr;
+      grid-template-columns: 360px 1fr;
       gap: 24px;
+      align-items: start;
     }
 
-    .sidebar {
+    /* Стеклянные панели */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 18px;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    /* Левая колонка: Структура */
+    .structure-card {
       position: sticky;
       top: 24px;
-      height: fit-content;
+      display: flex;
+      flex-direction: column;
     }
 
-    .structure-card {
-      margin-bottom: 24px;
+    .structure-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
     }
 
-    .add-button {
-      width: 100%;
-      margin-bottom: 16px;
+    .structure-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #71717a;
+      text-transform: uppercase;
+    }
+
+    .modules-pill {
+      font-size: 11px;
+      font-weight: 600;
+      color: #52525b;
+      background: #f4f4f5;
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .tree-scroll-container {
+      max-height: calc(100vh - 280px);
+      overflow-y: auto;
+      padding-right: 4px;
     }
 
     .structure-tree {
       background: transparent;
     }
 
-    .node-title {
-      flex: 1;
-      margin-left: 8px;
-    }
-
-    .delete-btn, .add-btn {
-      margin-left: auto;
-    }
-
-    .content-area {
-      min-height: 600px;
-    }
-
-    .editor-card {
-      margin-bottom: 24px;
-    }
-
-    .full-width {
-      width: 100%;
-      margin-bottom: 16px;
-    }
-
-    .content-editor {
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid #e0e0e0;
-    }
-
-    .form-actions {
+    /* Направляющие линии вложенности */
+    .tree-nested-group {
+      border-left: 1.5px solid rgba(0, 0, 0, 0.08);
+      margin-left: 18px;
+      padding-left: 10px;
       display: flex;
-      gap: 16px;
-      margin-top: 24px;
+      flex-direction: column;
+      gap: 3px;
+      margin-top: 3px;
+      margin-bottom: 6px;
     }
 
-    .empty-state {
-      text-align: center;
-      padding: 80px 20px;
-      color: #999;
+    .tree-hidden {
+      display: none;
     }
 
-    .empty-state mat-icon {
-      font-size: 96px;
-      width: 96px;
-      height: 96px;
-      margin-bottom: 24px;
-      opacity: 0.4;
-    }
-
-    h1 {
-      color: #1976d2;
-      font-weight: 500;
-      margin: 0;
-    }
-
-    .structure-card {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      border-radius: 8px;
-    }
-
-    .editor-card {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      border-radius: 8px;
-    }
-
-    .node-title {
-      font-weight: 500;
-      color: #333;
-    }
-
-    .add-button {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      font-weight: 500;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .add-button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-
-    .structure-tree {
-      max-height: 600px;
-      overflow-y: auto;
-    }
-
-    .structure-tree::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .structure-tree::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 4px;
-    }
-
-    .structure-tree::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 4px;
-    }
-
-    .structure-tree::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
-
-    mat-tree-node {
-      padding: 8px 0;
-      border-radius: 4px;
-      transition: background-color 0.2s;
-    }
-
-    mat-tree-node:hover {
-      background-color: #f5f5f5;
-    }
-
-    .delete-btn {
-      opacity: 0.6;
-      transition: opacity 0.2s;
-    }
-
-    .delete-btn:hover {
-      opacity: 1;
-      color: #f44336;
-    }
-
-    .add-btn {
-      opacity: 0.7;
-      transition: opacity 0.2s, transform 0.2s;
-    }
-
-    .add-btn:hover {
-      opacity: 1;
-      transform: scale(1.1);
-      color: #4caf50;
-    }
-
-    mat-card-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 16px 24px;
-      margin: -16px -16px 16px -16px;
-      border-radius: 8px 8px 0 0;
-    }
-
-    mat-card-title {
-      color: white;
-      font-weight: 500;
-    }
-
-    .builder-header button {
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .form-actions button[type="submit"] {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    .content-editor {
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid #e0e0e0;
-    }
-
-    .content-section {
-      margin-bottom: 24px;
-    }
-
-    .content-section h4 {
-      margin: 0 0 16px 0;
-      color: #333;
-      font-weight: 500;
-    }
-
-    .material-actions, .test-actions {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-
-    .selected-material, .selected-test {
+    /* Строки дерева */
+    .tree-node-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 12px;
-      background: #f5f5f5;
-      border-radius: 8px;
-      margin-top: 12px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      box-sizing: border-box;
+      transition: all 0.15s ease;
+      user-select: none;
     }
 
-    .selected-material mat-icon, .selected-test mat-icon {
-      color: #667eea;
+    .tree-node-row:hover {
+      background: rgba(0, 0, 0, 0.04);
     }
 
-    .video-preview {
-      margin-top: 16px;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .module-editor {
-      margin-top: 16px;
-    }
-
-    .module-actions {
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid #e0e0e0;
-    }
-
-    .module-actions h4 {
-      margin: 0 0 16px 0;
-      color: #333;
+    .module-row {
       font-weight: 500;
     }
 
-    .quick-actions {
+    .module-row.selected {
+      background: rgba(0, 0, 0, 0.06);
+      font-weight: 600;
+    }
+
+    .lesson-row {
+      font-size: 13px;
+    }
+
+    .lesson-row.selected {
+      background: #18181b;
+      color: #fff;
+    }
+
+    .lesson-row.selected .node-title {
+      color: #fff;
+    }
+
+    .lesson-row.selected .node-icon {
+      color: #fff;
+    }
+
+    .lesson-row.selected .action-btn {
+      color: #a1a1aa;
+    }
+
+    .lesson-row.selected .action-btn:hover {
+      color: #ef4444;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .toggle-btn {
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: transparent;
+      padding: 0;
       display: flex;
-      gap: 12px;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #71717a;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .toggle-btn:hover {
+      background: rgba(0, 0, 0, 0.06);
+      color: #18181b;
+    }
+
+    .toggle-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .toggle-placeholder {
+      width: 24px;
+      flex-shrink: 0;
+    }
+
+    .node-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #71717a;
+      flex-shrink: 0;
+    }
+
+    .folder-icon {
+      color: #52525b;
+    }
+
+    .lesson-icon {
+      color: #71717a;
+    }
+
+    .node-title {
+      font-size: 13px;
+      color: #18181b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    /* Hover-действия */
+    .node-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      margin-left: auto;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+    }
+
+    .tree-node-row:hover .node-actions {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .action-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #71717a;
+      padding: 0;
+      transition: all 0.15s ease;
+    }
+
+    .action-btn:hover {
+      background: rgba(0, 0, 0, 0.08);
+      color: #18181b;
+    }
+
+    .action-btn.delete-btn:hover {
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .action-btn mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Пунктирная кнопка добавления модуля */
+    .btn-add-module-dashed {
+      width: 100%;
+      margin-top: 16px;
+      border: 1.5px dashed rgba(0, 0, 0, 0.18);
+      border-radius: 12px;
+      background: transparent;
+      padding: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #52525b;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-add-module-dashed:hover {
+      border-color: #18181b;
+      color: #18181b;
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    .btn-add-module-dashed mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Правая колонка: Редактор */
+    .editor-column {
+      min-height: 500px;
+    }
+
+    .editor-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+      margin-bottom: 24px;
+    }
+
+    .editor-header-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .type-badge {
+      display: inline-block;
+      align-self: flex-start;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #52525b;
+      background: #f4f4f5;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+
+    .editor-item-title {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 26px;
+      font-weight: 400;
+      color: #18181b;
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    .editor-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-outline-cancel {
+      padding: 7px 18px;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: #fff;
+      color: #3f3f46;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-outline-cancel:hover {
+      background: #f4f4f5;
+      border-color: rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-solid-save {
+      padding: 7px 20px;
+      border-radius: 20px;
+      border: 1px solid #18181b;
+      background: #18181b;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+      transition: all 0.15s ease;
+    }
+
+    .btn-solid-save:hover:not(:disabled) {
+      background: #27272a;
+    }
+
+    .btn-solid-save:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Форма */
+    .editor-form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-section {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .form-field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #71717a;
+      text-transform: uppercase;
+    }
+
+    .field-input, .field-textarea {
+      width: 100%;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #18181b;
+      background: rgba(255, 255, 255, 0.85);
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .field-input:focus, .field-textarea:focus {
+      border-color: #18181b;
+      box-shadow: 0 0 0 2px rgba(24, 24, 27, 0.06);
+    }
+
+    .field-textarea {
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    /* Pill-переключатель типов */
+    .lesson-type-pills {
+      display: flex;
+      gap: 8px;
       flex-wrap: wrap;
     }
 
-    .quick-actions button {
-      flex: 1;
-      min-width: 150px;
+    .pill-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: #fff;
+      color: #3f3f46;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
     }
 
-    .example-tree-invisible {
-      display: none;
-    }
-    
-    .nested-group {
-      padding-left: 24px;
+    .pill-btn:hover {
+      background: #fafafa;
+      border-color: rgba(0, 0, 0, 0.25);
     }
 
-    .mat-tree-node {
+    .pill-btn.active {
+      background: #18181b;
+      color: #fff;
+      border-color: #18181b;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    }
+
+    .pill-btn mat-icon {
+      font-size: 17px;
+      width: 17px;
+      height: 17px;
+    }
+
+    /* Подсекции контента */
+    .sub-section {
+      margin-top: 10px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(0, 0, 0, 0.07);
       display: flex;
-      align-items: center; 
-      min-height: 48px;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sub-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .sub-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-sub-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: #fff;
+      color: #3f3f46;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-sub-action:hover {
+      background: #fafafa;
+      border-color: rgba(0, 0, 0, 0.25);
+    }
+
+    .btn-sub-action.highlight {
+      background: #18181b;
+      color: #fff;
+      border-color: #18181b;
+    }
+
+    .btn-sub-action.highlight:hover {
+      background: #27272a;
+    }
+
+    .btn-sub-action mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+    }
+
+    /* Карточки материалов и тестов */
+    .cards-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 280px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .selectable-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.85);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .selectable-card:hover {
+      border-color: rgba(0, 0, 0, 0.22);
+      background: #fafafa;
+    }
+
+    .selectable-card.selected {
+      border-color: #18181b;
+      background: rgba(24, 24, 27, 0.03);
+      box-shadow: 0 0 0 1px #18181b inset;
+    }
+
+    .card-icon-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #f4f4f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #52525b;
+      flex-shrink: 0;
+    }
+
+    .card-icon-box.quiz-box {
+      background: #f4f4f5;
+      color: #18181b;
+    }
+
+    .card-icon-box mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    .card-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .card-main-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #18181b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-sub-info {
+      font-size: 11px;
+      color: #71717a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .checkmark-badge {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #18181b;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .checkmark-badge mat-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+
+    .empty-cards-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+      border-radius: 12px;
+      border: 1px dashed rgba(0, 0, 0, 0.12);
+      background: rgba(255, 255, 255, 0.4);
+      color: #71717a;
+      font-size: 13px;
+      gap: 8px;
+      text-align: center;
+    }
+
+    .empty-cards-placeholder mat-icon {
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
+      opacity: 0.6;
+    }
+
+    /* Видео и чипы */
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      background: #fff;
+      color: #3f3f46;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .chip-item:hover {
+      border-color: rgba(0, 0, 0, 0.2);
+    }
+
+    .chip-item.active {
+      border-color: #18181b;
+      background: #18181b;
+      color: #fff;
+    }
+
+    .chip-item mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+
+    .video-embed-box {
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: #000;
+    }
+
+    .video-iframe {
+      width: 100%;
+      height: 380px;
+      display: block;
+      border: none;
+    }
+
+    /* Тулбар выбранного теста */
+    .test-toolbar-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(24, 24, 27, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      margin-top: 8px;
+    }
+
+    .test-toolbar-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #18181b;
+    }
+
+    .test-toolbar-name mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #16a34a;
+    }
+
+    .test-toolbar-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Пустое состояние */
+    .empty-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 24px;
+      text-align: center;
+      min-height: 440px;
+    }
+
+    .empty-icon-circle {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      color: #71717a;
+    }
+
+    .empty-icon-circle mat-icon {
+      font-size: 32px;
+      width: 32px;
+      height: 32px;
+    }
+
+    .empty-title {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 24px;
+      font-weight: 400;
+      color: #18181b;
+      margin: 0 0 8px 0;
+    }
+
+    .empty-description {
+      font-size: 13px;
+      color: #71717a;
+      max-width: 380px;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-3px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   `]
 })
@@ -615,6 +1279,7 @@ export class CourseBuilderComponent implements OnInit {
   selectedNode: TreeNode | null = null;
   editForm: FormGroup;
   saving = false;
+  justSaved = false;
   availableMaterials: any[] = [];
   availableTests: any[] = [];
   uploadingMaterial = false;
@@ -809,31 +1474,68 @@ export class CourseBuilderComponent implements OnInit {
     });
   }
 
-  addSubModule(parentModule: TreeNode) {
-    const dialogRef = this.dialog.open(InputDialogComponent, {
-      width: '400px',
-      data: { title: 'Добавить подмодуль', label: 'Название подмодуля:', placeholder: 'Введите название подмодуля' }
-    });
+  goBack(): void {
+    this.router.navigate(['/courses', this.subjectId]);
+  }
 
-    dialogRef.afterClosed().subscribe(result => {
-      if (result && result.trim()) {
-        // Создаем новый модуль как подмодуль (в будущем можно добавить parent_module_id)
-        this.apiService.createModule(this.subjectId, {
-          title: result.trim(),
-          description: `Подмодуль модуля "${parentModule.title}"`,
-          is_collapsed: false
-        }).subscribe({
-          next: () => {
-            this.loadCourse();
-            this.snackBar.open('Подмодуль добавлен', 'Закрыть', { duration: 2000 });
-          },
-          error: (err) => {
-            console.error('Error creating submodule:', err);
-            this.snackBar.open('Ошибка создания подмодуля: ' + (err.error?.detail || err.message || 'Неизвестная ошибка'), 'Закрыть', { duration: 5000 });
-          }
-        });
+  getModulesCount(): number {
+    return this.dataSource?.data?.length || 0;
+  }
+
+  getModuleIndex(node: TreeNode): number {
+    if (!this.dataSource?.data) return 1;
+    if (node.type === 'module') {
+      const idx = this.dataSource.data.findIndex(m => m.id === node.id);
+      return idx >= 0 ? idx + 1 : 1;
+    } else {
+      const parent = this.dataSource.data.find(m => m.id === node.moduleId || (m.children && m.children.some(c => c.id === node.id)));
+      if (parent) {
+        const idx = this.dataSource.data.findIndex(m => m.id === parent.id);
+        return idx >= 0 ? idx + 1 : 1;
       }
-    });
+      return 1;
+    }
+  }
+
+  getLessonIndex(node: TreeNode): string {
+    if (!this.dataSource?.data) return '1.1';
+    for (let m = 0; m < this.dataSource.data.length; m++) {
+      const mod = this.dataSource.data[m];
+      if (mod.children) {
+        const lIdx = mod.children.findIndex(c => c.id === node.id);
+        if (lIdx >= 0) {
+          return `${m + 1}.${lIdx + 1}`;
+        }
+      }
+    }
+    return '1.1';
+  }
+
+  setLessonType(type: string): void {
+    this.editForm.patchValue({ lessonType: type });
+  }
+
+  selectMaterial(materialId: string): void {
+    const current = this.editForm.get('materialId')?.value;
+    this.editForm.patchValue({ materialId: current === materialId ? '' : materialId });
+  }
+
+  selectTest(testId: string): void {
+    const current = this.editForm.get('testId')?.value;
+    this.editForm.patchValue({ testId: current === testId ? '' : testId });
+  }
+
+  getFileExt(name?: string): string {
+    if (!name) return 'FILE';
+    const parts = name.split('.');
+    return parts.length > 1 ? parts.pop()!.toUpperCase() : 'FILE';
+  }
+
+  formatFileSize(bytes?: number): string {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
   addLesson(moduleNode: TreeNode) {
@@ -895,6 +1597,8 @@ export class CourseBuilderComponent implements OnInit {
       }).subscribe({
         next: () => {
           this.loadCourse();
+          this.justSaved = true;
+          setTimeout(() => this.justSaved = false, 3000);
           this.snackBar.open('Модуль сохранен', 'Закрыть', { duration: 2000 });
         }
       });
@@ -929,6 +1633,8 @@ export class CourseBuilderComponent implements OnInit {
             this.apiService.updateContent(this.selectedNode.content.id, contentData).subscribe({
               next: () => {
                 this.loadCourse();
+                this.justSaved = true;
+                setTimeout(() => this.justSaved = false, 3000);
                 this.snackBar.open('Урок сохранен', 'Закрыть', { duration: 2000 });
               }
             });
@@ -936,6 +1642,8 @@ export class CourseBuilderComponent implements OnInit {
             this.apiService.createContent(this.selectedNode!.id, contentData).subscribe({
               next: () => {
                 this.loadCourse();
+                this.justSaved = true;
+                setTimeout(() => this.justSaved = false, 3000);
                 this.snackBar.open('Урок сохранен', 'Закрыть', { duration: 2000 });
               }
             });
@@ -952,11 +1660,15 @@ export class CourseBuilderComponent implements OnInit {
 
   saveStructure() {
     this.saving = true;
-    // Structure is saved automatically when editing nodes
+    if (this.selectedNode && this.editForm.valid) {
+      this.saveNode();
+    }
     setTimeout(() => {
       this.saving = false;
+      this.justSaved = true;
+      setTimeout(() => this.justSaved = false, 3000);
       this.snackBar.open('Структура сохранена', 'Закрыть', { duration: 2000 });
-    }, 500);
+    }, 400);
   }
 
   loadMaterials() {
