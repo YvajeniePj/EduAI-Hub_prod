@@ -76,25 +76,28 @@ interface TreeNode {
   ],
   template: `
     <div class="course-hub-container">
-      <div class="course-header" *ngIf="!loading" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dadce0; background: white; padding: 12px 24px; flex-shrink: 0;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <h1 style="margin: 0; font-size: 22px; font-weight: 400; color: #1e88e5;">{{ courseName }}</h1>
+      <div class="course-header" *ngIf="!loading">
+        <div class="course-header-left">
+          <a class="header-back-btn" [routerLink]="['/']" matTooltip="Назад на главную">
+            <mat-icon>chevron_left</mat-icon>
+          </a>
+          <h1 class="course-header-title">{{ courseName }}</h1>
           <!-- Small red pulse/dot indicator if stream is live -->
-          <div *ngIf="isStreamActive" class="live-pulse-dot" matTooltip="Трансляция в эфире!" style="width: 10px; height: 10px; border-radius: 50%; background-color: #d32f2f; box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); animation: pulse 1.2s infinite; margin-left: 8px;"></div>
+          <div *ngIf="isStreamActive" class="live-pulse-dot" matTooltip="Трансляция в эфире!"></div>
         </div>
-        <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
+        <div class="header-actions">
           <ng-container *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
-            <button mat-stroked-button (click)="copyCourseInviteLink()" style="height: 36px;">
+            <button class="pill-btn pill-btn-outline" (click)="copyCourseInviteLink()">
               🔗 Приглашение на курс
             </button>
-            <button mat-stroked-button [routerLink]="['/course-builder', subjectId]" style="height: 36px;">
+            <button class="pill-btn pill-btn-outline" [routerLink]="['/course-builder', subjectId]">
               ⚙️ Конструктор курса
             </button>
-            <button mat-stroked-button [routerLink]="['/ai-test']" [queryParams]="{ subjectId: subjectId }" style="height: 36px;">
-              🤖 AI-тест
+            <button class="pill-btn pill-btn-outline" [routerLink]="['/ai-test']" [queryParams]="{ subjectId: subjectId }">
+              ☆ AI-тест
             </button>
-            <button mat-raised-button color="warn" (click)="startStream()" style="height: 36px; display: flex; align-items: center; gap: 4px;">
-              <mat-icon>videocam</mat-icon> Начать трансляцию
+            <button class="pill-btn pill-btn-red" (click)="startStream()">
+              <mat-icon class="stream-btn-icon">videocam</mat-icon> НАЧАТЬ ТРАНСЛЯЦИЮ
             </button>
           </ng-container>
         </div>
@@ -103,129 +106,114 @@ interface TreeNode {
       <mat-tab-group animationDuration="0ms" class="course-tabs" [selectedIndex]="0">
         <!-- Tab 1: Лента -->
         <mat-tab label="Лента">
-          <div class="tab-content-container">
-            <div class="course-banner-card">
-              <div class="banner-overlay"></div>
-              <div class="banner-content">
-                <h1 class="banner-title">{{ courseName }}</h1>
-                <p class="banner-description" *ngIf="courseDescription">{{ courseDescription }}</p>
-                <div class="banner-meta">
-                  <span *ngIf="courseTeachers.length > 0">
-                    Преподаватель: <strong *ngFor="let t of courseTeachers; let last = last">{{ t.name }}{{ last ? '' : ', ' }}</strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-
+          <div class="tab-content-container feed-tab-container">
             <div class="stream-layout">
               <!-- Left Column: Deadlines -->
               <div class="deadlines-sidebar">
-                <mat-card class="sidebar-card">
-                  <mat-card-header>
-                    <mat-card-title>Предстоящие задания</mat-card-title>
-                  </mat-card-header>
-                  <mat-card-content>
+                <div class="glass-card sidebar-card">
+                  <div class="sidebar-header">
+                    <span class="sidebar-title">Предстоящие задания</span>
+                  </div>
+                  <div class="sidebar-content">
                     <div *ngIf="courseDeadlines.length === 0" class="no-deadlines">
                       Ура, заданий на этой неделе нет!
                     </div>
                     <div *ngIf="courseDeadlines.length > 0" class="deadlines-list">
                       <div *ngFor="let deadline of courseDeadlines" class="deadline-item" [class.overdue]="deadline.overdue" [class.finished]="deadline.finished">
-                        <mat-icon [style.color]="deadline.finished ? '#43a047' : (deadline.overdue ? '#d32f2f' : '#5f6368')">
-                          {{ deadline.finished ? 'check_circle' : 'event' }}
-                        </mat-icon>
+                        <div class="deadline-icon-box">
+                          <mat-icon class="deadline-mat-icon">
+                            {{ deadline.finished ? 'check_circle' : 'assignment' }}
+                          </mat-icon>
+                        </div>
                         <div class="deadline-info">
                           <a [routerLink]="['/tests', deadline.id, 'take']" [queryParams]="{ source: 'courses' }" class="deadline-title">
                             {{ deadline.title }}
                           </a>
                           <div class="deadline-date">
-                            Срок: {{ deadline.dueDate | date:'short' }}
+                            Срок: {{ deadline.dueDate | date:'M/d/yy, h:mm a' }}
                           </div>
                           <div *ngIf="deadline.overdue" class="deadline-status overdue-text">Просрочено</div>
                           <div *ngIf="deadline.finished" class="deadline-status finished-text">Сдано</div>
                         </div>
                       </div>
                     </div>
-                  </mat-card-content>
-                </mat-card>
+                  </div>
+                </div>
               </div>
 
               <!-- Right Column: Compose Form & Feed -->
               <div class="stream-feed">
                 <!-- Compose box for teachers/admins -->
-                <mat-card class="compose-card" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
-                  <mat-card-content>
-                    <div class="compose-trigger" *ngIf="!showComposeForm" (click)="showComposeForm = true">
-                      <img *ngIf="currentUser?.avatar_url" [src]="getAvatarUrl(currentUser.avatar_url)" (error)="currentUser.avatar_url = undefined" class="compose-avatar" />
-                      <div *ngIf="!currentUser?.avatar_url" class="compose-avatar-placeholder">
-                        <mat-icon>person</mat-icon>
-                      </div>
-                      <span class="placeholder-text">Поделитесь чем-нибудь с классом...</span>
+                <div class="glass-card compose-card" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+                  <div class="compose-trigger" *ngIf="!showComposeForm" (click)="showComposeForm = true">
+                    <div class="user-monogram-circle">
+                      {{ getUserInitials(currentUser?.name) }}
+                    </div>
+                    <span class="placeholder-text">Поделитесь чем-нибудь с классом...</span>
+                  </div>
+                  
+                  <form [formGroup]="announcementForm" (ngSubmit)="postAnnouncement()" *ngIf="showComposeForm" class="compose-form">
+                    <div class="form-field-wrapper">
+                      <input class="custom-input full-width" formControlName="title" placeholder="Тема объявления" />
                     </div>
                     
-                    <form [formGroup]="announcementForm" (ngSubmit)="postAnnouncement()" *ngIf="showComposeForm" class="compose-form">
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Тема объявления</mat-label>
-                        <input matInput formControlName="title" placeholder="Тема..." />
-                      </mat-form-field>
-                      
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Текст объявления</mat-label>
-                        <textarea matInput formControlName="content" rows="4" placeholder="Напишите здесь ваше сообщение..."></textarea>
-                      </mat-form-field>
-                      
-                      <div class="compose-actions">
-                        <button mat-button type="button" (click)="showComposeForm = false; announcementForm.reset()">Отмена</button>
-                        <button mat-raised-button color="primary" type="submit" [disabled]="announcementForm.invalid || saving">
-                          Опубликовать
-                        </button>
-                      </div>
-                    </form>
-                  </mat-card-content>
-                </mat-card>
+                    <div class="form-field-wrapper">
+                      <textarea class="custom-textarea full-width" formControlName="content" rows="4" placeholder="Напишите здесь ваше сообщение..."></textarea>
+                    </div>
+                    
+                    <div class="compose-actions">
+                      <button class="pill-btn pill-btn-outline" type="button" (click)="showComposeForm = false; announcementForm.reset()">Отмена</button>
+                      <button class="pill-btn pill-btn-dark" type="submit" [disabled]="announcementForm.invalid || saving">
+                        Опубликовать
+                      </button>
+                    </div>
+                  </form>
+                </div>
 
                 <!-- Announcements Feed -->
                 <div class="announcements-feed">
-                  <!-- Bright LIVE card for students when stream is active -->
-                  <mat-card *ngIf="isStreamActive && currentUser?.role === 'student'" class="live-stream-card" style="background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%); color: white; margin-bottom: 24px; border-radius: 12px; box-shadow: 0 4px 15px rgba(255, 75, 43, 0.4); overflow: hidden; position: relative;">
-                    <div style="position: absolute; top: -20px; right: -20px; font-size: 100px; opacity: 0.15; pointer-events: none;">
-                      <mat-icon style="font-size: 100px; width: 100px; height: 100px; color: white;">live_tv</mat-icon>
-                    </div>
-                    <mat-card-content style="padding: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
-                      <div>
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                          <span style="background: white; color: #ff4b2b; font-weight: bold; font-size: 11px; padding: 2px 8px; border-radius: 4px; letter-spacing: 1px;">ЭФИР</span>
-                          <div class="live-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background-color: white; box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); animation: pulse-white 1.2s infinite; display: inline-block;"></div>
-                        </div>
-                        <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 500; color: white; border: none;">Трансляция уже началась!</h2>
-                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">Присоединяйтесь к онлайн-уроку прямо сейчас.</p>
+                  <!-- Active stream card for students when stream is active -->
+                  <div *ngIf="isStreamActive && currentUser?.role === 'student'" class="glass-card announcement-card live-announcement-card">
+                    <div class="announcement-header">
+                      <div class="user-monogram-circle">П</div>
+                      <div class="announcement-meta-container">
+                        <div class="announcement-author">Преподаватель</div>
+                        <div class="announcement-date">Прямо сейчас</div>
                       </div>
-                      <button mat-raised-button [routerLink]="['/courses', subjectId, 'stream']" style="background: white; color: #ff4b2b; font-weight: 600; padding: 8px 24px;">
-                        Войти в класс
+                    </div>
+                    <div class="announcement-body">
+                      <div class="live-tag-row">
+                        <span class="live-bullet"></span>
+                        <span class="live-tag-title">Прямой эфир</span>
+                      </div>
+                      <div class="live-subtitle">Трансляция уже началась! Присоединяйтесь к онлайн-паре прямо сейчас.</div>
+                      <button class="pill-btn-join-stream" [routerLink]="['/courses', subjectId, 'stream']">
+                        ПРИСОЕДИНИТЬСЯ К ТРАНСЛЯЦИИ
                       </button>
-                    </mat-card-content>
-                  </mat-card>
+                    </div>
+                  </div>
 
                   <div *ngIf="courseAnnouncements.length === 0 && !isStreamActive" class="no-announcements">
                     <mat-icon class="feed-empty-icon">chat_bubble_outline</mat-icon>
                     <p>Здесь пока ничего нет. Объявления появятся в этой ленте.</p>
                   </div>
-                  <mat-card *ngFor="let announcement of courseAnnouncements" class="announcement-card">
-                    <mat-card-header class="announcement-header">
-                      <img mat-card-avatar *ngIf="announcement.author_avatar" [src]="getAvatarUrl(announcement.author_avatar)" (error)="announcement.author_avatar = undefined" class="author-avatar" />
-                      <div *ngIf="!announcement.author_avatar" class="author-avatar-placeholder" mat-card-avatar>
-                        <mat-icon>person</mat-icon>
+
+                  <div *ngFor="let announcement of courseAnnouncements" class="glass-card announcement-card" [class.live-announcement-card]="isLiveAnnouncement(announcement)">
+                    <div class="announcement-header">
+                      <div class="user-monogram-circle">
+                        {{ getUserInitials(announcement.author_name || 'Преподаватель') }}
                       </div>
                       <div class="announcement-meta-container">
-                        <mat-card-title class="announcement-author">
+                        <div class="announcement-author">
                           {{ announcement.author_name || 'Преподаватель' }}
-                        </mat-card-title>
-                        <mat-card-subtitle class="announcement-date">
+                        </div>
+                        <div class="announcement-date">
                           {{ announcement.created_at | russianDate }}
-                        </mat-card-subtitle>
+                        </div>
                       </div>
                       <span class="spacer"></span>
-                      <button mat-icon-button [matMenuTriggerFor]="announcementMenu" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
-                        <mat-icon>more_vert</mat-icon>
+                      <button mat-icon-button [matMenuTriggerFor]="announcementMenu" class="dots-btn" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+                        <mat-icon>more_horiz</mat-icon>
                       </button>
                       <mat-menu #announcementMenu="matMenu">
                         <button mat-menu-item (click)="deleteAnnouncement(announcement.id)">
@@ -233,15 +221,31 @@ interface TreeNode {
                           <span>Удалить</span>
                         </button>
                       </mat-menu>
-                    </mat-card-header>
-                    <mat-card-content class="announcement-body">
+                    </div>
+
+                    <!-- Live announcement body -->
+                    <div *ngIf="isLiveAnnouncement(announcement)" class="announcement-body">
+                      <div class="live-tag-row">
+                        <span class="live-bullet"></span>
+                        <span class="live-tag-title">Прямой эфир</span>
+                      </div>
+                      <div class="live-subtitle">
+                        Преподаватель {{ announcement.author_name || 'Преподаватель' }} начал трансляцию!
+                      </div>
+                      <button class="pill-btn-join-stream" [routerLink]="['/courses', subjectId, 'stream']">
+                        ПРИСОЕДИНИТЬСЯ К ТРАНСЛЯЦИИ
+                      </button>
+                    </div>
+
+                    <!-- Regular announcement body -->
+                    <div *ngIf="!isLiveAnnouncement(announcement)" class="announcement-body">
                       <h3 class="announcement-title-text">{{ announcement.title }}</h3>
                       <div [innerHTML]="announcement.content" class="announcement-content-text"></div>
                       <div *ngIf="announcement.image_url" class="announcement-image-container">
                         <img [src]="announcement.image_url" class="announcement-image" />
                       </div>
-                    </mat-card-content>
-                  </mat-card>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -251,34 +255,34 @@ interface TreeNode {
         <!-- Tab 2: Задания -->
         <mat-tab label="Задания">
           <!-- Classwork List (viewingLessonMode === false) -->
-          <div class="tab-content-container" *ngIf="!viewingLessonMode">
+          <div class="tab-content-container assignments-tab-container" *ngIf="!viewingLessonMode">
             <div class="classwork-header-bar">
-              <h2>Задания и Материалы курса</h2>
-              <div class="actions" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'">
-                <button mat-raised-button color="primary" (click)="openCreateTest()">
-                  <mat-icon>quiz</mat-icon> Создать тест
+              <h2 class="classwork-title">Задания и Материалы курса</h2>
+              <div class="actions" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+                <button class="pill-btn pill-btn-outline" (click)="openCreateTest()">
+                  ☆ Создать тест
                 </button>
-                <button mat-raised-button color="accent" (click)="openUploadMaterial()">
-                  <mat-icon>upload_file</mat-icon> Загрузить материал
+                <button class="pill-btn pill-btn-outline" (click)="openUploadMaterial()">
+                  ⤓ Загрузить материал
                 </button>
               </div>
             </div>
 
             <!-- Progress Bar for Students -->
-            <div class="student-progress-container" *ngIf="currentUser?.role === 'student'" style="margin-bottom: 24px; background: white; padding: 16px; border-radius: 8px; border: 1px solid #dadce0;">
-              <div class="progress-label" style="display: flex; justify-content: space-between; font-weight: 500; font-size: 14px; margin-bottom: 8px;">
+            <div class="student-progress-container glass-card" *ngIf="currentUser?.role === 'student'">
+              <div class="progress-label">
                 <span>Пройдено {{ completedLessonsCount }} из {{ totalLessonsCount }} уроков</span>
                 <span>{{ totalLessonsCount > 0 ? mathRound((completedLessonsCount / totalLessonsCount) * 100) : 0 }}%</span>
               </div>
-              <div class="progress-bar-bg" style="background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden; position: relative;">
-                <div class="progress-bar-fill" [style.width.%]="totalLessonsCount > 0 ? (completedLessonsCount / totalLessonsCount) * 100 : 0" style="background: #4caf50; height: 100%; transition: width 0.3s ease;"></div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" [style.width.%]="totalLessonsCount > 0 ? (completedLessonsCount / totalLessonsCount) * 100 : 0"></div>
               </div>
             </div>
 
             <!-- Modules Accordion -->
             <mat-accordion multi="true" class="modules-accordion">
-              <mat-expansion-panel *ngFor="let module of dataSource.data" [expanded]="true" class="module-panel">
-                <mat-expansion-panel-header>
+              <mat-expansion-panel *ngFor="let module of dataSource.data" [expanded]="true" class="glass-card module-panel">
+                <mat-expansion-panel-header class="module-panel-header">
                   <mat-panel-title>
                     <span class="module-panel-title">{{ module.title }}</span>
                   </mat-panel-title>
@@ -286,20 +290,22 @@ interface TreeNode {
 
                 <div class="lessons-list">
                   <div *ngFor="let lesson of module.children" class="lesson-row" (click)="selectLessonFromOutline(lesson)">
-                    <mat-icon class="lesson-type-icon" [style.color]="getLessonIconColor(lesson)">
-                      {{ getLessonTypeIcon(lesson.lessonType) }}
-                    </mat-icon>
+                    <div class="lesson-icon-box">
+                      <mat-icon class="lesson-type-icon">
+                        {{ getLessonTypeIcon(lesson.lessonType) }}
+                      </mat-icon>
+                    </div>
                     <span class="lesson-row-title">{{ lesson.title }}</span>
                     <span class="spacer"></span>
                     
+                    <!-- Deadline Badge -->
+                    <span class="deadline-badge-item" *ngIf="getLessonDeadline(lesson)">
+                      Срок: {{ getLessonDeadline(lesson) | date:'M/d/yy, h:mm a' }}
+                    </span>
+
                     <!-- Status Badge -->
                     <span class="status-badge" [ngClass]="getLessonStatusClass(lesson)">
                       {{ getLessonStatusText(lesson) }}
-                    </span>
-
-                    <!-- Deadline Badge -->
-                    <span class="deadline-badge-item" *ngIf="getLessonDeadline(lesson)">
-                      Срок: {{ getLessonDeadline(lesson) | date:'short' }}
                     </span>
                   </div>
                   <div *ngIf="!module.children || module.children.length === 0" class="no-lessons">
@@ -310,63 +316,54 @@ interface TreeNode {
             </mat-accordion>
 
             <!-- Management Section for Teachers -->
-            <div class="teacher-management-section" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'">
+            <div class="teacher-management-section" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
               <div class="section-title">
-                <h3>Панель управления (Все материалы и тесты)</h3>
+                <h3 class="mgmt-heading">Панель управления (Все материалы и тесты)</h3>
               </div>
               <div class="assignments-list">
                 <div class="list-section">
-                    <h3>Тесты</h3>
-                    <div *ngIf="visibleTests.length === 0" class="empty-list">Нет тестов</div>
-                    <mat-card *ngFor="let test of visibleTests" class="item-card">
-                        <mat-card-content class="item-content">
-                            <div class="item-info">
-                                <div class="item-title-row">
-                                    <mat-icon class="item-icon">quiz</mat-icon>
-                                    <span class="item-title">{{ test.title }}</span>
-                                </div>
-                                <div class="item-meta">
-                                    <span class="meta-label">Доступ:</span> {{ getGroupNames(test.allowed_groups) }}
-                                    <span *ngIf="test.due_date" class="meta-separator">•</span>
-                                    <span *ngIf="test.due_date">Дедлайн: {{ test.due_date | date:'short' }}</span>
-                                </div>
-                            </div>
-                            <div class="item-actions" style="display: flex; align-items: center; gap: 16px;">
-                                <mat-checkbox [checked]="test.peer_review_enabled === 'true'" (change)="togglePeerReview(test, $event.checked)">
-                                    Включить кросс-проверку
-                                </mat-checkbox>
-                                <button mat-icon-button color="warn" (click)="deleteTest(test.id)">
-                                    <mat-icon>delete</mat-icon>
-                                </button>
-                            </div>
-                        </mat-card-content>
-                    </mat-card>
+                  <div class="section-subtitle-caps">ТЕСТЫ</div>
+                  <div *ngIf="visibleTests.length === 0" class="empty-list">Нет тестов</div>
+                  <div *ngFor="let test of visibleTests" class="glass-card test-mgmt-card">
+                    <div class="item-content">
+                      <div class="item-info">
+                        <div class="item-title">{{ test.title }}</div>
+                        <div class="item-meta">
+                          Доступ: {{ getGroupNames(test.allowed_groups) }}
+                          <span *ngIf="test.due_date"> • Дедлайн: {{ test.due_date | date:'M/d/yy, h:mm a' }}</span>
+                        </div>
+                      </div>
+                      <div class="item-actions">
+                        <mat-checkbox [checked]="test.peer_review_enabled === 'true'" (change)="togglePeerReview(test, $event.checked)" class="peer-review-check">
+                          Включить кросс-проверку
+                        </mat-checkbox>
+                        <button mat-icon-button (click)="deleteTest(test.id)" class="delete-icon-btn">
+                          <mat-icon>close</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="list-section">
-                    <h3>Материалы</h3>
-                    <div *ngIf="visibleMaterials.length === 0" class="empty-list">Нет материалов</div>
-                    <mat-card *ngFor="let material of visibleMaterials" class="item-card">
-                         <mat-card-content class="item-content">
-                            <div class="item-info">
-                                <div class="item-title-row">
-                                    <mat-icon class="item-icon">description</mat-icon>
-                                    <span class="item-title">{{ material.original_name || material.name }}</span>
-                                </div>
-                                <div class="item-meta">
-                                    <span class="meta-label">Доступ:</span> {{ getGroupNames(material.allowed_groups) }}
-                                    <span class="meta-separator">•</span>
-                                    <span>{{ material.note || 'Без описания' }}</span>
-                                </div>
-                            </div>
-                            <div class="item-actions">
-                                <button mat-button color="primary" (click)="downloadMaterial(material.id)">Скачать</button>
-                                <button mat-icon-button color="warn" (click)="deleteMaterial(material.id)">
-                                    <mat-icon>delete</mat-icon>
-                                </button>
-                            </div>
-                         </mat-card-content>
-                    </mat-card>
+                  <div class="section-subtitle-caps">МАТЕРИАЛЫ</div>
+                  <div *ngIf="visibleMaterials.length === 0" class="empty-list">Нет материалов</div>
+                  <div *ngFor="let material of visibleMaterials" class="glass-card material-mgmt-card">
+                    <div class="item-content">
+                      <div class="item-info">
+                        <div class="item-title">{{ material.original_name || material.name }}</div>
+                        <div class="item-meta">
+                          Доступ: {{ getGroupNames(material.allowed_groups) }} • {{ material.note || 'Без описания' }}
+                        </div>
+                      </div>
+                      <div class="item-actions">
+                        <button class="pill-btn pill-btn-outline pill-sm" (click)="downloadMaterial(material.id)">Скачать</button>
+                        <button mat-icon-button (click)="deleteMaterial(material.id)" class="delete-icon-btn">
+                          <mat-icon>delete_outline</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -569,154 +566,127 @@ interface TreeNode {
 
         <!-- Tab 3: Участники -->
         <mat-tab label="Участники">
-          <div class="tab-content-container">
-            <div class="people-tab-container">
-              <!-- Teachers Section -->
-              <div class="people-section">
-                <div class="people-section-header">
-                  <h2>Преподаватели</h2>
-                  <span class="people-count">{{ courseTeachers.length }}</span>
-                </div>
-                <!-- Assign Teacher Form -->
-                <div class="add-teacher-form-wrapper" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'">
-                  <form [formGroup]="addTeacherForm" (ngSubmit)="assignTeacher()" class="add-teacher-form">
-                    <mat-form-field appearance="outline" class="small-input" style="margin-bottom: 0;">
-                      <mat-label>Имя пользователя преподавателя</mat-label>
-                      <input matInput formControlName="username" placeholder="Имя пользователя..." [matAutocomplete]="auto" />
-                      <mat-autocomplete #auto="matAutocomplete">
-                        <mat-option *ngFor="let user of suggestedTeachers" [value]="user.name">
-                          {{ user.name }}
-                        </mat-option>
-                      </mat-autocomplete>
-                    </mat-form-field>
-                    <button mat-raised-button color="primary" type="submit" [disabled]="addTeacherForm.invalid">
-                      Назначить
-                    </button>
-                  </form>
-                </div>
-                <div class="people-list">
-                  <div *ngFor="let teacher of courseTeachers" class="person-row">
-                    <div class="person-info">
-                      <img *ngIf="teacher.avatar_url" [src]="getAvatarUrl(teacher.avatar_url)" (error)="teacher.avatar_url = undefined" class="person-avatar" />
-                      <div *ngIf="!teacher.avatar_url" class="person-avatar-placeholder">
-                        <mat-icon>person</mat-icon>
-                      </div>
-                      <span class="person-name">{{ teacher.name }}</span>
-                    </div>
-                    <div class="person-actions">
-                      <button mat-icon-button (click)="startChatWith(teacher.name)" title="Начать чат" *ngIf="teacher.name !== currentUser?.name">
-                        <mat-icon>chat</mat-icon>
-                      </button>
-                      <button mat-icon-button color="warn" *ngIf="(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && teacher.name !== currentUser.name" (click)="removeTeacher(teacher.name)" title="Удалить преподавателя">
-                        <mat-icon>person_remove</mat-icon>
-                      </button>
-                    </div>
-                  </div>
-                  <div *ngIf="courseTeachers.length === 0" class="empty-people">
-                    Нет назначенных преподавателей.
-                  </div>
-                </div>
+          <div class="tab-content-container people-tab-container">
+            <!-- Teachers Section -->
+            <div class="glass-card people-card">
+              <div class="people-card-header">
+                <h2 class="people-card-title">Преподаватели</h2>
+                <span class="people-count">{{ courseTeachers.length }}</span>
               </div>
-
-              <!-- Students Section -->
-              <div class="people-section">
-                <div class="people-section-header">
-                  <h2>Учащиеся</h2>
-                  <span class="people-count">{{ courseStudents.length }}</span>
-                </div>
-                <div class="people-list">
-                  <div *ngFor="let student of courseStudents" class="person-row" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #f1f3f4;">
-                    <div class="person-info" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                      <img *ngIf="student.avatar_url" [src]="getAvatarUrl(student.avatar_url)" (error)="student.avatar_url = undefined" class="person-avatar" />
-                      <div *ngIf="!student.avatar_url" class="person-avatar-placeholder">
-                        <mat-icon>person</mat-icon>
-                      </div>
-                      <span class="person-name" style="font-weight: 500;">{{ student.name }}</span>
-                      
-                      <!-- Group status for non-teachers -->
-                      <span *ngIf="!(currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin')" 
-                            style="font-size: 13px; color: #5f6368; background-color: #f1f3f4; padding: 2px 8px; border-radius: 12px; margin-left: 12px;">
-                        Группа: {{ (studentGroupMappings && studentGroupMappings[student.name]) ? studentGroupMappings[student.name].group_name : 'Без группы' }}
-                      </span>
-                      
-                      <!-- Teacher group assignment dropdown -->
-                      <div *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'" 
-                           style="margin-left: 12px; display: flex; align-items: center; gap: 4px;">
-                        <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width: 160px; font-size: 13px;">
-                          <mat-select [value]="(studentGroupMappings && studentGroupMappings[student.name]) ? studentGroupMappings[student.name].group_id : ''" 
-                                      (selectionChange)="onGroupSelectedForStudent(student.name, $event.value)"
-                                      placeholder="Без группы">
-                            <mat-option value="">Без группы</mat-option>
-                            <mat-option *ngFor="let g of groups" [value]="g.id">{{ g.name }}</mat-option>
-                          </mat-select>
-                        </mat-form-field>
-                      </div>
-                    </div>
-                    <div class="person-actions">
-                      <button mat-icon-button (click)="startChatWith(student.name)" title="Начать чат" *ngIf="student.name !== currentUser?.name">
-                        <mat-icon>chat</mat-icon>
-                      </button>
-                    </div>
-                  </div>
-                  <div *ngIf="courseStudents.length === 0" class="empty-people">
-                    Нет учащихся на данном курсе.
-                  </div>
-                </div>
-              </div>
-
-              <!-- Groups Section -->
-              <div class="people-section groups-section-wrapper">
-                <div class="people-section-header">
-                  <h2>Группы курса</h2>
-                  <button mat-raised-button color="primary" (click)="createGroup()" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'">
-                    <mat-icon>group_add</mat-icon> Создать группу
+              <!-- Assign Teacher Form -->
+              <div class="add-teacher-row" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+                <form [formGroup]="addTeacherForm" (ngSubmit)="assignTeacher()" class="add-teacher-form">
+                  <input class="custom-input teacher-input" formControlName="username" placeholder="Имя пользователя преподавателя*" [matAutocomplete]="auto" />
+                  <mat-autocomplete #auto="matAutocomplete">
+                    <mat-option *ngFor="let user of suggestedTeachers" [value]="user.name">
+                      {{ user.name }}
+                    </mat-option>
+                  </mat-autocomplete>
+                  <button class="pill-btn pill-btn-dark" type="submit" [disabled]="addTeacherForm.invalid">
+                    Назначить
                   </button>
+                </form>
+              </div>
+              <div class="people-list">
+                <div *ngFor="let teacher of courseTeachers" class="person-row">
+                  <div class="person-info">
+                    <div class="user-monogram-circle">{{ getUserInitials(teacher.name) }}</div>
+                    <span class="person-name">{{ teacher.name }}</span>
+                  </div>
+                  <div class="person-actions">
+                    <button mat-icon-button (click)="startChatWith(teacher.name)" title="Начать чат" *ngIf="teacher.name !== currentUser?.name" class="chat-icon-btn">
+                      <mat-icon>chat_bubble_outline</mat-icon>
+                    </button>
+                    <button mat-icon-button *ngIf="(currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin') && teacher.name !== currentUser.name" (click)="removeTeacher(teacher.name)" title="Удалить преподавателя" class="delete-icon-btn">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
                 </div>
-                
-                <div class="list-section" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'">
-                    <p class="section-hint">Управляйте участниками и заявками на странице каждой группы.</p>
+                <div *ngIf="courseTeachers.length === 0" class="empty-people">
+                  Нет назначенных преподавателей.
                 </div>
-                
-                <div class="groups-list">
-                    <div *ngIf="groups.length === 0" class="empty-list">Нет доступных групп</div>
-                    <mat-card *ngFor="let group of groups" class="item-card">
-                         <mat-card-content class="item-content">
-                            <div class="item-info">
-                                <div class="item-title-row">
-                                    <mat-icon class="item-icon">group</mat-icon>
-                                    <span class="item-title">{{ group.name }}</span>
-                                </div>
-                                <div class="item-meta">
-                                    <span>Участников: {{ group.member_count || 0 }}</span>
-                                    <span class="meta-separator">•</span>
-                                    <span>{{ group.description || 'Без описания' }}</span>
-                                </div>
-                            </div>
-                            <div class="item-actions">
-                                <!-- Teacher actions -->
-                                <div *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin'" class="teacher-btns">
-                                    <button mat-stroked-button color="primary" (click)="copyInviteLink(group)" style="height: 40px; margin-right: 8px;">
-                                        <mat-icon>share</mat-icon> Ссылка для приглашения
-                                    </button>
-                                    <button mat-icon-button color="primary" (click)="navigateToGroup(group.id)" matTooltip="Управление">
-                                        <mat-icon>settings</mat-icon>
-                                    </button>
-                                    <button mat-icon-button color="warn" (click)="deleteGroup(group.id)">
-                                        <mat-icon>delete</mat-icon>
-                                    </button>
-                                </div>
-                                
-                                <!-- Student actions -->
-                                <div *ngIf="currentUser?.role === 'student'">
-                                    <span *ngIf="isGroupMember(group.id)" class="status-badge member">Вы участник</span>
-                                    <span *ngIf="!isGroupMember(group.id) && hasPendingRequest(group.id)" class="status-badge pending">Заявка отправлена</span>
-                                    <button mat-raised-button color="primary" *ngIf="!isGroupMember(group.id) && !hasPendingRequest(group.id)" (click)="joinGroup(group.id)">
-                                        Вступить
-                                    </button>
-                                </div>
-                            </div>
-                         </mat-card-content>
-                    </mat-card>
+              </div>
+            </div>
+
+            <!-- Students Section -->
+            <div class="glass-card people-card">
+              <div class="people-card-header">
+                <h2 class="people-card-title">Учащиеся</h2>
+                <span class="people-count">{{ courseStudents.length }}</span>
+              </div>
+              <div class="people-list">
+                <div *ngFor="let student of courseStudents" class="person-row">
+                  <div class="person-info">
+                    <div class="user-monogram-circle">{{ getUserInitials(student.name) }}</div>
+                    <span class="person-name">{{ student.name }}</span>
+                  </div>
+                  <div class="person-right-box">
+                    <!-- Teacher group assignment dropdown -->
+                    <div *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'" class="group-select-wrapper">
+                      <mat-select [value]="(studentGroupMappings && studentGroupMappings[student.name]) ? studentGroupMappings[student.name].group_id : ''" 
+                                  (selectionChange)="onGroupSelectedForStudent(student.name, $event.value)"
+                                  placeholder="Без группы" class="clean-group-select">
+                        <mat-option value="">Без группы</mat-option>
+                        <mat-option *ngFor="let g of groups" [value]="g.id">{{ g.name }}</mat-option>
+                      </mat-select>
+                    </div>
+                    <!-- Group status for non-teachers -->
+                    <span *ngIf="!(currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin')" class="student-group-chip">
+                      {{ (studentGroupMappings && studentGroupMappings[student.name]) ? studentGroupMappings[student.name].group_name : 'Без группы' }}
+                    </span>
+                    <button mat-icon-button (click)="startChatWith(student.name)" title="Начать чат" *ngIf="student.name !== currentUser?.name" class="chat-icon-btn">
+                      <mat-icon>chat_bubble_outline</mat-icon>
+                    </button>
+                  </div>
+                </div>
+                <div *ngIf="courseStudents.length === 0" class="empty-people">
+                  Нет учащихся на данном курсе.
+                </div>
+              </div>
+            </div>
+
+            <!-- Groups Section -->
+            <div class="glass-card people-card">
+              <div class="people-card-header">
+                <h2 class="people-card-title">Группы курса</h2>
+                <button class="pill-btn pill-btn-outline" (click)="createGroup()" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+                  👥 Создать группу
+                </button>
+              </div>
+              <p class="section-hint" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+                Управляйте участниками и заявками на странице каждой группы.
+              </p>
+              <div class="groups-list">
+                <div *ngIf="groups.length === 0" class="empty-list">Нет доступных групп</div>
+                <div *ngFor="let group of groups" class="group-item-card">
+                  <div class="group-item-info">
+                    <div class="group-item-title">{{ group.name }}</div>
+                    <div class="group-item-meta">
+                      Участников: {{ group.member_count || 0 }} • {{ group.description || 'Без описания' }}
+                    </div>
+                  </div>
+                  <div class="group-item-actions">
+                    <!-- Teacher actions -->
+                    <ng-container *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
+                      <button class="pill-btn pill-btn-outline pill-sm" (click)="copyInviteLink(group)">
+                        🔗 Ссылка для приглашения
+                      </button>
+                      <button mat-icon-button (click)="navigateToGroup(group.id)" matTooltip="Управление" class="settings-icon-btn">
+                        <mat-icon>settings</mat-icon>
+                      </button>
+                      <button mat-icon-button (click)="deleteGroup(group.id)" class="delete-icon-btn">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </ng-container>
+                    <!-- Student actions -->
+                    <ng-container *ngIf="currentUser?.role === 'student'">
+                      <span *ngIf="isGroupMember(group.id)" class="status-badge member">Вы участник</span>
+                      <span *ngIf="!isGroupMember(group.id) && hasPendingRequest(group.id)" class="status-badge pending">Заявка отправлена</span>
+                      <button class="pill-btn pill-btn-dark pill-sm" *ngIf="!isGroupMember(group.id) && !hasPendingRequest(group.id)" (click)="joinGroup(group.id)">
+                        Вступить
+                      </button>
+                    </ng-container>
+                  </div>
                 </div>
               </div>
             </div>
@@ -727,81 +697,74 @@ interface TreeNode {
         <mat-tab *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
           <ng-template mat-tab-label>
             <span>Проверка работ</span>
-            <span class="pending-badge" *ngIf="pendingSubmissionsCount > 0" style="background: #d32f2f; color: white; border-radius: 10px; padding: 2px 8px; font-size: 11px; margin-left: 8px; font-weight: bold;">
+            <span class="tab-counter-badge" *ngIf="pendingSubmissionsCount > 0">
               {{ pendingSubmissionsCount }}
             </span>
           </ng-template>
 
-          <div class="tab-content-container">
-            <div class="submissions-grading-header" style="display: flex; gap: 16px; margin-bottom: 24px; align-items: center; flex-wrap: wrap;">
-              <mat-form-field appearance="outline" style="flex: 1; min-width: 200px; margin-bottom: 0;">
-                <mat-label>Поиск по тесту</mat-label>
-                <input matInput [(ngModel)]="submissionFilterTest" (ngModelChange)="applySubmissionFilters()" placeholder="Название теста..." />
-              </mat-form-field>
+          <div class="tab-content-container submissions-tab-container">
+            <div class="submissions-grading-header">
+              <div class="filter-input-wrap">
+                <input class="custom-input search-input" [(ngModel)]="submissionFilterTest" (ngModelChange)="applySubmissionFilters()" placeholder="Поиск по тесту" />
+              </div>
 
-              <mat-form-field appearance="outline" style="flex: 1; min-width: 150px; margin-bottom: 0;">
-                <mat-label>Статус</mat-label>
-                <mat-select [(ngModel)]="submissionFilterStatus" (selectionChange)="applySubmissionFilters()">
+              <div class="filter-input-wrap select-wrap">
+                <mat-select [(ngModel)]="submissionFilterStatus" (selectionChange)="applySubmissionFilters()" class="custom-select" placeholder="Все статусы">
                   <mat-option value="">Все статусы</mat-option>
                   <mat-option value="pending">Ожидает проверки</mat-option>
                   <mat-option value="approved">Одобрено</mat-option>
                   <mat-option value="rejected">Отклонено</mat-option>
                 </mat-select>
-              </mat-form-field>
+              </div>
 
-              <mat-form-field appearance="outline" style="flex: 1; min-width: 200px; margin-bottom: 0;">
-                <mat-label>Поиск по ученику</mat-label>
-                <input matInput [(ngModel)]="submissionFilterStudent" (ngModelChange)="applySubmissionFilters()" placeholder="Имя ученика..." />
-              </mat-form-field>
+              <div class="filter-input-wrap">
+                <input class="custom-input search-input" [(ngModel)]="submissionFilterStudent" (ngModelChange)="applySubmissionFilters()" placeholder="Поиск по ученику" />
+              </div>
             </div>
 
-            <!-- Submissions Table -->
-            <div class="submissions-table-container" style="background: white; border-radius: 8px; border: 1px solid #dadce0; overflow: hidden;">
-              <table mat-table [dataSource]="filteredSubmissions" class="submissions-table" style="width: 100%;">
-                
+            <!-- Submissions Table Card -->
+            <div class="glass-card submissions-table-card">
+              <table mat-table [dataSource]="filteredSubmissions" class="clean-submissions-table">
                 <!-- Student Column -->
                 <ng-container matColumnDef="student">
-                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Ученик </th>
-                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                      <img *ngIf="s.user_avatar" [src]="getAvatarUrl(s.user_avatar)" class="person-avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" (error)="s.user_avatar = undefined" />
-                      <div *ngIf="!s.user_avatar" class="person-avatar-placeholder" style="width: 32px; height: 32px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                        <mat-icon style="font-size: 18px; width: 18px; height: 18px; line-height: 18px; margin: 0;">person</mat-icon>
-                      </div>
-                      <span style="font-weight: 500;">{{ s.user_name }}</span>
+                  <th mat-header-cell *matHeaderCellDef> Ученик </th>
+                  <td mat-cell *matCellDef="let s">
+                    <div class="table-student-box">
+                      <div class="user-monogram-circle">{{ getUserInitials(s.user_name) }}</div>
+                      <span class="table-student-name">{{ s.user_name }}</span>
                     </div>
                   </td>
                 </ng-container>
 
                 <!-- Test Title Column -->
                 <ng-container matColumnDef="testTitle">
-                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Тест </th>
-                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left;">
+                  <th mat-header-cell *matHeaderCellDef> Тест </th>
+                  <td mat-cell *matCellDef="let s" class="table-test-title">
                     {{ getTestTitle(s.test_id) }}
                   </td>
                 </ng-container>
 
                 <!-- Submission Date Column -->
                 <ng-container matColumnDef="date">
-                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Дата сдачи </th>
-                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left;">
-                    {{ s.finished_at | date:'short' }}
+                  <th mat-header-cell *matHeaderCellDef> Дата сдачи </th>
+                  <td mat-cell *matCellDef="let s" class="table-date">
+                    {{ s.finished_at | date:'M/d/yy, h:mm a' }}
                   </td>
                 </ng-container>
 
                 <!-- Score Column -->
                 <ng-container matColumnDef="score">
-                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Балл </th>
-                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left; font-weight: 600;">
+                  <th mat-header-cell *matHeaderCellDef> Балл </th>
+                  <td mat-cell *matCellDef="let s" class="table-score">
                     {{ s.total_score !== undefined && s.total_score !== null ? s.total_score : '—' }}
                   </td>
                 </ng-container>
 
                 <!-- Status Column -->
                 <ng-container matColumnDef="status">
-                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Статус </th>
-                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left;">
-                    <span class="status-badge" [ngClass]="getSubmissionStatusClass(s.status)">
+                  <th mat-header-cell *matHeaderCellDef> Статус </th>
+                  <td mat-cell *matCellDef="let s">
+                    <span class="submission-status-pill" [ngClass]="getSubmissionStatusClass(s.status)">
                       {{ getSubmissionStatusText(s.status) }}
                     </span>
                   </td>
@@ -809,9 +772,9 @@ interface TreeNode {
 
                 <!-- Action Column -->
                 <ng-container matColumnDef="action">
-                  <th mat-header-cell *matHeaderCellDef style="padding: 16px; text-align: left;"> Действие </th>
-                  <td mat-cell *matCellDef="let s" style="padding: 16px; text-align: left;">
-                    <button mat-raised-button color="primary" [routerLink]="['/submissions', s.id]" [queryParams]="{ returnTo: 'course', subjectId: subjectId }">
+                  <th mat-header-cell *matHeaderCellDef> Действие </th>
+                  <td mat-cell *matCellDef="let s">
+                    <button class="pill-btn pill-btn-dark pill-sm" [routerLink]="['/submissions', s.id]" [queryParams]="{ returnTo: 'course', subjectId: subjectId }">
                       Проверить
                     </button>
                   </td>
@@ -821,7 +784,7 @@ interface TreeNode {
                 <tr mat-row *matRowDef="let row; columns: ['student', 'testTitle', 'date', 'score', 'status', 'action'];"></tr>
               </table>
 
-              <div *ngIf="filteredSubmissions.length === 0" style="padding: 32px; text-align: center; color: #5f6368; font-style: italic;">
+              <div *ngIf="filteredSubmissions.length === 0" class="empty-table-hint">
                 Нет сданных работ, соответствующих фильтрам.
               </div>
             </div>
@@ -834,149 +797,356 @@ interface TreeNode {
     .course-hub-container {
       display: flex;
       flex-direction: column;
-      height: 100vh;
-      background-color: #f8f9fa;
-      color: #3c4043;
-      font-family: Roboto, Arial, sans-serif;
+      min-height: 100vh;
+      height: 100%;
+      background: transparent;
+      color: #09090b;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
+    /* Course Header */
     .course-header {
-      background: white;
-      padding: 12px 24px;
-      border-bottom: 1px solid #dadce0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 12px 28px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
       flex-shrink: 0;
+      z-index: 10;
     }
 
-    .course-header h1 {
-        margin: 0;
-        font-size: 22px;
-        font-weight: 400;
-        color: #1e88e5;
+    .course-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
-    ::ng-deep .course-tabs .mat-mdc-tab-body-wrapper {
-        flex: 1; 
-        height: 100%;
-        background-color: #f8f9fa;
+    .header-back-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: #09090b;
+      text-decoration: none;
+      transition: background 0.15s ease;
+      cursor: pointer;
     }
-    
+
+    .header-back-btn:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .header-back-btn mat-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+      line-height: 24px;
+    }
+
+    .course-header-title {
+      margin: 0;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 28px;
+      font-weight: 400;
+      color: #09090b;
+      letter-spacing: -0.01em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Pill Buttons */
+    .pill-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 36px;
+      padding: 0 16px;
+      border-radius: 20px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+      text-decoration: none;
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    .pill-btn-outline {
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      color: #18181b;
+    }
+
+    .pill-btn-outline:hover {
+      background: #ffffff;
+      border-color: rgba(0, 0, 0, 0.25);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .pill-btn-dark {
+      background: #09090b;
+      color: #ffffff;
+      border: 1px solid #09090b;
+    }
+
+    .pill-btn-dark:hover {
+      background: #27272a;
+      border-color: #27272a;
+    }
+
+    .pill-btn-dark:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .pill-btn-red {
+      background: #991b1b;
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      border: none;
+      box-shadow: 0 2px 10px rgba(153, 27, 27, 0.25);
+    }
+
+    .pill-btn-red:hover {
+      background: #7f1d1d;
+    }
+
+    .pill-sm {
+      height: 30px;
+      padding: 0 12px;
+      font-size: 12px;
+      border-radius: 15px;
+    }
+
+    .stream-btn-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      line-height: 18px;
+    }
+
+    /* Tabs Styling */
     ::ng-deep .course-tabs {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: transparent;
     }
 
     ::ng-deep .course-tabs .mat-mdc-tab-header {
-        background-color: white;
-        border-bottom: 1px solid #dadce0;
+      background: transparent;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      padding: 0 16px;
+    }
+
+    ::ng-deep .course-tabs .mdc-tab {
+      height: 46px;
+      letter-spacing: 0;
+      padding: 0 20px;
     }
 
     ::ng-deep .course-tabs .mdc-tab__text-label {
-        font-weight: 500;
-        font-size: 14px;
-        letter-spacing: 0.25px;
+      font-family: 'Inter', sans-serif !important;
+      font-size: 14px !important;
+      font-weight: 500 !important;
+      color: #71717a !important;
     }
 
+    ::ng-deep .course-tabs .mdc-tab--active .mdc-tab__text-label {
+      color: #09090b !important;
+      font-weight: 600 !important;
+    }
+
+    ::ng-deep .course-tabs .mdc-tab-indicator__content--underline {
+      border-color: #09090b !important;
+      border-top-width: 2px !important;
+    }
+
+    ::ng-deep .course-tabs .mat-mdc-tab-body-wrapper {
+      flex: 1;
+      height: 100%;
+      background: transparent;
+    }
+
+    .tab-counter-badge {
+      background: #09090b;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 10px;
+      margin-left: 6px;
+      display: inline-block;
+    }
+
+    /* Tab Content Layouts */
     .tab-content-container {
-        padding: 24px;
-        max-width: 1000px;
-        margin: 0 auto;
-        width: 100%;
-        box-sizing: border-box;
-        overflow-y: auto;
-        height: 100%;
+      padding: 24px 20px;
+      width: 100%;
+      box-sizing: border-box;
+      overflow-y: auto;
+      height: 100%;
     }
 
-    /* Course Banner */
-    .course-banner-card {
-      position: relative;
-      background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-      color: white;
+    .feed-tab-container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .assignments-tab-container,
+    .people-tab-container,
+    .submissions-tab-container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    /* Glass Cards */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.02);
+      box-sizing: border-box;
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .glass-card:hover {
+      border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    /* Monogram circle */
+    .user-monogram-circle {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+
+    /* Custom Form Inputs */
+    .custom-input,
+    .custom-textarea {
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      background: rgba(255, 255, 255, 0.9);
       border-radius: 8px;
-      padding: 24px;
-      margin-bottom: 24px;
-      box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 2px 6px 2px rgba(60,64,67,0.15);
-      overflow: hidden;
+      padding: 9px 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13.5px;
+      color: #09090b;
+      outline: none;
+      box-sizing: border-box;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    .banner-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/></svg>') repeat;
-      opacity: 0.3;
+    .custom-input:focus,
+    .custom-textarea:focus {
+      border-color: #09090b;
+      box-shadow: 0 0 0 1px #09090b;
     }
 
-    .banner-content {
-      position: relative;
-      z-index: 1;
+    .full-width {
+      width: 100%;
     }
 
-    .banner-title {
-      font-size: 32px;
-      font-weight: 500;
-      margin: 0 0 8px 0;
-      line-height: 1.2;
+    .form-field-wrapper {
+      margin-bottom: 10px;
     }
 
-    .banner-description {
-      font-size: 16px;
-      opacity: 0.9;
-      margin: 0 0 16px 0;
-    }
-
-    .banner-meta {
-      font-size: 14px;
-      opacity: 0.8;
-    }
-
-    /* Stream Layout */
+    /* ========================================================
+       Tab 1: Лента (Feed)
+       ======================================================== */
     .stream-layout {
       display: flex;
-      gap: 24px;
+      gap: 22px;
       align-items: flex-start;
     }
 
     .deadlines-sidebar {
-      width: 280px;
+      width: 260px;
       flex-shrink: 0;
     }
 
     .sidebar-card {
-      border: 1px solid #dadce0;
-      border-radius: 8px;
-      box-shadow: none !important;
-      background: white;
+      padding: 16px;
+      border-radius: 14px;
     }
 
-    .sidebar-card mat-card-title {
+    .sidebar-header {
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .sidebar-title {
+      font-family: 'Inter', sans-serif;
       font-size: 14px;
-      font-weight: 500;
-      color: #3c4043;
-      margin: 16px 16px 8px 16px;
+      font-weight: 600;
+      color: #09090b;
     }
 
     .no-deadlines {
-      padding: 16px;
-      color: #5f6368;
+      color: #71717a;
       font-size: 13px;
+      padding: 8px 0;
     }
 
     .deadlines-list {
-      padding: 8px 16px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
     }
 
     .deadline-item {
       display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
+      gap: 10px;
+      align-items: flex-start;
     }
 
-    .deadline-item:last-child {
-      margin-bottom: 0;
+    .deadline-icon-box {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.03);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .deadline-mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: #71717a;
     }
 
     .deadline-info {
@@ -985,10 +1155,10 @@ interface TreeNode {
     }
 
     .deadline-title {
-      font-size: 14px;
-      color: #1a73e8;
-      text-decoration: none;
+      font-size: 13.5px;
       font-weight: 500;
+      color: #09090b;
+      text-decoration: none;
     }
 
     .deadline-title:hover {
@@ -996,29 +1166,24 @@ interface TreeNode {
     }
 
     .deadline-date {
-      font-size: 12px;
-      color: #5f6368;
+      font-size: 11.5px;
+      color: #71717a;
       margin-top: 2px;
     }
 
     .deadline-status {
       font-size: 11px;
       font-weight: 500;
-      margin-top: 4px;
-      padding: 2px 6px;
-      border-radius: 4px;
+      margin-top: 3px;
       display: inline-block;
-      width: fit-content;
     }
 
     .overdue-text {
-      background-color: #fce8e6;
-      color: #c5221f;
+      color: #dc2626;
     }
 
     .finished-text {
-      background-color: #e6f4ea;
-      color: #137333;
+      color: #16a34a;
     }
 
     .stream-feed {
@@ -1026,126 +1191,114 @@ interface TreeNode {
       display: flex;
       flex-direction: column;
       gap: 16px;
+      min-width: 0;
     }
 
-    /* Compose Card */
     .compose-card {
-      border: 1px solid #dadce0;
-      border-radius: 8px;
-      box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3) !important;
-      background: white;
-      margin-bottom: 8px;
+      padding: 14px 18px;
+      border-radius: 12px;
     }
 
     .compose-trigger {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
       cursor: pointer;
-      padding: 8px 0;
-    }
-
-    .compose-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      object-fit: cover;
     }
 
     .placeholder-text {
-      color: #5f6368;
+      color: #71717a;
       font-size: 14px;
     }
 
     .compose-form {
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      padding: 8px 0;
+      gap: 10px;
+      padding-top: 8px;
     }
 
     .compose-actions {
       display: flex;
       justify-content: flex-end;
       gap: 8px;
+      margin-top: 4px;
     }
 
-    /* Announcements Feed */
     .announcements-feed {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
 
     .no-announcements {
       text-align: center;
       padding: 48px;
-      background: white;
-      border-radius: 8px;
-      border: 1px solid #dadce0;
-      color: #5f6368;
+      color: #71717a;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.05);
     }
 
     .feed-empty-icon {
-      font-size: 48px;
-      width: 48px;
-      height: 48px;
-      margin-bottom: 16px;
-      color: #dadce0;
+      font-size: 44px;
+      width: 44px;
+      height: 44px;
+      margin-bottom: 12px;
+      color: #d4d4d8;
     }
 
     .announcement-card {
-      border: 1px solid #dadce0;
-      border-radius: 8px;
-      box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3) !important;
-      background: white;
+      padding: 18px 20px;
+      border-radius: 14px;
     }
 
     .announcement-header {
       display: flex;
       align-items: center;
-      padding: 16px 16px 8px 16px !important;
-    }
-
-    .author-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      object-fit: cover;
+      gap: 10px;
+      margin-bottom: 12px;
     }
 
     .announcement-meta-container {
       display: flex;
       flex-direction: column;
-      margin-left: 12px;
     }
 
     .announcement-author {
       font-size: 14px;
-      font-weight: 500;
-      color: #3c4043;
+      font-weight: 600;
+      color: #09090b;
     }
 
     .announcement-date {
       font-size: 12px;
-      color: #5f6368;
+      color: #71717a;
+    }
+
+    .dots-btn {
+      color: #a1a1aa !important;
+    }
+
+    .dots-btn:hover {
+      color: #09090b !important;
     }
 
     .announcement-body {
-      padding: 0 16px 16px 16px !important;
+      padding-top: 2px;
     }
 
     .announcement-title-text {
-      font-size: 16px;
-      font-weight: 500;
-      color: #202124;
-      margin: 8px 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: #09090b;
+      margin: 0 0 6px 0;
     }
 
     .announcement-content-text {
       font-size: 14px;
       line-height: 1.5;
-      color: #3c4043;
+      color: #3f3f46;
       white-space: pre-wrap;
     }
 
@@ -1153,7 +1306,7 @@ interface TreeNode {
       margin-top: 12px;
       border-radius: 8px;
       overflow: hidden;
-      border: 1px solid #dadce0;
+      border: 1px solid rgba(0, 0, 0, 0.06);
       max-height: 400px;
     }
 
@@ -1163,21 +1316,106 @@ interface TreeNode {
       object-fit: cover;
     }
 
-    /* Classwork Tab Styles */
+    /* Live broadcast announcement card */
+    .live-announcement-card {
+      border: 1px solid rgba(220, 38, 38, 0.2);
+    }
+
+    .live-tag-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .live-bullet {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #dc2626;
+      box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+      animation: pulse 1.2s infinite;
+      display: inline-block;
+    }
+
+    .live-tag-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: #09090b;
+    }
+
+    .live-subtitle {
+      font-size: 13.5px;
+      color: #52525b;
+      margin: 0 0 14px 0;
+    }
+
+    .pill-btn-join-stream {
+      background: #991b1b;
+      color: #ffffff;
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 9px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-block;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+
+    .pill-btn-join-stream:hover {
+      background: #7f1d1d;
+    }
+
+    /* ========================================================
+       Tab 2: Задания (Assignments)
+       ======================================================== */
     .classwork-header-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 24px;
-      border-bottom: 1px solid #dadce0;
-      padding-bottom: 12px;
+      margin-bottom: 20px;
     }
 
-    .classwork-header-bar h2 {
+    .classwork-title {
       margin: 0;
-      font-size: 20px;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 24px;
       font-weight: 400;
-      color: #3c4043;
+      color: #09090b;
+    }
+
+    .student-progress-container {
+      margin-bottom: 20px;
+      padding: 16px;
+      border-radius: 12px;
+    }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 500;
+      font-size: 13.5px;
+      margin-bottom: 8px;
+      color: #3f3f46;
+    }
+
+    .progress-bar-bg {
+      background: #e4e4e7;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      background: #16a34a;
+      height: 100%;
+      transition: width 0.3s ease;
     }
 
     .modules-accordion {
@@ -1185,17 +1423,22 @@ interface TreeNode {
     }
 
     .module-panel {
-      border: 1px solid #dadce0;
-      border-radius: 8px !important;
-      margin-bottom: 16px !important;
-      box-shadow: none !important;
+      margin-bottom: 12px !important;
+      border-radius: 12px !important;
       overflow: hidden;
+      border: 1px solid rgba(0, 0, 0, 0.06) !important;
+      box-shadow: none !important;
+    }
+
+    ::ng-deep .module-panel .mat-expansion-panel-header {
+      padding: 0 20px;
+      height: 52px;
     }
 
     .module-panel-title {
-      font-size: 18px;
-      font-weight: 500;
-      color: #1e88e5;
+      font-size: 15px;
+      font-weight: 600;
+      color: #09090b;
     }
 
     .lessons-list {
@@ -1206,521 +1449,232 @@ interface TreeNode {
     .lesson-row {
       display: flex;
       align-items: center;
-      padding: 14px 16px;
-      border-top: 1px solid #dadce0;
+      padding: 12px 20px;
+      border-top: 1px solid rgba(0, 0, 0, 0.05);
       cursor: pointer;
-      transition: background-color 0.2s;
+      transition: background-color 0.15s;
     }
 
     .lesson-row:hover {
-      background-color: #f1f3f4;
+      background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    .lesson-icon-box {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      flex-shrink: 0;
     }
 
     .lesson-type-icon {
-      margin-right: 16px;
-      font-size: 24px;
-      width: 24px;
-      height: 24px;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #71717a;
+      line-height: 18px;
     }
 
     .lesson-row-title {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 500;
-      color: #3c4043;
+      color: #09090b;
     }
 
     .status-badge {
       font-size: 12px;
-      padding: 4px 12px;
+      padding: 3px 10px;
       border-radius: 12px;
       font-weight: 500;
-      margin-right: 12px;
+      margin-left: 10px;
     }
 
     .status-completed {
-      background-color: #e6f4ea;
-      color: #137333;
+      background-color: #dcfce7;
+      color: #166534;
     }
 
     .status-progress {
-      background-color: #e8f0fe;
-      color: #1a73e8;
+      background-color: #fff7ed;
+      color: #ea580c;
     }
 
     .status-not-started {
-      background-color: #f1f3f4;
-      color: #5f6368;
+      background-color: #f1f5f9;
+      color: #64748b;
     }
 
     .deadline-badge-item {
       font-size: 12px;
-      color: #5f6368;
-      background: #f1f3f4;
-      padding: 4px 8px;
-      border-radius: 4px;
-      border: 1px solid #dadce0;
+      color: #71717a;
+      margin-right: 8px;
     }
 
     .no-lessons {
       padding: 16px;
       text-align: center;
-      color: #5f6368;
+      color: #71717a;
       font-style: italic;
-      border-top: 1px solid #dadce0;
+      border-top: 1px solid rgba(0, 0, 0, 0.05);
     }
 
     /* Teacher Management Section */
     .teacher-management-section {
-      margin-top: 40px;
-      border-top: 2px dashed #dadce0;
-      padding-top: 24px;
+      margin-top: 32px;
+      padding-top: 20px;
     }
 
-    .teacher-management-section h3 {
-      font-size: 18px;
-      color: #3c4043;
-      margin-top: 0;
-      margin-bottom: 16px;
+    .mgmt-heading {
+      font-size: 14px;
+      font-weight: 500;
+      color: #71717a;
+      margin: 0 0 16px 0;
     }
 
     .assignments-list {
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
     }
-    
-    .list-section h3 {
-        margin: 0 0 16px 0;
-        font-size: 16px;
-        color: #1e88e5;
-        border-bottom: 2px solid #e8eaf6;
-        padding-bottom: 8px;
+
+    .section-subtitle-caps {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #71717a;
+      text-transform: uppercase;
+      margin-bottom: 10px;
     }
-    
-    .item-card {
-        margin-bottom: 12px;
-        border-left: 4px solid #1e88e5;
-        border-right: 1px solid #dadce0;
-        border-top: 1px solid #dadce0;
-        border-bottom: 1px solid #dadce0;
-        box-shadow: none !important;
-        border-radius: 4px;
+
+    .test-mgmt-card {
+      border-left: 4px solid #09090b !important;
+      padding: 14px 18px;
+      margin-bottom: 8px;
+      border-radius: 10px;
     }
-    
+
+    .material-mgmt-card {
+      padding: 14px 18px;
+      margin-bottom: 8px;
+      border-radius: 10px;
+    }
+
     .item-content {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 16px !important;
-    }
-    
-    .item-info {
-        flex: 1;
-    }
-    
-    .item-title-row {
-        display: flex;
-        align-items: center;
-        margin-bottom: 4px;
-    }
-    
-    .item-icon {
-        margin-right: 8px;
-        color: #1e88e5;
-    }
-    
-    .item-title {
-        font-weight: 500;
-        font-size: 16px;
-    }
-    
-    .item-meta {
-        font-size: 13px;
-        color: #666;
-        margin-left: 32px; 
-    }
-    
-    .meta-label {
-        font-weight: 500;
-        color: #333;
-    }
-    
-    .meta-separator {
-        margin: 0 8px;
-        color: #ccc;
-    }
-
-    .empty-list {
-        padding: 24px;
-        text-align: center;
-        color: #999;
-        font-style: italic;
-        background: white;
-        border-radius: 4px;
-        border: 1px solid #dadce0;
-    }
-
-    /* Lesson Viewer Split Layout */
-    .lesson-viewer-container {
-      display: flex;
-      flex-direction: column;
-      height: calc(100vh - 112px);
-      background-color: white;
-    }
-
-    .viewer-header {
-      padding: 12px 24px;
-      border-bottom: 1px solid #dadce0;
-      background: #f8f9fa;
-    }
-
-    .viewer-header .back-btn {
-      font-weight: 500;
-    }
-
-    .course-layout {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
-
-    /* Sidebar */
-    .sidebar {
-      width: 320px;
-      background: white;
-      border-right: 1px solid #dadce0;
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-    }
-
-    .sidebar-header {
-      padding: 20px 24px;
-      border-bottom: 1px solid #f0f0f0;
-    }
-
-    .sidebar-header h2 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 500;
-      color: #3c4043;
-    }
-
-    .sidebar-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px 0;
-    }
-
-    .nav-tree {
-      background: transparent;
-    }
-
-    .module-group {
-      display: flex;
-      align-items: center;
-      padding: 4px 8px;
-      font-weight: 500;
-      color: #3c4043;
-    }
-
-    .module-title {
-        font-size: 14px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .nav-item-btn {
-      width: 100%;
-      text-align: left;
-      padding: 8px 16px 8px 48px; /* Indent for lessons */
-      font-size: 14px;
-      color: #5f6368;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      border-radius: 0;
-    }
-    
-    .nav-item-btn:hover {
-        background-color: #f1f3f4;
-    }
-
-    .nav-item-btn.active {
-      background-color: #e8f0fe;
-      color: #1a73e8;
-      font-weight: 500;
-    }
-    
-    .nav-item-btn.active::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 4px;
-        background-color: #1a73e8;
-    }
-    
-    .nav-text {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    /* Main Content */
-    .main-content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      background: #f8f9fa;
-    }
-
-    .breadcrumbs {
-      padding: 16px 32px;
-      display: flex;
-      align-items: center;
-      font-size: 13px;
-      color: #5f6368;
-      border-bottom: 1px solid #dadce0;
-      background: white;
-    }
-
-    .separator {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-      margin: 0 8px;
-      color: #5f6368;
-    }
-
-    .current {
-      color: #1a73e8;
-      font-weight: 500;
-    }
-
-    .content-area {
-      flex: 1;
-      padding: 32px 48px;
-      overflow-y: auto;
-      background: white;
-      max-width: 1000px; /* Readability limit */
-      width: 100%;
-      margin: 0 auto;
-      box-shadow: 0 0 10px rgba(0,0,0,0.02);
-    }
-
-    .lesson-header {
-      display: flex;
-      align-items: flex-start;
-      gap: 16px;
-      margin-bottom: 32px;
-      border-bottom: 1px solid #dadce0;
-      padding-bottom: 24px;
-    }
-
-    .header-icon {
-        width: 48px;
-        height: 48px;
-        background-color: #e8f0fe;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #1a73e8;
-    }
-
-    .header-icon mat-icon {
-        font-size: 28px;
-        width: 28px;
-        height: 28px;
-    }
-
-    .header-text h1 {
-        margin: 0;
-        font-size: 14px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        color: #5f6368;
-        font-weight: 500;
-    }
-
-    .lesson-title {
-        font-size: 24px;
-        font-weight: 500;
-        color: #202124;
-        margin-top: 4px;
-    }
-
-    .text-content {
-      font-size: 16px;
-      line-height: 1.6;
-      color: #3c4043;
-      margin-bottom: 32px;
-    }
-
-    .video-section {
-        margin: 32px 0;
-    }
-    
-    .video-section h3 {
-        margin-bottom: 16px;
-        font-size: 18px;
-        color: #3c4043;
-    }
-
-    .video-container {
-        position: relative;
-        padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
-        height: 0;
-        overflow: hidden;
-        border-radius: 8px;
-        background: black;
-    }
-    
-    .video-iframe {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-    }
-
-    .resource-card {
-      display: flex;
-      align-items: center;
-      padding: 16px;
-      border: 1px solid #dadce0;
-      border-radius: 8px;
-      margin-bottom: 16px;
-      background: #f8f9fa;
-    }
-
-    .resource-icon {
-        font-size: 32px;
-        width: 32px;
-        height: 32px;
-        color: #1a73e8;
-        margin-right: 16px;
-    }
-
-    .resource-info {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    .resource-title {
-        font-weight: 500;
-        color: #3c4043;
-        margin-right: auto;
-    }
-
-    .resource-actions {
-        display: flex;
-        gap: 8px;
-    }
-
-    .test-card .resource-icon {
-        color: #a142f4;
-    }
-
-    .locked {
-      background-color: #f1f3f4;
-      border-color: #dadce0;
-    }
-
-    .locked .resource-icon {
-      color: #5f6368;
-    }
-
-    .locked .resource-title {
-      color: #5f6368;
-      font-style: italic;
-    }
-
-    .loading-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100%;
-    }
-
-    .select-hint {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        color: #5f6368;
-    }
-    
-    .select-hint mat-icon {
-        font-size: 64px;
-        width: 64px;
-        height: 64px;
-        margin-bottom: 16px;
-        opacity: 0.5;
-    }
-
-    .live-btn {
-        animation: pulse 2s infinite;
-        font-weight: bold;
-    }
-
-    @keyframes pulse {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-        70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-    }
-
-    .spacer {
-        flex: 1 1 auto;
-    }
-
-    .example-tree-invisible {
-      display: none;
-    }
-
-    /* People Tab Styles */
-    .people-tab-container {
-      display: flex;
-      flex-direction: column;
-      gap: 32px;
-      background: white;
-      padding: 24px;
-      border-radius: 8px;
-      border: 1px solid #dadce0;
-    }
-
-    .people-section {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .people-section-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid #1a73e8;
-      padding-bottom: 8px;
+    }
+
+    .item-info {
+      flex: 1;
+    }
+
+    .item-title {
+      font-weight: 600;
+      font-size: 14.5px;
+      color: #09090b;
+      margin-bottom: 3px;
+    }
+
+    .item-meta {
+      font-size: 12.5px;
+      color: #71717a;
+    }
+
+    .item-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .peer-review-check {
+      font-size: 13px;
+      color: #3f3f46;
+    }
+
+    .delete-icon-btn {
+      color: #a1a1aa !important;
+      width: 32px !important;
+      height: 32px !important;
+      line-height: 32px !important;
+      padding: 0 !important;
+    }
+
+    .delete-icon-btn:hover {
+      color: #dc2626 !important;
+    }
+
+    .delete-icon-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      line-height: 18px;
+    }
+
+    .empty-list {
+      padding: 20px;
+      text-align: center;
+      color: #71717a;
+      font-style: italic;
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 8px;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    /* ========================================================
+       Tab 3: Участники (People)
+       ======================================================== */
+    .people-tab-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .people-card {
+      padding: 20px 24px;
+      border-radius: 14px;
+    }
+
+    .people-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 16px;
     }
 
-    .people-section-header h2 {
+    .people-card-title {
       margin: 0;
+      font-family: 'Instrument Serif', Georgia, serif;
       font-size: 22px;
       font-weight: 400;
-      color: #1a73e8;
+      color: #09090b;
     }
 
     .people-count {
-      font-size: 14px;
-      color: #5f6368;
+      font-size: 13px;
+      color: #71717a;
+      font-weight: 500;
+    }
+
+    .add-teacher-row {
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .add-teacher-form {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .teacher-input {
+      flex: 1;
+      height: 38px;
     }
 
     .people-list {
@@ -1730,10 +1684,10 @@ interface TreeNode {
 
     .person-row {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 12px 8px;
-      border-bottom: 1px solid #dadce0;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     }
 
     .person-row:last-child {
@@ -1743,167 +1697,422 @@ interface TreeNode {
     .person-info {
       display: flex;
       align-items: center;
-      gap: 16px;
-    }
-
-    .person-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      object-fit: cover;
+      gap: 12px;
     }
 
     .person-name {
       font-size: 14px;
       font-weight: 500;
-      color: #3c4043;
+      color: #09090b;
+    }
+
+    .person-right-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .clean-group-select {
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 13px;
+      background: rgba(255, 255, 255, 0.85);
+      width: 140px;
+    }
+
+    .student-group-chip {
+      font-size: 12.5px;
+      color: #71717a;
+      background-color: rgba(0, 0, 0, 0.04);
+      padding: 3px 10px;
+      border-radius: 12px;
+    }
+
+    .chat-icon-btn {
+      color: #71717a !important;
+      width: 32px !important;
+      height: 32px !important;
+      line-height: 32px !important;
+      padding: 0 !important;
+    }
+
+    .chat-icon-btn:hover {
+      color: #09090b !important;
+    }
+
+    .chat-icon-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      line-height: 18px;
+    }
+
+    .settings-icon-btn {
+      color: #71717a !important;
+      width: 32px !important;
+      height: 32px !important;
+      line-height: 32px !important;
+      padding: 0 !important;
+    }
+
+    .settings-icon-btn:hover {
+      color: #09090b !important;
+    }
+
+    .settings-icon-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      line-height: 18px;
     }
 
     .empty-people {
-      padding: 16px;
-      color: #5f6368;
+      padding: 16px 0;
+      color: #71717a;
       text-align: center;
       font-style: italic;
     }
 
-    .groups-section-wrapper {
-      margin-top: 16px;
+    .section-hint {
+      color: #71717a;
+      font-size: 12.5px;
+      margin: 0 0 12px 0;
     }
 
-    .groups-section-wrapper .people-section-header {
-      border-bottom: 1px solid #dadce0;
-      padding-bottom: 16px;
-      margin-bottom: 16px;
-    }
-
-    .groups-section-wrapper .people-section-header h2 {
-      color: #3c4043;
-    }
-
-    .teacher-btns {
+    .groups-list {
       display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .group-item-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.02);
+      border-radius: 8px;
+      border: 1px solid rgba(0, 0, 0, 0.04);
+    }
+
+    .group-item-title {
+      font-weight: 600;
+      font-size: 14.5px;
+      color: #09090b;
+      margin-bottom: 2px;
+    }
+
+    .group-item-meta {
+      font-size: 12.5px;
+      color: #71717a;
+    }
+
+    .group-item-actions {
+      display: flex;
+      align-items: center;
       gap: 8px;
     }
 
     .status-badge.member {
-      background-color: #e6f4ea;
-      color: #137333;
+      background-color: #dcfce7;
+      color: #166534;
     }
 
     .status-badge.pending {
-      background-color: #fef7e0;
-      color: #b06000;
+      background-color: #fef3c7;
+      color: #92400e;
     }
 
-    .section-hint {
-      color: #5f6368;
-      font-style: italic;
+    /* ========================================================
+       Tab 4: Проверка работ (Submissions)
+       ======================================================== */
+    .submissions-grading-header {
+      display: flex;
+      gap: 12px;
       margin-bottom: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-input-wrap {
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 38px;
+    }
+
+    .custom-select {
+      width: 100%;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 13.5px;
+      box-sizing: border-box;
+    }
+
+    .submissions-table-card {
+      border-radius: 12px;
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .clean-submissions-table {
+      width: 100%;
+      background: transparent;
+      border-collapse: collapse;
+    }
+
+    ::ng-deep .clean-submissions-table th.mat-mdc-header-cell {
+      padding: 14px 18px !important;
+      font-family: 'Inter', sans-serif !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      color: #71717a !important;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+      background: rgba(0, 0, 0, 0.015) !important;
+    }
+
+    ::ng-deep .clean-submissions-table td.mat-mdc-cell {
+      padding: 14px 18px !important;
+      font-family: 'Inter', sans-serif !important;
+      font-size: 13.5px !important;
+      color: #09090b !important;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .table-student-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .table-student-name {
+      font-weight: 500;
+    }
+
+    .table-test-title {
+      font-weight: 600;
+    }
+
+    .table-date {
+      color: #71717a;
       font-size: 13px;
     }
 
-    .add-teacher-form-wrapper {
-      margin: 16px 0;
-      padding: 16px;
-      background-color: #f1f3f4;
-      border-radius: 8px;
-      border: 1px dashed #dadce0;
-    }
-    .add-teacher-form {
-      display: flex;
-      gap: 16px;
-      align-items: center;
-    }
-    .small-input {
-      flex: 1;
+    .table-score {
+      font-weight: 700;
     }
 
-    .compose-avatar-placeholder, .author-avatar-placeholder {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background-color: #f1f3f4;
-      color: #5f6368;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .submission-status-pill {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 12px;
     }
-    .compose-avatar-placeholder mat-icon, .author-avatar-placeholder mat-icon {
-      font-size: 24px;
-      width: 24px;
-      height: 24px;
-      margin: 0;
+
+    .submission-pending {
+      background: #fff7ed;
+      color: #ea580c;
+      border: 1px solid #ffedd5;
     }
-    
-    .person-avatar-placeholder {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background-color: #f1f3f4;
-      color: #5f6368;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+
+    .submission-approved {
+      background: #f0fdf4;
+      color: #16a34a;
+      border: 1px solid #dcfce7;
     }
-    .person-avatar-placeholder mat-icon {
-      font-size: 20px;
-      width: 20px;
-      height: 20px;
-      margin: 0;
+
+    .submission-rejected {
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fee2e2;
     }
+
+    .empty-table-hint {
+      padding: 36px;
+      text-align: center;
+      color: #71717a;
+      font-style: italic;
+    }
+
+    /* Pulse Animations */
     .live-pulse-dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background-color: #d32f2f;
-      box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7);
+      background-color: #dc2626;
+      box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
       animation: pulse 1.2s infinite;
       display: inline-block;
+      margin-left: 4px;
     }
+
     @keyframes pulse {
       0% {
         transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7);
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
       }
       70% {
         transform: scale(1);
-        box-shadow: 0 0 0 6px rgba(211, 47, 47, 0);
+        box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
       }
       100% {
         transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(211, 47, 47, 0);
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
       }
     }
-    @keyframes pulse-white {
-      0% {
-        transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
-      }
-      70% {
-        transform: scale(1);
-        box-shadow: 0 0 0 6px rgba(255, 255, 255, 0);
-      }
-      100% {
-        transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
-      }
+
+    .spacer {
+      flex: 1 1 auto;
     }
-    .submission-pending {
-      background-color: #fef7e0;
-      color: #b06000;
+
+    /* Lesson Viewer Split Layout */
+    .lesson-viewer-container {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 112px);
+      background: transparent;
     }
-    .submission-approved {
-      background-color: #e6f4ea;
-      color: #137333;
+
+    .viewer-header {
+      padding: 12px 24px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
     }
-    .submission-rejected {
-      background-color: #fce8e6;
-      color: #c5221f;
+
+    .course-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
     }
-    .status-pending {
-      background-color: #fef7e0;
-      color: #b06000;
+
+    .sidebar {
+      width: 300px;
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(16px);
+      border-right: 1px solid rgba(0, 0, 0, 0.06);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
     }
+
+    .sidebar-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .sidebar-header h2 {
+      margin: 0;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 20px;
+      color: #09090b;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 0;
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      background: transparent;
+      padding: 24px 32px;
+    }
+
+    .breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #71717a;
+      margin-bottom: 20px;
+    }
+
+    .breadcrumbs .current {
+      color: #09090b;
+      font-weight: 500;
+    }
+
+    .breadcrumbs .separator {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: #a1a1aa;
+    }
+
+    .content-area {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 12px;
+      padding: 28px;
+    }
+
+    .lesson-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .header-icon mat-icon {
+      font-size: 32px;
+      width: 32px;
+      height: 32px;
+      color: #09090b;
+    }
+
+    .lesson-title {
+      font-size: 22px;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-weight: 400;
+      color: #09090b;
+    }
+
+    .resource-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.02);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 10px;
+      margin-top: 16px;
+    }
+
+    .resource-icon {
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
+      color: #09090b;
+    }
+
+    .resource-title {
+      font-weight: 600;
+      font-size: 14.5px;
+      color: #09090b;
+    }
+
+    .video-container {
+      position: relative;
+      margin-top: 16px;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
     .video-overlay {
       position: absolute;
       top: 0;
@@ -1919,12 +2128,29 @@ interface TreeNode {
       z-index: 10;
       transition: background 0.3s;
     }
+
     .video-overlay:hover {
       background: rgba(0, 0, 0, 0.7);
     }
   `]
 })
 export class CourseViewComponent implements OnInit, OnDestroy {
+  getUserInitials(name?: string): string {
+    if (!name) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
+
+  isLiveAnnouncement(announcement: any): boolean {
+    if (!announcement) return false;
+    const title = (announcement.title || '').toLowerCase();
+    const content = (announcement.content || '').toLowerCase();
+    return title.includes('прямой эфир') || content.includes('/stream') || content.includes('начал трансляцию');
+  }
+
   subjectId: string = '';
   courseName: string = 'Загрузка...';
   structure: any = null;

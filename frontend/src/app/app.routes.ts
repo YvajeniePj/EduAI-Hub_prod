@@ -32,6 +32,7 @@ export const routes: Routes = [
   { path: 'callback', component: CallbackComponent },
   { path: 'register', redirectTo: 'login' },
   { path: '', component: HomeComponent, canActivate: [authGuard] },
+  { path: 'home', redirectTo: '', pathMatch: 'full' },
   { path: 'calendar-news', component: CalendarNewsComponent, canActivate: [authGuard] },
   { path: 'news/manage', component: NewsManageComponent, canActivate: [authGuard] },
   { path: 'subjects', redirectTo: '', pathMatch: 'full' },
