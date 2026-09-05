@@ -98,6 +98,14 @@ async def verify_jwt_token_keycloak(token: str) -> Optional[dict]:
             "name": "Тестик Гена",
             "realm_access": {"roles": ["student"]}
         }
+    if token == "mock-token-test-vanya":
+        return {
+            "sub": "00000000-0000-0000-0000-000000000002",
+            "preferred_username": "test_vanya",
+            "email": "vanya@eduaihub.ru",
+            "name": "Тестик Ваня",
+            "realm_access": {"roles": ["teacher"]}
+        }
     try:
         jwks = await get_jwks()
         unverified_header = jwt.get_unverified_header(token)
@@ -191,9 +199,10 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         elif "teacher" in roles or "Teacher" in roles:
             role = "teacher"
             
+        display_name = payload.get("name") or username
         create_body = {
             "id": external_id,
-            "name": username,
+            "name": display_name,
             "role": role,
             "avatar_url": token_avatar
         }
@@ -203,8 +212,8 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
             # Fallback to token data if creation fails
             return {
                 "user_id": external_id,
-                "username": username,
-                "role": "student",
+                "username": display_name,
+                "role": role,
                 "avatar_url": token_avatar
             }
             
@@ -212,7 +221,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     # Prefer full name from token if DB name is an ISU-placeholder or missing
     token_full_name = payload.get("name")
     internal_name = user_data["name"]
-    if token_full_name and (internal_name.startswith("isu_") or not internal_name):
+    if token_full_name and (internal_name.startswith("isu_") or not internal_name or internal_name in ["test_gena", "test_vanya"]):
         internal_name = token_full_name
         # Sync back to DB if name improved
         if internal_name != user_data["name"]:
@@ -248,11 +257,11 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         else:
             internal_user["is_hidden_admin"] = False
         
-    # 2. Force Teacher (307553 - Юлия Разливина)
-    if preferred_username in ["307553", "isu_307553"] or isu_number == "307553":
+    # 2. Force Teacher (307553 - Юлия Разливина, test_vanya)
+    if preferred_username in ["307553", "isu_307553", "test_vanya"] or isu_number == "307553" or external_id == "00000000-0000-0000-0000-000000000002":
         internal_user["role"] = "teacher"
         # Sync back to DB if currently student
-        if user_data.get("role") == "student":
+        if user_data.get("role") != "teacher":
             asyncio.create_task(proxy_request(SUBMISSION_SERVICE_URL, f"/users/{external_id}", "PUT", body={"role": "teacher"}))
     
     # Cache it

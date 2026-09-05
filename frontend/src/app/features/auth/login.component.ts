@@ -45,6 +45,10 @@ import { AuthService } from '../../core/services/auth.service';
           <button class="btn-mock" (click)="loginAsGena()" [disabled]="loading">
             <span>ВОЙТИ КАК ТЕСТИК ГЕНА</span>
           </button>
+
+          <button class="btn-mock" (click)="loginAsVanya()" [disabled]="loading">
+            <span>ВОЙТИ КАК ТЕСТИК ВАНЯ</span>
+          </button>
         </div>
       </div>
     </div>
@@ -299,6 +303,21 @@ export class LoginComponent implements OnInit {
   loginAsGena() {
     this.loading = true;
     this.auth.loginAsMockStudent('Тестик Гена', 'mock-token-test-gena').subscribe({
+      next: () => {
+        const targetUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
+        this.router.navigateByUrl(targetUrl);
+      },
+      error: (err) => {
+        this.loading = false;
+        console.error('Mock login failed:', err);
+        alert('Не удалось выполнить тестовый вход.');
+      }
+    });
+  }
+
+  loginAsVanya() {
+    this.loading = true;
+    this.auth.loginAsMockTeacher('Тестик Ваня', 'mock-token-test-vanya').subscribe({
       next: () => {
         const targetUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
         this.router.navigateByUrl(targetUrl);

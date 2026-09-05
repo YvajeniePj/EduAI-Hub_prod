@@ -335,5 +335,21 @@ export class AuthService {
     
     return this.syncUserWithBackend(user);
   }
+
+  loginAsMockTeacher(name: string = 'Тестик Ваня', token: string = 'mock-token-test-vanya'): Observable<any> {
+    const user: CurrentUser = {
+      id: '00000000-0000-0000-0000-000000000002',
+      name: name,
+      avatar_url: undefined,
+      role: 'teacher',
+      is_hidden_admin: false
+    };
+    
+    localStorage.setItem('mockUser', JSON.stringify({ user, token }));
+    this.tokenSubject.next(token);
+    this.currentUserSubject.next(user);
+    
+    return this.syncUserWithBackend(user);
+  }
 }
 
