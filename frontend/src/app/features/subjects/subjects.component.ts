@@ -29,8 +29,8 @@ import { AuthService } from '../../core/services/auth.service';
     MatIconModule
   ],
   template: `
-    <h2 mat-dialog-title>Сгенерировать курс с AI</h2>
-    <mat-dialog-content>
+    <h2 mat-dialog-title class="dialog-title">Сгенерировать курс с AI</h2>
+    <mat-dialog-content class="dialog-content-body">
       <form [formGroup]="form" *ngIf="!loading; else loadingTpl">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Тема курса</mat-label>
@@ -39,7 +39,7 @@ import { AuthService } from '../../core/services/auth.service';
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Дополнительные пожелания</mat-label>
-          <textarea matInput formControlName="additionalInfo" rows="4" placeholder="Например: акцент на практику..."></textarea>
+          <textarea matInput formControlName="additionalInfo" rows="4" placeholder="Например: акцент на практику, разбор библиотек pandas и numpy..."></textarea>
         </mat-form-field>
 
         <p class="hint">
@@ -50,52 +50,108 @@ import { AuthService } from '../../core/services/auth.service';
 
       <ng-template #loadingTpl>
         <div class="loading-container">
-          <mat-spinner diameter="50"></mat-spinner>
+          <mat-spinner diameter="44"></mat-spinner>
           <p>AI генерирует курс...</p>
           <p class="sub-text">Пожалуйста, не закрывайте окно</p>
         </div>
       </ng-template>
     </mat-dialog-content>
-    <mat-dialog-actions align="end" *ngIf="!loading">
-      <button mat-button (click)="cancel()">Отмена</button>
-      <button mat-raised-button color="accent" (click)="generate()" [disabled]="!form.valid">
+    <mat-dialog-actions align="end" class="dialog-actions-row" *ngIf="!loading">
+      <button type="button" class="pill-btn pill-btn-outline" (click)="cancel()">Отмена</button>
+      <button type="button" class="pill-btn pill-btn-dark" (click)="generate()" [disabled]="!form.valid">
         <mat-icon>auto_awesome</mat-icon>
-        Сгенерировать
+        <span>Сгенерировать</span>
       </button>
     </mat-dialog-actions>
   `,
   styles: [`
+    .dialog-title {
+      font-family: 'Instrument Serif', Georgia, serif !important;
+      font-size: 26px !important;
+      font-weight: 400 !important;
+      color: #09090b !important;
+      padding: 24px 24px 8px !important;
+      margin: 0 !important;
+    }
+    .dialog-content-body {
+      padding: 12px 24px !important;
+    }
     .full-width {
       width: 100%;
       margin-bottom: 16px;
     }
     .hint {
       font-size: 13px;
-      color: #757575;
+      color: #52525b;
       display: flex;
       align-items: center;
-      gap: 8px;
-      background: #f1f8e9;
-      padding: 12px;
-      border-radius: 4px;
+      gap: 10px;
+      background: rgba(0, 0, 0, 0.03);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      padding: 14px;
+      border-radius: 12px;
+      line-height: 1.4;
     }
     .loading-container {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 24px;
+      padding: 32px 24px;
       text-align: center;
     }
     .loading-container p {
       margin-top: 16px;
-      font-weight: 500;
-      color: #4caf50;
+      font-weight: 600;
+      color: #18181b;
+      font-size: 15px;
     }
     .sub-text {
-      font-size: 12px;
-      color: #9e9e9e !important;
+      font-size: 12.5px;
+      color: #71717a !important;
       margin-top: 4px !important;
+    }
+    .dialog-actions-row {
+      padding: 16px 24px 24px !important;
+      gap: 10px;
+    }
+    .pill-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 22px;
+      border-radius: 24px;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: none;
+    }
+    .pill-btn mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+    .pill-btn-dark {
+      background: #18181b;
+      color: #ffffff;
+    }
+    .pill-btn-dark:hover:not(:disabled) {
+      background: #27272a;
+      transform: translateY(-1px);
+    }
+    .pill-btn-dark:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .pill-btn-outline {
+      background: #ffffff;
+      color: #3f3f46;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+    .pill-btn-outline:hover {
+      background: #f4f4f5;
     }
   `]
 })
@@ -150,31 +206,79 @@ export class GenerateCourseDialogComponent {
     MatButtonModule
   ],
   template: `
-    <h2 mat-dialog-title>Создать курс</h2>
-    <mat-dialog-content>
+    <h2 mat-dialog-title class="dialog-title">Создать курс</h2>
+    <mat-dialog-content class="dialog-content-body">
       <form [formGroup]="form">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Название курса</mat-label>
-          <input matInput formControlName="name" required>
+          <input matInput formControlName="name" required placeholder="Например: Архитектура веб-приложений">
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Описание (опционально)</mat-label>
-          <textarea matInput formControlName="description" rows="4" placeholder="Краткое описание курса"></textarea>
+          <textarea matInput formControlName="description" rows="4" placeholder="Краткое описание целей и содержания курса"></textarea>
         </mat-form-field>
       </form>
     </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="cancel()">Отмена</button>
-      <button mat-raised-button color="primary" (click)="save()" [disabled]="!form.valid">
-        Создать
+    <mat-dialog-actions align="end" class="dialog-actions-row">
+      <button type="button" class="pill-btn pill-btn-outline" (click)="cancel()">Отмена</button>
+      <button type="button" class="pill-btn pill-btn-dark" (click)="save()" [disabled]="!form.valid">
+        <span>Создать</span>
       </button>
     </mat-dialog-actions>
   `,
   styles: [`
+    .dialog-title {
+      font-family: 'Instrument Serif', Georgia, serif !important;
+      font-size: 26px !important;
+      font-weight: 400 !important;
+      color: #09090b !important;
+      padding: 24px 24px 8px !important;
+      margin: 0 !important;
+    }
+    .dialog-content-body {
+      padding: 12px 24px !important;
+    }
     .full-width {
       width: 100%;
       margin-bottom: 16px;
+    }
+    .dialog-actions-row {
+      padding: 16px 24px 24px !important;
+      gap: 10px;
+    }
+    .pill-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 22px;
+      border-radius: 24px;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: none;
+    }
+    .pill-btn-dark {
+      background: #18181b;
+      color: #ffffff;
+    }
+    .pill-btn-dark:hover:not(:disabled) {
+      background: #27272a;
+      transform: translateY(-1px);
+    }
+    .pill-btn-dark:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .pill-btn-outline {
+      background: #ffffff;
+      color: #3f3f46;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+    .pill-btn-outline:hover {
+      background: #f4f4f5;
     }
   `]
 })

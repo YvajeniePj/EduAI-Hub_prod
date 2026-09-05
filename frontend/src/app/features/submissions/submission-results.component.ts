@@ -364,8 +364,9 @@ import { Router } from '@angular/router';
         </div>
 
         <div class="actions">
-          <button mat-raised-button color="primary" (click)="goBack()" class="back-button">
-            {{ getBackButtonLabel() }}
+          <button type="button" (click)="goBack()" class="pill-btn pill-btn-dark back-button">
+            <mat-icon>arrow_back</mat-icon>
+            <span>{{ getBackButtonLabel() }}</span>
           </button>
         </div>
       </div>
@@ -420,51 +421,60 @@ import { Router } from '@angular/router';
     }
 
     .results-title {
-      font-size: 32px;
-      font-weight: 600;
-      color: #1a237e;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 34px;
+      font-weight: 400;
+      color: #09090b;
       margin: 0;
     }
 
-    .summary-card.approved { background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); }
-    .summary-card.rejected { background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%); }
-    .summary-card.pending { background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); }
+    .summary-card {
+      background: rgba(255, 255, 255, 0.78) !important;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.08) !important;
+      border-radius: 20px !important;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04) !important;
+      margin-bottom: 24px;
+    }
 
     .summary-content {
       padding: 32px;
     }
 
     .status-badge {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       padding: 4px 12px;
       border-radius: 16px;
-      font-size: 14px;
+      font-size: 12.5px;
       font-weight: 600;
       text-transform: uppercase;
       margin-top: 8px;
     }
-    .status-badge.approved { background: #c6f6d5; color: #22543d; }
-    .status-badge.rejected { background: #fed7d7; color: #822727; }
-    .status-badge.pending { background: #feebc8; color: #744210; }
+    .status-badge.approved { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .status-badge.rejected { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .status-badge.pending { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
 
     .review-panel, .feedback-card {
       margin-bottom: 32px;
-      border-radius: 12px;
+      border-radius: 16px;
     }
     .full-width { width: 100%; }
     .feedback-text { font-style: italic; color: #4a5568; line-height: 1.6; }
-    .feedback-card mat-icon { margin-right: 8px; color: #4a90e2; }
+    .feedback-card mat-icon { margin-right: 8px; color: #18181b; }
 
     .summary-info {
       text-align: center;
-      color: white;
+      color: #09090b;
     }
 
     .summary-label {
-      font-size: 18px;
-      font-weight: 500;
+      font-size: 13px;
+      font-weight: 600;
       margin: 0 0 16px 0;
-      opacity: 0.95;
+      color: #71717a;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -481,14 +491,16 @@ import { Router } from '@angular/router';
       font-size: 56px;
       font-weight: 700;
       line-height: 1;
+      color: #09090b;
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
     }
 
     .score-value-pending {
-      font-size: 32px;
+      font-size: 28px;
       font-weight: 600;
       line-height: 1;
+      color: #d97706;
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
     }
@@ -496,22 +508,25 @@ import { Router } from '@angular/router';
     .score-separator {
       font-size: 32px;
       font-weight: 400;
-      opacity: 0.8;
+      color: #a1a1aa;
     }
 
     .score-max {
       font-size: 32px;
       font-weight: 500;
-      opacity: 0.9;
+      color: #71717a;
     }
 
     .points-info {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      font-size: 16px;
-      opacity: 0.95;
+      font-size: 14px;
+      background: rgba(0, 0, 0, 0.04);
+      padding: 6px 16px;
+      border-radius: 20px;
+      color: #27272a;
     }
 
     .points-label {
@@ -528,61 +543,68 @@ import { Router } from '@angular/router';
     }
 
     .section-title {
+      font-family: 'Instrument Serif', Georgia, serif;
       font-size: 24px;
-      font-weight: 600;
-      color: #1a237e;
-      margin: 0 0 24px 0;
+      font-weight: 400;
+      color: #09090b;
+      margin: 0 0 20px 0;
     }
 
     .result-card {
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
       margin-bottom: 24px;
       overflow: hidden;
       transition: box-shadow 0.3s ease;
+      background: rgba(255, 255, 255, 0.95);
     }
 
     .result-card:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
     }
 
     .result-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #18181b;
       color: white;
       padding: 16px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      border-radius: 16px 16px 0 0;
     }
 
     .question-number {
-      font-size: 14px;
-      font-weight: 500;
-      opacity: 0.95;
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0.9;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
 
     .question-score {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 600;
-      background: rgba(255, 255, 255, 0.2);
-      padding: 6px 16px;
+      background: rgba(255, 255, 255, 0.16);
+      padding: 4px 14px;
       border-radius: 12px;
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
     }
 
     .question-score.score-full {
-      background: rgba(76, 175, 80, 0.3);
+      background: rgba(16, 185, 129, 0.25);
+      color: #10b981;
     }
 
     .question-score.score-partial {
-      background: rgba(255, 193, 7, 0.3);
+      background: rgba(245, 158, 11, 0.25);
+      color: #f59e0b;
     }
 
     .question-score.score-zero {
-      background: rgba(244, 67, 54, 0.3);
+      background: rgba(239, 68, 68, 0.25);
+      color: #ef4444;
     }
 
     .result-content {
@@ -590,19 +612,19 @@ import { Router } from '@angular/router';
     }
 
     .question-title {
-      font-size: 20px;
-      font-weight: 500;
-      color: #212121;
-      margin: 0 0 24px 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #18181b;
+      margin: 0 0 20px 0;
       line-height: 1.5;
     }
 
     .answer-section {
       margin-bottom: 24px;
       padding: 16px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      border-left: 4px solid #667eea;
+      background: rgba(0, 0, 0, 0.02);
+      border-radius: 10px;
+      border-left: 3px solid #18181b;
     }
 
     .answer-label {
@@ -702,9 +724,9 @@ import { Router } from '@angular/router';
 
     .review-panel {
       margin-top: 24px;
-      border-radius: 12px;
-      border: 1px solid #667eea;
-      background: #f0f4ff;
+      border-radius: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.85);
     }
     .score-field {
       width: 100%;
@@ -717,7 +739,7 @@ import { Router } from '@angular/router';
       background: white;
       padding: 16px;
       border-radius: 8px;
-      border: 1px solid #e0e0e0;
+      border: 1px solid rgba(0, 0, 0, 0.08);
     }
 
     .materials-panel {
@@ -729,9 +751,9 @@ import { Router } from '@angular/router';
     }
 
     .materials-panel-title {
-      font-size: 16px;
-      font-weight: 500;
-      color: #667eea;
+      font-size: 15px;
+      font-weight: 600;
+      color: #18181b;
     }
 
     .materials-content {
@@ -847,12 +869,38 @@ import { Router } from '@angular/router';
       padding-top: 24px;
     }
 
+    .pill-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 28px;
+      border-radius: 24px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: none;
+    }
+
+    .pill-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .pill-btn-dark {
+      background: #18181b;
+      color: #ffffff;
+    }
+
+    .pill-btn-dark:hover {
+      background: #27272a;
+      transform: translateY(-1px);
+    }
+
     .back-button {
       min-width: 200px;
-      height: 48px;
-      font-size: 16px;
-      font-weight: 500;
-      border-radius: 8px;
     }
 
     @media (max-width: 768px) {

@@ -85,14 +85,14 @@ import { debounceTime } from 'rxjs/operators';
 
         <!-- Buffer / Consent Screen -->
         <div *ngIf="isPreStart" class="pre-start-container">
-          <mat-card class="buffer-card">
-            <mat-card-header>
-              <mat-card-title>Предупреждение перед началом</mat-card-title>
-            </mat-card-header>
-            <mat-card-content class="buffer-content">
+          <div class="buffer-card glass-panel">
+            <div class="buffer-header">
+              <h2 class="buffer-title">Перед началом тестирования</h2>
+            </div>
+            <div class="buffer-content">
               <div class="warning-box">
-                <mat-icon>warning</mat-icon>
-                <p>После начала теста выполнение отменить нельзя.</p>
+                <mat-icon>info</mat-icon>
+                <p>После начала теста выполнение отменить нельзя. Убедитесь, что у вас стабильное подключение к сети.</p>
               </div>
               
               <div class="test-pre-info">
@@ -111,12 +111,18 @@ import { debounceTime } from 'rxjs/operators';
                   </div>
                 </div>
               </div>
-            </mat-card-content>
-            <mat-card-actions class="buffer-actions">
-              <button mat-button (click)="onCancel()" class="exit-btn">Выйти</button>
-              <button mat-raised-button color="primary" (click)="startTest()" class="start-btn">Начать</button>
-            </mat-card-actions>
-          </mat-card>
+            </div>
+            <div class="buffer-actions">
+              <button type="button" (click)="onCancel()" class="pill-btn pill-btn-outline exit-btn">
+                <mat-icon>arrow_back</mat-icon>
+                <span>Выйти</span>
+              </button>
+              <button type="button" (click)="startTest()" class="pill-btn pill-btn-dark start-btn">
+                <mat-icon>play_arrow</mat-icon>
+                <span>Начать тест</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="test-main-layout" *ngIf="!isPreStart">
@@ -260,22 +266,19 @@ import { debounceTime } from 'rxjs/operators';
               </div>
 
               <div class="form-actions">
-                <button mat-raised-button 
-                        color="primary" 
-                        type="submit" 
+                <button type="button" 
+                        (click)="onCancel()"
+                        class="pill-btn pill-btn-outline cancel-button"
+                        *ngIf="test.test_type.toLowerCase() === 'project'">
+                  <mat-icon>close</mat-icon>
+                  <span>Выйти без отправки</span>
+                </button>
+                <button type="submit" 
                         [disabled]="submitting || timeExpired"
-                        class="submit-button">
+                        class="pill-btn pill-btn-dark submit-button">
                   <mat-icon>check</mat-icon>
                   <span *ngIf="!submitting">Завершить и отправить</span>
                   <span *ngIf="submitting">Отправка...</span>
-                </button>
-                <button mat-stroked-button 
-                        type="button" 
-                        (click)="onCancel()"
-                        class="cancel-button"
-                        *ngIf="test.test_type.toLowerCase() === 'project'">
-                  <mat-icon>close</mat-icon>
-                  Выйти без отправки
                 </button>
               </div>
             </div>
@@ -319,11 +322,14 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .test-header {
-      background: white;
-      border-radius: 16px;
-      padding: 32px;
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      padding: 28px 32px;
       margin-bottom: 24px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
@@ -335,16 +341,17 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .test-title {
-      font-size: 32px;
-      font-weight: 600;
-      color: #1a237e;
-      margin: 0 0 12px 0;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 34px;
+      font-weight: 400;
+      color: #09090b;
+      margin: 0 0 10px 0;
       line-height: 1.2;
     }
 
     .test-description {
-      font-size: 16px;
-      color: #616161;
+      font-size: 14.5px;
+      color: #52525b;
       margin: 0;
       line-height: 1.6;
     }
@@ -352,13 +359,13 @@ import { debounceTime } from 'rxjs/operators';
     .test-assets-wrapper {
       margin-top: 16px;
       padding-top: 16px;
-      border-top: 1px solid #eee;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
     }
 
     .assets-header {
-      font-size: 16px;
-      font-weight: 500;
-      color: #764ba2;
+      font-size: 14.5px;
+      font-weight: 600;
+      color: #18181b;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -381,17 +388,17 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .asset-download-link {
-      color: #667eea;
+      color: #18181b;
       text-decoration: none;
       display: flex;
       align-items: center;
       gap: 4px;
       font-weight: 500;
-      transition: color 0.2s;
+      transition: opacity 0.2s;
     }
 
     .asset-download-link:hover {
-      color: #764ba2;
+      opacity: 0.75;
       text-decoration: underline;
     }
 
@@ -403,8 +410,8 @@ import { debounceTime } from 'rxjs/operators';
 
     .asset-size-badge {
       font-size: 11px;
-      color: #9e9e9e;
-      background: #f5f5f5;
+      color: #71717a;
+      background: rgba(0, 0, 0, 0.05);
       padding: 2px 6px;
       border-radius: 4px;
     }
@@ -414,25 +421,25 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .timer {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 12px;
-      padding: 20px 24px;
+      background: #18181b;
+      border-radius: 14px;
+      padding: 16px 22px;
       color: white;
       display: flex;
       align-items: center;
       gap: 16px;
-      min-width: 200px;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      min-width: 190px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
       transition: all 0.3s ease;
     }
 
     .timer.timer-warning {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      background: #ea580c;
       animation: pulse 1s infinite;
     }
 
     .timer.timer-critical {
-      background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+      background: #dc2626;
       animation: pulse 0.5s infinite;
     }
 
@@ -474,10 +481,13 @@ import { debounceTime } from 'rxjs/operators';
 
     .test-form {
       flex: 1;
-      background: white;
-      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
       padding: 32px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
     }
 
     .questions-carousel {
@@ -498,47 +508,50 @@ import { debounceTime } from 'rxjs/operators';
     .question-card {
       min-width: 100%;
       flex-shrink: 0;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
       transition: box-shadow 0.3s ease, transform 0.3s ease;
       overflow: hidden;
       opacity: 0.3;
-      transform: scale(0.95);
+      transform: scale(0.96);
       pointer-events: none;
+      background: rgba(255, 255, 255, 0.95);
     }
 
     .question-card.active {
       opacity: 1;
       transform: scale(1);
       pointer-events: auto;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
     }
 
     .question-card:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
     }
 
     .question-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #18181b;
       color: white;
       padding: 16px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      border-radius: 16px 16px 0 0;
     }
 
     .question-number {
-      font-size: 14px;
-      font-weight: 500;
-      opacity: 0.95;
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0.9;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
 
     .question-points {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.16);
       padding: 4px 12px;
       border-radius: 12px;
       text-rendering: optimizeLegibility;
@@ -553,9 +566,9 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .question-title {
-      font-size: 20px;
-      font-weight: 500;
-      color: #212121;
+      font-size: 18px;
+      font-weight: 600;
+      color: #18181b;
       margin: 0 0 24px 0;
       line-height: 1.5;
     }
@@ -571,29 +584,29 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .radio-option {
-      padding: 16px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
+      padding: 14px 18px;
+      border: 1.5px solid rgba(0, 0, 0, 0.08);
+      border-radius: 12px;
       transition: all 0.2s ease;
-      background: #fafafa;
+      background: rgba(255, 255, 255, 0.6);
     }
 
     .radio-option:hover {
-      border-color: #667eea;
-      background: #f3f4ff;
+      border-color: #18181b;
+      background: rgba(255, 255, 255, 0.95);
     }
 
     .radio-option ::ng-deep .mat-radio-checked .mat-radio-outer-circle {
-      border-color: #667eea;
+      border-color: #18181b;
     }
 
     .radio-option ::ng-deep .mat-radio-checked .mat-radio-inner-circle {
-      background-color: #667eea;
+      background-color: #18181b;
     }
 
     .option-label {
-      font-size: 16px;
-      color: #424242;
+      font-size: 15px;
+      color: #27272a;
       margin-left: 8px;
     }
 
@@ -632,10 +645,10 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .nav-button:hover:not(:disabled) {
-      background: #667eea;
+      background: #18181b;
       color: white;
-      transform: scale(1.1);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      transform: scale(1.08);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
     .nav-button:disabled {
@@ -644,10 +657,10 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .nav-button mat-icon {
-      font-size: 32px;
-      width: 32px;
-      height: 32px;
-      line-height: 32px;
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
+      line-height: 28px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -676,14 +689,14 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .indicator-dot {
-      width: 12px;
-      height: 12px;
-      min-width: 12px;
-      min-height: 12px;
+      width: 10px;
+      height: 10px;
+      min-width: 10px;
+      min-height: 10px;
       border-radius: 50%;
-      background: #e0e0e0;
+      background: #e4e4e7;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -693,28 +706,28 @@ import { debounceTime } from 'rxjs/operators';
 
     .indicator-dot:hover {
       transform: scale(1.3);
-      background: #667eea;
+      background: #18181b;
     }
 
     .indicator-dot.active {
-      background: #667eea;
-      transform: scale(1.4);
-      box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
+      background: #18181b;
+      transform: scale(1.3);
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.2);
     }
 
     .indicator-dot.answered {
-      background: #4caf50;
+      background: #10b981;
     }
 
     .indicator-dot.answered.active {
-      background: #667eea;
+      background: #18181b;
     }
 
     .question-counter {
       text-align: center;
-      font-size: 16px;
+      font-size: 14.5px;
       font-weight: 500;
-      color: #616161;
+      color: #71717a;
       margin-bottom: 24px;
     }
 
@@ -723,16 +736,19 @@ import { debounceTime } from 'rxjs/operators';
       gap: 16px;
       margin-top: 32px;
       padding-top: 24px;
-      border-top: 1px solid #e0e0e0;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
       justify-content: flex-end;
     }
 
     .quick-nav-sidebar {
       width: 280px;
-      background: white;
-      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
       padding: 24px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
       position: sticky;
       top: 24px;
       max-height: calc(100vh - 48px);
@@ -740,59 +756,60 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .sidebar-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #1a237e;
-      margin: 0 0 20px 0;
-      padding-bottom: 16px;
-      border-bottom: 2px solid #e0e0e0;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 20px;
+      font-weight: 400;
+      color: #09090b;
+      margin: 0 0 16px 0;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     }
 
     .questions-list {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 12px;
+      gap: 10px;
     }
 
     .question-nav-item {
-      width: 44px;
-      height: 44px;
-      border-radius: 8px;
-      border: 2px solid #e0e0e0;
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
       background: white;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
-      transition: all 0.3s ease;
-      font-weight: 500;
-      color: #424242;
+      transition: all 0.2s ease;
+      font-weight: 600;
+      color: #3f3f46;
     }
 
     .question-nav-item:hover {
-      border-color: #667eea;
+      border-color: #18181b;
       transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(102, 126, 234, 0.2);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
     }
 
     .question-nav-item.active {
-      background: #667eea;
-      border-color: #667eea;
+      background: #18181b;
+      border-color: #18181b;
       color: white;
-      transform: scale(1.1);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
     .question-nav-item.answered {
-      background: #4caf50;
-      border-color: #4caf50;
+      background: #10b981;
+      border-color: #10b981;
       color: white;
     }
 
     .question-nav-item.answered.active {
-      background: #667eea;
-      border-color: #667eea;
+      background: #18181b;
+      border-color: #18181b;
     }
 
     .question-nav-number {
@@ -1062,68 +1079,74 @@ import { debounceTime } from 'rxjs/operators';
       padding: 20px;
     }
     .buffer-card {
-      max-width: 500px;
+      max-width: 480px;
       width: 100%;
-      border-radius: 24px;
-      box-shadow: 0 15px 50px rgba(0,0,0,0.1);
-      padding: 24px;
-      background: white;
+      border-radius: 20px;
+      padding: 32px;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.08);
+    }
+    .buffer-title {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 26px;
+      font-weight: 400;
+      color: #09090b;
+      margin: 0;
+      text-align: center;
     }
     .buffer-content {
       display: flex;
       flex-direction: column;
-      gap: 24px;
-      margin-top: 24px;
+      gap: 20px;
+      margin-top: 20px;
       text-align: center;
     }
     .warning-box {
-      background: #fff5f5;
-      padding: 20px;
-      border-radius: 16px;
-      color: #c53030;
+      background: rgba(0, 0, 0, 0.03);
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      color: #52525b;
       display: flex;
-      flex-direction: column;
       align-items: center;
       gap: 12px;
-      font-weight: 600;
+      font-size: 13.5px;
+      line-height: 1.4;
+      text-align: left;
     }
-    .warning-box mat-icon { width: 40px; height: 40px; font-size: 40px; }
+    .warning-box mat-icon { width: 24px; height: 24px; font-size: 24px; color: #71717a; flex-shrink: 0; }
+    .warning-box p { margin: 0; }
     .test-pre-info {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 14px;
     }
     .pre-info-item {
-      background: #f7fafc;
-      padding: 16px;
-      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(0, 0, 0, 0.07);
+      padding: 14px;
+      border-radius: 12px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       text-align: left;
     }
-    .pre-info-item mat-icon { color: #6366f1; }
-    .pre-info-item .label { display: block; font-size: 11px; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
-    .pre-info-item .value { font-weight: 700; color: #2d3748; font-size: 16px; }
+    .pre-info-item mat-icon { color: #18181b; }
+    .pre-info-item .label { display: block; font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px; }
+    .pre-info-item .value { font-weight: 700; color: #18181b; font-size: 16px; }
     .buffer-actions {
-      margin-top: 32px;
+      margin-top: 28px;
       display: flex;
-      gap: 16px;
+      gap: 12px;
       padding: 0 !important;
     }
     .buffer-actions button {
       flex: 1;
-      height: 52px;
-      border-radius: 16px;
-      font-weight: 600;
+      height: 44px;
     }
-    .start-btn {
-      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-      color: white;
-      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-      border: none;
-    }
-    .exit-btn { border: 2px solid #e2e8f0; background: white; color: #718096; }
   `]
 })
 export class TestTakeComponent implements OnInit, OnDestroy {

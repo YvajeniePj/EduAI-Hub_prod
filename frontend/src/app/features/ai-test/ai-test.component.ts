@@ -127,13 +127,14 @@ import { ApiService } from '../../core/services/api.service';
           </div>
 
           <button 
-            mat-raised-button 
-            color="primary" 
+            type="button"
+            class="pill-btn pill-btn-dark" 
             (click)="generateTest()" 
             [disabled]="!canGenerate() || generating"
             style="margin-top: 20px;">
-            <mat-spinner *ngIf="generating" diameter="20" style="display: inline-block; margin-right: 10px;"></mat-spinner>
-            {{ generating ? 'Генерация...' : 'Сгенерировать тест' }}
+            <mat-spinner *ngIf="generating" diameter="18" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+            <mat-icon *ngIf="!generating">auto_awesome</mat-icon>
+            <span>{{ generating ? 'Генерация...' : 'Сгенерировать тест' }}</span>
           </button>
         </mat-card-content>
       </mat-card>
@@ -141,9 +142,9 @@ import { ApiService } from '../../core/services/api.service';
       <!-- Generated Test (Interactive Editor) -->
       <mat-card *ngIf="generatedTest" class="generated-test-card">
         <mat-card-header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <mat-card-title style="color: #1a237e;">Сгенерированный тест ({{ generatedTest.questions.length }} вопр.)</mat-card-title>
-          <button mat-stroked-button color="primary" (click)="addQuestion()">
-            <mat-icon>add</mat-icon> Добавить вопрос
+          <h2 class="card-section-title">Сгенерированный тест ({{ generatedTest.questions.length }} вопр.)</h2>
+          <button type="button" class="pill-btn pill-btn-outline" (click)="addQuestion()">
+            <mat-icon>add</mat-icon> <span>Добавить вопрос</span>
           </button>
         </mat-card-header>
         <mat-card-content>
@@ -222,11 +223,12 @@ import { ApiService } from '../../core/services/api.service';
           </div>
 
           <div class="save-actions" style="margin-top: 24px; display: flex; justify-content: space-between; align-items: center;">
-            <button mat-stroked-button color="accent" (click)="addQuestion()">
-              <mat-icon>add_circle</mat-icon> Добавить вопрос
+            <button type="button" class="pill-btn pill-btn-outline" (click)="addQuestion()">
+              <mat-icon>add_circle</mat-icon> <span>Добавить вопрос</span>
             </button>
-            <button mat-raised-button color="primary" (click)="saveTest()" [disabled]="saving || generatedTest.questions.length === 0">
-              {{ saving ? 'Сохранение...' : 'Сохранить тест (' + generatedTest.questions.length + ' вопр.)' }}
+            <button type="button" class="pill-btn pill-btn-dark" (click)="saveTest()" [disabled]="saving || generatedTest.questions.length === 0">
+              <mat-icon>check</mat-icon>
+              <span>{{ saving ? 'Сохранение...' : 'Сохранить тест (' + generatedTest.questions.length + ' вопр.)' }}</span>
             </button>
           </div>
         </mat-card-content>
@@ -249,29 +251,41 @@ import { ApiService } from '../../core/services/api.service';
     }
 
     .page-title {
-      font-size: 32px;
-      font-weight: 600;
-      color: #1a237e;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 36px;
+      font-weight: 400;
+      color: #09090b;
       margin: 0 0 8px 0;
       line-height: 1.2;
     }
 
     .page-subtitle {
-      font-size: 16px;
-      color: #616161;
+      font-size: 14.5px;
+      color: #52525b;
       margin: 0;
       line-height: 1.5;
     }
 
+    .card-section-title {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 22px;
+      font-weight: 400;
+      color: #09090b;
+      margin: 0;
+    }
+
     mat-card {
       margin-bottom: 24px;
-      border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      background: white;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
     }
 
     mat-card-content {
-      padding: 24px;
+      padding: 28px 32px;
     }
 
     .full-width {
@@ -298,36 +312,73 @@ import { ApiService } from '../../core/services/api.service';
     }
 
     .info-message {
-      padding: 20px;
+      padding: 16px 20px;
       text-align: center;
-      color: #616161;
-      background: #f8f9fa;
-      border-radius: 8px;
+      color: #52525b;
+      background: rgba(0, 0, 0, 0.02);
+      border-radius: 10px;
       margin-top: 20px;
-      border-left: 4px solid #667eea;
+      border-left: 3px solid #18181b;
+      font-size: 13.5px;
     }
 
-    button[mat-raised-button] {
-      padding: 12px 32px;
-      font-size: 16px;
+    .pill-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 22px;
+      border-radius: 24px;
+      font-size: 13.5px;
       font-weight: 500;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
-      margin-top: 24px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: none;
+    }
+
+    .pill-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .pill-btn-dark {
+      background: #18181b;
+      color: #ffffff;
+    }
+
+    .pill-btn-dark:hover:not(:disabled) {
+      background: #27272a;
+      transform: translateY(-1px);
+    }
+
+    .pill-btn-dark:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .pill-btn-outline {
+      background: #ffffff;
+      color: #3f3f46;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .pill-btn-outline:hover {
+      background: #f4f4f5;
     }
 
     .question-edit-block {
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 18px 20px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      padding: 20px;
       margin-bottom: 20px;
-      background: #f8fafc;
+      background: rgba(255, 255, 255, 0.9);
       transition: all 0.2s;
     }
 
     .question-edit-block:hover {
-      border-color: #cbd5e1;
-      background: #f1f5f9;
+      border-color: rgba(0, 0, 0, 0.16);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
     }
 
     .question-edit-header {
@@ -339,8 +390,8 @@ import { ApiService } from '../../core/services/api.service';
 
     .question-badge {
       font-weight: 600;
-      color: #1e3a8a;
-      font-size: 1.05rem;
+      color: #18181b;
+      font-size: 14.5px;
     }
 
     .question-row {
@@ -352,7 +403,7 @@ import { ApiService } from '../../core/services/api.service';
     .section-sublabel {
       display: block;
       font-weight: 500;
-      color: #475569;
+      color: #52525b;
       margin-bottom: 8px;
       font-size: 0.9rem;
     }

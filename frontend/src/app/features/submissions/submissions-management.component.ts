@@ -125,8 +125,8 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
             </div>
           </mat-card-content>
           <mat-card-actions class="card-actions">
-            <button mat-raised-button color="primary" (click)="viewSubmission(sub.id)">
-              <mat-icon>visibility</mat-icon> Проверить
+            <button type="button" class="pill-btn pill-btn-dark pill-sm" (click)="viewSubmission(sub.id)">
+              <mat-icon>visibility</mat-icon> <span>Проверить</span>
             </button>
             <div class="quick-status-actions" *ngIf="sub.status === 'pending'">
               <button mat-icon-button color="primary" matTooltip="Одобрить" (click)="approveSubmission(sub.id)" *ngIf="getTestType(sub.test_id) !== 'project'">
@@ -147,9 +147,15 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
       max-width: 1400px;
       margin: 0 auto;
     }
-    .page-header { margin-bottom: 32px; text-align: center; }
-    .page-title { font-size: 32px; font-weight: 700; color: #1a237e; margin-bottom: 8px; }
-    .page-subtitle { color: #666; font-size: 16px; }
+    .page-header { margin-bottom: 28px; text-align: center; }
+    .page-title { 
+      font-family: 'Instrument Serif', Georgia, serif; 
+      font-size: 36px; 
+      font-weight: 400; 
+      color: #09090b; 
+      margin-bottom: 8px; 
+    }
+    .page-subtitle { color: #52525b; font-size: 14.5px; }
 
     .dashboard-controls {
       display: flex;
@@ -158,7 +164,7 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
     }
 
     .badge {
-      background: #f44336;
+      background: #18181b;
       color: white;
       padding: 2px 8px;
       border-radius: 10px;
@@ -169,8 +175,12 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
 
     .filters-card {
       margin-bottom: 32px;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+      border-radius: 20px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
     }
     .filters-panel {
       display: flex;
@@ -190,22 +200,28 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
 
     .submission-card {
       border-radius: 20px;
-      transition: all 0.3s ease;
-      border: 1px solid rgba(0,0,0,0.05);
+      transition: all 0.25s ease;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
       overflow: hidden;
     }
     .submission-card:hover {
-      transform: translateY(-8px);
-      box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.07);
+      border-color: rgba(0, 0, 0, 0.14);
     }
     
     .student-avatar {
-      background: linear-gradient(135deg, #3f51b5 0%, #5c6bc0 100%);
+      background: #18181b;
       color: white;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 700;
+      border-radius: 50%;
     }
 
     .submission-details {
@@ -218,9 +234,10 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
       display: flex;
       align-items: center;
       gap: 10px;
-      color: #444;
+      color: #27272a;
+      font-size: 13.5px;
     }
-    .detail-row mat-icon { color: #3f51b5; font-size: 20px; width: 20px; height: 20px; }
+    .detail-row mat-icon { color: #71717a; font-size: 18px; width: 18px; height: 18px; }
 
     .tag-row {
       display: flex;
@@ -235,10 +252,9 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
       font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
+      background: rgba(0, 0, 0, 0.04);
+      color: #52525b;
     }
-    .test-type-badge.multiple_choice { background: #e3f2fd; color: #1976d2; }
-    .test-type-badge.keyword_based { background: #f3e5f5; color: #7b1fa2; }
-    .test-type-badge.project { background: #e8f5e9; color: #2e7d32; }
 
     .status-badge {
       padding: 4px 12px;
@@ -247,15 +263,43 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
       font-weight: 600;
       text-transform: uppercase;
     }
-    .status-badge.pending { background: #fff3e0; color: #ef6c00; }
-    .status-badge.approved { background: #e8f5e9; color: #2e7d32; }
-    .status-badge.rejected { background: #ffebee; color: #c62828; }
+    .status-badge.pending { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+    .status-badge.approved { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .status-badge.rejected { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
 
     .card-actions {
-      padding: 16px;
-      border-top: 1px solid #eee;
+      padding: 14px 18px;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
       display: flex;
       justify-content: space-between;
+      align-items: center;
+    }
+
+    .pill-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: none;
+    }
+    .pill-btn mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+    .pill-btn-dark {
+      background: #18181b;
+      color: #ffffff;
+    }
+    .pill-btn-dark:hover {
+      background: #27272a;
+      transform: translateY(-1px);
     }
 
     .loading-state, .empty-state {

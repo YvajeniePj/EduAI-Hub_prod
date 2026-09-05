@@ -35,6 +35,7 @@ export const routes: Routes = [
   { path: 'home', redirectTo: '', pathMatch: 'full' },
   { path: 'calendar-news', component: CalendarNewsComponent, canActivate: [authGuard] },
   { path: 'news/manage', component: NewsManageComponent, canActivate: [authGuard] },
+  { path: 'courses', redirectTo: '', pathMatch: 'full' },
   { path: 'subjects', redirectTo: '', pathMatch: 'full' },
   { path: 'course-builder', component: CourseBuilderListComponent, canActivate: [authGuard] },
   { path: 'course-builder/:id', component: CourseBuilderComponent, canActivate: [authGuard] },
@@ -67,6 +68,7 @@ export const routes: Routes = [
   { path: 'leaderboard', loadComponent: () => import('./features/leaderboard/leaderboard.component').then(m => m.LeaderboardComponent), canActivate: [authGuard] },
   { path: 'ai-test', loadComponent: () => import('./features/ai-test/ai-test.component').then(m => m.AiTestComponent), canActivate: [authGuard] },
   { path: 'chat', loadComponent: () => import('./features/chat/chat.component').then(m => m.ChatComponent), canActivate: [authGuard] },
-  { path: 'messages', loadComponent: () => import('./features/chat/p2p-chat.component').then(m => m.P2pChatComponent), canActivate: [authGuard] }
+  { path: 'messages', loadComponent: () => import('./features/chat/p2p-chat.component').then(m => m.P2pChatComponent), canActivate: [authGuard] },
+  { path: '**', redirectTo: '' }
 ];
 
