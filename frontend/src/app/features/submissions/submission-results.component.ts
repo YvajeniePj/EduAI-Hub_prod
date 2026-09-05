@@ -1234,8 +1234,18 @@ export class SubmissionResultsComponent implements OnInit {
   }
 
   goBack() {
-    if (this.source === 'courses' && this.subjectId) {
-      this.router.navigate(['/courses', this.subjectId]);
+    const courseId = this.subjectId || this.route.snapshot.queryParams['courseId'];
+    const tab = this.route.snapshot.queryParams['tab'];
+    const lessonId = this.route.snapshot.queryParams['lessonId'];
+    if (this.source === 'courses' && courseId) {
+      const qParams: any = {};
+      if (tab !== undefined && tab !== null) {
+        qParams.tab = tab;
+      }
+      if (lessonId) {
+        qParams.lessonId = lessonId;
+      }
+      this.router.navigate(['/courses', courseId], { queryParams: qParams });
     } else {
       this.router.navigate(['/tests']);
     }

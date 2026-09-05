@@ -82,16 +82,16 @@ import { MatBadgeModule } from '@angular/material/badge';
                        (test.time_limit_minutes ? 'Осталось: ' + (remainingTimes[test.id] || '--:--') : 'Тест в процессе') }}
                   </span>
                 </div>
-                <ng-container *ngIf="sub.is_finished === 'true'" [ngSwitch]="sub.status">
-                  <div *ngSwitchCase="'pending'" class="status-box pending">
-                    <mat-icon>hourglass_empty</mat-icon>
-                    <span>На проверке <ng-container *ngIf="test.test_type === 'multiple_choice'">({{ sub.total_score }} / {{ sub.total_max }})</ng-container></span>
-                  </div>
-                  <div *ngSwitchCase="'approved'" class="status-box approved">
+                <ng-container *ngIf="sub.is_finished === 'true' || sub.is_finished === true">
+                  <div *ngIf="test.test_type === 'multiple_choice' || sub.status === 'approved'" class="status-box approved">
                     <mat-icon>check_circle</mat-icon>
-                    <span>Завершено: {{ sub.total_score }} / {{ sub.total_max }}</span>
+                    <span>Сдано: {{ sub.total_score }} / {{ sub.total_max }}</span>
                   </div>
-                  <div *ngSwitchCase="'rejected'" class="status-box rejected">
+                  <div *ngIf="test.test_type !== 'multiple_choice' && sub.status === 'pending'" class="status-box pending">
+                    <mat-icon>hourglass_empty</mat-icon>
+                    <span>На проверке</span>
+                  </div>
+                  <div *ngIf="sub.status === 'rejected'" class="status-box rejected">
                     <mat-icon>error</mat-icon>
                     <span>Отклонено: {{ sub.teacher_feedback || 'Нужно доработать' }}</span>
                   </div>

@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule, FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -22,6 +22,7 @@ import { debounceTime } from 'rxjs/operators';
   standalone: true,
   imports: [
     CommonModule,
+    RouterModule,
     FormsModule,
     ReactiveFormsModule,
     MatCardModule,
@@ -38,12 +39,13 @@ import { debounceTime } from 'rxjs/operators';
   template: `
     <div class="test-container" *ngIf="test">
       <div *ngIf="isTestExpired" class="error-container">
-        <div class="error-content">
-          <mat-icon class="error-icon">error_outline</mat-icon>
+        <div class="error-content glass-panel">
+          <mat-icon class="error-icon">schedule</mat-icon>
           <h2>Тест недоступен</h2>
           <p>Срок прохождения этого теста истек. Дедлайн: {{ test.due_date | russianDate:'datetime' }}</p>
-          <button mat-raised-button color="primary" routerLink="/tests" class="back-button">
-            Вернуться к тестам
+          <button type="button" class="pill-btn pill-btn-dark back-button" (click)="navigateBack()">
+            <mat-icon style="font-size: 18px; width: 18px; height: 18px;">arrow_back</mat-icon>
+            <span>{{ source === 'courses' ? 'Вернуться к курсу' : 'Вернуться к тестам' }}</span>
           </button>
         </div>
       </div>
@@ -906,37 +908,70 @@ import { debounceTime } from 'rxjs/operators';
       justify-content: center;
       align-items: center;
       min-height: 60vh;
+      padding: 20px;
     }
 
     .error-content {
-      background: white;
-      border-radius: 16px;
-      padding: 48px;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      padding: 44px 36px;
       text-align: center;
-      max-width: 500px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     .error-icon {
-      font-size: 80px;
-      width: 80px;
-      height: 80px;
-      color: #f44336;
-      margin-bottom: 24px;
+      font-size: 56px;
+      width: 56px;
+      height: 56px;
+      color: #ef4444;
+      margin-bottom: 16px;
     }
 
     .error-content h2 {
-      color: #1a237e;
-      font-size: 24px;
-      font-weight: 600;
-      margin: 0 0 16px 0;
+      font-family: 'Instrument Serif', Georgia, serif;
+      color: #18181b;
+      font-size: 28px;
+      font-weight: 400;
+      margin: 0 0 10px 0;
     }
 
     .error-content p {
-      color: #616161;
-      font-size: 16px;
-      margin: 0 0 32px 0;
-      line-height: 1.6;
+      color: #71717a;
+      font-size: 14px;
+      margin: 0 0 24px 0;
+      line-height: 1.5;
+    }
+
+    .pill-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 24px;
+      border-radius: 24px;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: none;
+    }
+
+    .pill-btn-dark {
+      background: #18181b;
+      color: #fff;
+    }
+
+    .pill-btn-dark:hover {
+      background: #27272a;
+      transform: translateY(-1px);
     }
 
     .back-button {
@@ -1108,6 +1143,9 @@ export class TestTakeComponent implements OnInit, OnDestroy {
   uploadedFiles: any[] = [];
   testAssets: any[] = [];
   source: string | null = null;
+  courseId: string | null = null;
+  returnTab?: number;
+  returnLessonId?: string | null;
   isPreStart: boolean = false;
   private saveSubject = new Subject<void>();
 
@@ -1122,6 +1160,10 @@ export class TestTakeComponent implements OnInit, OnDestroy {
   ngOnInit() {
     const testId = this.route.snapshot.paramMap.get('id');
     this.source = this.route.snapshot.queryParamMap.get('source');
+    this.courseId = this.route.snapshot.queryParamMap.get('courseId');
+    const tabParam = this.route.snapshot.queryParamMap.get('tab');
+    this.returnTab = tabParam !== null && tabParam !== undefined ? parseInt(tabParam, 10) : undefined;
+    this.returnLessonId = this.route.snapshot.queryParamMap.get('lessonId');
     
     if (testId) {
       this.loadTest(testId);
@@ -1561,11 +1603,17 @@ export class TestTakeComponent implements OnInit, OnDestroy {
     }
   }
 
-  private navigateBack() {
-    if (this.source === 'tests') {
-      this.router.navigate(['/tests']);
-    } else if (this.source === 'courses' && this.test && this.test.subject_id) {
-      this.router.navigate(['/courses', this.test.subject_id]);
+  navigateBack() {
+    const courseId = this.courseId || (this.source === 'courses' ? this.test?.subject_id : null);
+    if (courseId) {
+      const qParams: any = {};
+      if (this.returnTab !== undefined) {
+        qParams.tab = this.returnTab;
+      }
+      if (this.returnLessonId) {
+        qParams.lessonId = this.returnLessonId;
+      }
+      this.router.navigate(['/courses', courseId], { queryParams: qParams });
     } else {
       this.router.navigate(['/tests']);
     }
@@ -1615,15 +1663,23 @@ export class TestTakeComponent implements OnInit, OnDestroy {
 
             // Redirect based on source
             const isMultipleChoice = this.test && this.test.test_type === 'multiple_choice';
+            const courseId = this.courseId || (this.source === 'courses' ? this.test?.subject_id : null);
             
             if (isMultipleChoice) {
-              this.router.navigate(['/submissions', this.submissionId, 'results'], { queryParams: { source: this.source } });
+              const resParams: any = { source: this.source };
+              if (courseId) resParams.courseId = courseId;
+              if (this.returnTab !== undefined) resParams.tab = this.returnTab;
+              if (this.returnLessonId) resParams.lessonId = this.returnLessonId;
+              this.router.navigate(['/submissions', this.submissionId, 'results'], { queryParams: resParams });
             } else {
-              if (this.source === 'tests') {
+              if (this.source === 'courses' && courseId) {
+                alert('Тест завершен! Ваш результат отправлен на проверку.');
+                const qParams: any = {};
+                if (this.returnTab !== undefined) qParams.tab = this.returnTab;
+                if (this.returnLessonId) qParams.lessonId = this.returnLessonId;
+                this.router.navigate(['/courses', courseId], { queryParams: qParams });
+              } else if (this.source === 'tests') {
                 this.router.navigate(['/tests']);
-              } else if (this.source === 'courses' && this.test && this.test.subject_id) {
-                alert('Тест завершен! Ваш результат сохранен.');
-                this.router.navigate(['/courses', this.test.subject_id]);
               } else {
                 this.router.navigate(['/submissions', this.submissionId, 'results']);
               }

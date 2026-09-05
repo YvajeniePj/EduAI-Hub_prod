@@ -103,7 +103,7 @@ interface TreeNode {
         </div>
       </div>
 
-      <mat-tab-group animationDuration="0ms" class="course-tabs" [selectedIndex]="0">
+      <mat-tab-group animationDuration="0ms" class="course-tabs" [selectedIndex]="selectedTabIndex" (selectedIndexChange)="onTabChange($event)">
         <!-- Tab 1: Лента -->
         <mat-tab label="Лента">
           <div class="tab-content-container feed-tab-container">
@@ -122,18 +122,20 @@ interface TreeNode {
                       <div *ngFor="let deadline of courseDeadlines" class="deadline-item" [class.overdue]="deadline.overdue" [class.finished]="deadline.finished">
                         <div class="deadline-icon-box">
                           <mat-icon class="deadline-mat-icon">
-                            {{ deadline.finished ? 'check_circle' : 'assignment' }}
+                            {{ deadline.finished ? (deadline.statusText === 'На проверке' ? 'hourglass_empty' : 'check_circle') : 'assignment' }}
                           </mat-icon>
                         </div>
                         <div class="deadline-info">
-                          <a [routerLink]="['/tests', deadline.id, 'take']" [queryParams]="{ source: 'courses' }" class="deadline-title">
+                          <a [routerLink]="['/tests', deadline.id, 'take']" [queryParams]="{ source: 'courses', courseId: subjectId, tab: 0 }" class="deadline-title">
                             {{ deadline.title }}
                           </a>
                           <div class="deadline-date">
                             Срок: {{ deadline.dueDate | date:'M/d/yy, h:mm a' }}
                           </div>
                           <div *ngIf="deadline.overdue" class="deadline-status overdue-text">Просрочено</div>
-                          <div *ngIf="deadline.finished" class="deadline-status finished-text">Сдано</div>
+                          <div *ngIf="deadline.finished" class="deadline-status finished-text" [class.pending-text]="deadline.statusText === 'На проверке'">
+                            {{ deadline.statusText || 'Сдано' }}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -372,7 +374,7 @@ interface TreeNode {
           <!-- Lesson Viewer split layout (viewingLessonMode === true) -->
           <div class="lesson-viewer-container" *ngIf="viewingLessonMode">
             <div class="viewer-header">
-              <button mat-button color="primary" (click)="viewingLessonMode = false" class="back-btn">
+              <button mat-button color="primary" (click)="exitLessonView()" class="back-btn">
                 <mat-icon>arrow_back</mat-icon>
                 Вернуться к заданиям
               </button>
@@ -506,18 +508,28 @@ interface TreeNode {
                       <!-- Test link -->
                       <ng-container *ngIf="selectedLesson.content?.test_id">
                           <div *ngIf="lessonMetadata.testAllowed" class="resource-card test-card">
-                            <mat-icon class="resource-icon">quiz</mat-icon>
-                             <div class="resource-info">
-                                <div class="resource-title">Проверочное тестирование</div>
-                                <div class="test-action-buttons" style="display: flex; gap: 8px;">
-                                  <button mat-raised-button color="primary" [routerLink]="['/tests', selectedLesson.content.test_id, 'take']" [queryParams]="{ source: 'courses' }">
-                                    Начать тест
-                                  </button>
-                                  <button mat-stroked-button color="accent" *ngIf="isPeerReviewEnabledForTest(selectedLesson.content.test_id)" (click)="openPeerReviewDialog(selectedLesson.content.test_id)">
-                                    <mat-icon>rate_review</mat-icon> Кросс-проверка
-                                  </button>
-                                </div>
-                             </div>
+                            <div class="test-icon-circle">
+                              <mat-icon class="resource-icon">quiz</mat-icon>
+                            </div>
+                            <div class="resource-info">
+                              <div class="resource-title">Проверочное тестирование</div>
+                              <div class="test-action-buttons" style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+                                <button type="button" 
+                                        class="pill-btn pill-btn-dark" 
+                                        [routerLink]="['/tests', selectedLesson.content.test_id, 'take']" 
+                                        [queryParams]="{ source: 'courses', courseId: subjectId, tab: 1, lessonId: selectedLesson.id }">
+                                  <mat-icon style="font-size: 18px; width: 18px; height: 18px;">play_arrow</mat-icon>
+                                  <span>Начать тест</span>
+                                </button>
+                                <button type="button" 
+                                        class="pill-btn pill-btn-outline" 
+                                        *ngIf="isPeerReviewEnabledForTest(selectedLesson.content.test_id)" 
+                                        (click)="openPeerReviewDialog(selectedLesson.content.test_id)">
+                                  <mat-icon style="font-size: 18px; width: 18px; height: 18px;">rate_review</mat-icon>
+                                  <span>Кросс-проверка</span>
+                                </button>
+                              </div>
+                            </div>
                           </div>
                           <div *ngIf="!lessonMetadata.testAllowed" class="resource-card locked">
                               <mat-icon class="resource-icon">lock</mat-icon>
@@ -534,22 +546,26 @@ interface TreeNode {
                       <!-- Text study confirmation button for students -->
                       <div *ngIf="selectedLesson.content?.text_content && !selectedLesson.content?.video_url && !selectedLesson.content?.material_id && currentUser?.role === 'student'" 
                            style="margin-top: 24px; display: flex; justify-content: center;">
-                        <button mat-raised-button 
-                                [color]="isLessonViewed(selectedLesson.id) ? 'accent' : 'primary'"
+                        <button type="button" 
+                                class="pill-btn" 
+                                [class.pill-btn-dark]="!isLessonViewed(selectedLesson.id)"
+                                [class.pill-btn-outline]="isLessonViewed(selectedLesson.id)"
                                 [disabled]="isLessonViewed(selectedLesson.id)"
                                 (click)="triggerLessonViewed()">
-                          <mat-icon>{{ isLessonViewed(selectedLesson.id) ? 'check_circle' : 'assignment_turned_in' }}</mat-icon>
-                          {{ isLessonViewed(selectedLesson.id) ? 'Материал изучен' : 'Я изучил этот материал' }}
+                          <mat-icon style="font-size: 18px; width: 18px; height: 18px;">{{ isLessonViewed(selectedLesson.id) ? 'check_circle' : 'assignment_turned_in' }}</mat-icon>
+                          <span>{{ isLessonViewed(selectedLesson.id) ? 'Материал изучен' : 'Я изучил этот материал' }}</span>
                         </button>
                       </div>
 
                       <!-- Lesson Navigation Buttons -->
-                      <div class="lesson-navigation-buttons" style="display: flex; justify-content: space-between; margin-top: 32px; border-top: 1px solid #dadce0; padding-top: 16px;">
-                        <button mat-button color="primary" [disabled]="!previousLesson" (click)="previousLesson && navigateToLesson(previousLesson)" style="display: flex; align-items: center; gap: 4px;">
-                          <mat-icon>navigate_before</mat-icon> Предыдущий урок
+                      <div class="lesson-navigation-buttons" style="display: flex; justify-content: space-between; margin-top: 32px; border-top: 1px solid rgba(0, 0, 0, 0.08); padding-top: 16px;">
+                        <button type="button" class="pill-btn pill-btn-outline pill-sm" [disabled]="!previousLesson" (click)="previousLesson && navigateToLesson(previousLesson)">
+                          <mat-icon style="font-size: 16px; width: 16px; height: 16px;">navigate_before</mat-icon>
+                          <span>Предыдущий урок</span>
                         </button>
-                        <button mat-button color="primary" [disabled]="!nextLesson" (click)="nextLesson && navigateToLesson(nextLesson)" style="display: flex; align-items: center; gap: 4px;">
-                          Следующий урок <mat-icon>navigate_next</mat-icon>
+                        <button type="button" class="pill-btn pill-btn-outline pill-sm" [disabled]="!nextLesson" (click)="nextLesson && navigateToLesson(nextLesson)">
+                          <span>Следующий урок</span>
+                          <mat-icon style="font-size: 16px; width: 16px; height: 16px;">navigate_next</mat-icon>
                         </button>
                       </div>
                   </div>
@@ -1508,6 +1524,20 @@ interface TreeNode {
       color: #64748b;
     }
 
+    .status-pending {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-rejected {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+
+    .pending-text {
+      color: #d97706 !important;
+    }
+
     .deadline-badge-item {
       font-size: 12px;
       color: #71717a;
@@ -2191,6 +2221,10 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   // Lesson progress tracking property
   lessonProgress: string[] = [];
 
+  // Tab & navigation restoration state
+  selectedTabIndex = 0;
+  pendingLessonId: string | null = null;
+
   // Data for tabs
   lessonMetadata = {
     moduleName: '',
@@ -2281,6 +2315,17 @@ export class CourseViewComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       }
     });
+
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(qParams => {
+      if (qParams['tab'] !== undefined && qParams['tab'] !== null) {
+        this.selectedTabIndex = parseInt(qParams['tab'], 10) || 0;
+      }
+      if (qParams['lessonId']) {
+        this.pendingLessonId = qParams['lessonId'];
+        this.restorePendingLesson();
+      }
+      this.cdr.markForCheck();
+    });
   }
 
   checkActiveStream() {
@@ -2312,8 +2357,10 @@ export class CourseViewComponent implements OnInit, OnDestroy {
         this.buildTree();
         this.loading = false;
 
-        // Auto-select first lesson if available
-        if (this.dataSource.data.length > 0) {
+        // Auto-select first lesson if available, or restore pending lesson
+        if (this.pendingLessonId) {
+          this.restorePendingLesson();
+        } else if (this.dataSource.data.length > 0) {
           const firstModule = this.dataSource.data[0];
           if (firstModule.children && firstModule.children.length > 0) {
             this.selectLesson(firstModule.children[0]);
@@ -2400,7 +2447,8 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     let count = 0;
     const lessons = this.flatLessons;
     for (const lesson of lessons) {
-      if (this.getLessonStatusText(lesson) === 'Сдано') {
+      const status = this.getLessonStatusText(lesson);
+      if (status === 'Сдано' || status === 'Просмотрено') {
         count++;
       }
     }
@@ -2477,14 +2525,6 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     this.updateLessonMetadata(node);
     this.updateSafeVideoUrl(node.content?.video_url);
     this.isVideoStarted = false;
-    
-    // Save to viewed-lessons in localStorage
-    const viewedIds = JSON.parse(localStorage.getItem('viewed-lessons') || '[]');
-    if (!viewedIds.includes(node.id)) {
-      viewedIds.push(node.id);
-      localStorage.setItem('viewed-lessons', JSON.stringify(viewedIds));
-    }
-
     this.checkActiveStream();
     this.cdr.markForCheck();
 
@@ -2934,6 +2974,14 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   selectLessonFromOutline(lesson: TreeNode) {
     this.viewingLessonMode = true;
     this.selectLesson(lesson);
+    this.selectedTabIndex = 1;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: 1, lessonId: lesson.id },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    });
+    this.cdr.markForCheck();
   }
 
   getLessonTypeIcon(lessonType?: string): string {
@@ -2953,8 +3001,9 @@ export class CourseViewComponent implements OnInit, OnDestroy {
 
   getLessonIconColor(lesson: TreeNode): string {
     const status = this.getLessonStatusText(lesson);
-    if (status === 'Сдано') return '#4caf50'; // Green
-    if (status === 'На проверке') return '#ffb300'; // Yellow/Pending
+    if (status === 'Сдано' || status === 'Просмотрено') return '#10b981'; // Green
+    if (status === 'На проверке') return '#f59e0b'; // Amber/Pending
+    if (status === 'На доработке') return '#ef4444'; // Red/Rejected
     return '#9e9e9e'; // Gray/Unstarted
   }
 
@@ -3176,16 +3225,65 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     event.target.src = 'assets/default-avatar.png';
   }
 
+  onTabChange(index: number) {
+    this.selectedTabIndex = index;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: index },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    });
+    this.cdr.markForCheck();
+  }
+
+  restorePendingLesson() {
+    if (!this.pendingLessonId || !this.structure?.modules) return;
+    const lessons = this.flatLessons;
+    const targetLesson = lessons.find(l => l.id === this.pendingLessonId);
+    if (targetLesson) {
+      this.viewingLessonMode = true;
+      this.selectLesson(targetLesson);
+      this.selectedTabIndex = 1;
+      this.pendingLessonId = null;
+      this.cdr.markForCheck();
+    }
+  }
+
+  exitLessonView() {
+    this.viewingLessonMode = false;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: 1, lessonId: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    });
+    this.cdr.markForCheck();
+  }
+
   filterCourseDeadlines() {
     this.courseDeadlines = this.tests
       .filter(t => t.due_date)
-      .map(t => ({
-        id: t.id,
-        title: t.title,
-        dueDate: t.due_date ? new Date(t.due_date) : null,
-        overdue: this.isTestOverdue(t),
-        finished: this.isTestFinished(t.id)
-      }))
+      .map(t => {
+        const sub = this.userSubmissions.find(s => s.test_id === t.id);
+        let statusText = 'Сдано';
+        if (sub) {
+          if (sub.status === 'pending') {
+            statusText = (t.test_type === 'multiple_choice') ? 'Сдано' : 'На проверке';
+          } else if (sub.status === 'approved') {
+            statusText = 'Сдано';
+          } else if (sub.status === 'rejected') {
+            statusText = 'На доработке';
+          }
+        }
+        return {
+          id: t.id,
+          title: t.title,
+          dueDate: t.due_date ? new Date(t.due_date) : null,
+          overdue: this.isTestOverdue(t),
+          finished: this.isTestFinished(t.id),
+          statusText: statusText
+        };
+      })
       .sort((a, b) => {
         if (!a.dueDate) return 1;
         if (!b.dueDate) return -1;
@@ -3194,31 +3292,47 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   }
 
   getLessonStatusText(lesson: TreeNode): string {
-    if (lesson.content?.test_id) {
-      const testId = lesson.content.test_id;
+    const isTest = !!(lesson.content?.test_id || lesson.lessonType === 'quiz');
+    if (isTest) {
+      const testId = lesson.content?.test_id;
+      if (!testId) return 'Не начато';
+
+      const test = this.tests.find(t => t.id === testId);
       const sub = this.userSubmissions.find(s => s.test_id === testId);
       if (sub) {
-        if (sub.status === 'approved' || (sub.total_score !== undefined && sub.total_score !== null && sub.total_score >= 0)) {
+        // If multiple choice test, once submitted it is immediately 'Сдано'
+        const isMultipleChoice = test?.test_type === 'multiple_choice';
+        if (isMultipleChoice) {
+          return 'Сдано';
+        }
+        if (sub.status === 'approved') {
           return 'Сдано';
         }
         if (sub.status === 'pending') {
           return 'На проверке';
         }
+        if (sub.status === 'rejected') {
+          return 'На доработке';
+        }
+        if (sub.total_score !== undefined && sub.total_score !== null && sub.total_score >= 0) {
+          return 'Сдано';
+        }
       }
       return 'Не начато';
     }
 
-    const viewedIds = JSON.parse(localStorage.getItem('viewed-lessons') || '[]');
-    if (viewedIds.includes(lesson.id) || this.lessonProgress.includes(lesson.id)) {
-      return 'Сдано';
+    // Materials (non-tests): only Просмотрено or Не просмотрено
+    if (this.isLessonViewed(lesson.id)) {
+      return 'Просмотрено';
     }
-    return 'Не начато';
+    return 'Не просмотрено';
   }
 
   getLessonStatusClass(lesson: TreeNode): string {
     const status = this.getLessonStatusText(lesson);
-    if (status === 'Сдано') return 'status-completed';
+    if (status === 'Сдано' || status === 'Просмотрено') return 'status-completed';
     if (status === 'На проверке') return 'status-pending';
+    if (status === 'На доработке') return 'status-rejected';
     return 'status-not-started';
   }
 
