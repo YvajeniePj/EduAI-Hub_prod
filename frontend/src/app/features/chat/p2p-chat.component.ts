@@ -28,6 +28,8 @@ interface Dialog {
   unread_count: number;
   avatar_url?: string;
   isTemp?: boolean;
+  is_online?: boolean;
+  last_seen?: number;
 }
 
 interface ChatAttachment {
@@ -136,7 +138,7 @@ interface Message {
               <div class="avatar-initials" *ngIf="!getResolvedAvatar(dialog.username, dialog.avatar_url) || avatarErrors.has(dialog.username)">
                 {{ getInitials(dialog.username) }}
               </div>
-              <span class="status-dot online"></span>
+              <span class="status-dot" [class.online]="dialog.is_online"></span>
             </div>
 
             <div class="dialog-info">
@@ -176,13 +178,13 @@ interface Message {
                 <div class="avatar-initials" *ngIf="!getResolvedAvatar(selectedDialog.username, selectedDialog.avatar_url) || avatarErrors.has(selectedDialog.username)">
                   {{ getInitials(selectedDialog.username) }}
                 </div>
-                <span class="status-dot online"></span>
+                <span class="status-dot" [class.online]="selectedDialog.is_online"></span>
               </div>
               <div class="chat-header-info">
                 <span class="chat-title">{{ selectedDialog.username }}</span>
-                <span class="chat-status" [class.temp-chat]="selectedDialog.isTemp">
-                  <span class="status-dot-mini" [class.temp]="selectedDialog.isTemp"></span>
-                  {{ selectedDialog.isTemp ? 'Новый диалог' : 'в сети' }}
+                <span class="chat-status" [class.online]="selectedDialog.is_online" [class.temp-chat]="selectedDialog.isTemp">
+                  <span class="status-dot-mini" [class.online]="selectedDialog.is_online" [class.temp]="selectedDialog.isTemp"></span>
+                  {{ selectedDialog.isTemp ? 'Новый диалог' : (selectedDialog.is_online ? 'в сети' : formatUserLastSeen(selectedDialog.last_seen)) }}
                 </span>
               </div>
             </div>
@@ -292,16 +294,13 @@ interface Message {
             </div>
 
             <div class="chat-pill-input-bar">
-              <input id="chatFileInput" 
-                     #fileInput 
-                     type="file" 
-                     (change)="onFileSelected($event)" 
-                     style="position: absolute; left: -9999px; opacity: 0; width: 1px; height: 1px; pointer-events: none;" />
-              <label for="chatFileInput" 
-                     class="pill-attach-btn" 
-                     (click)="triggerFileInput($event)" 
+              <label class="pill-attach-btn" 
                      [class.disabled]="sending" 
                      title="Прикрепить файл или фото">
+                <input type="file" 
+                       (change)="onFileSelected($event)" 
+                       [disabled]="sending" 
+                       class="pill-native-file-input" />
                 <mat-icon>attach_file</mat-icon>
               </label>
               <input type="text" 
@@ -612,8 +611,10 @@ interface Message {
       border: 2px solid #ffffff;
       background: #22c55e;
       z-index: 1;
+      display: none;
     }
     .status-dot.online {
+      display: block;
       animation: pulseAura 2s infinite ease-in-out;
     }
     @keyframes pulseAura {
@@ -754,23 +755,29 @@ interface Message {
     }
     .chat-status {
       font-size: 12px;
-      color: #22c55e;
+      color: #8e8e93;
       display: flex;
       align-items: center;
       gap: 5px;
+    }
+    .chat-status.online {
+      color: #16a34a;
+    }
+    .chat-status.temp-chat {
+      color: #f59e0b;
     }
     .status-dot-mini {
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: #22c55e;
+      background: #94a3b8;
       display: inline-block;
+    }
+    .status-dot-mini.online {
+      background: #22c55e;
     }
     .status-dot-mini.temp {
       background: #f59e0b;
-    }
-    .chat-status.temp-chat {
-      color: #f59e0b;
     }
     .btn-clear-chat {
       display: flex;
@@ -1212,6 +1219,7 @@ interface Message {
       box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
     }
     .pill-attach-btn {
+      position: relative;
       background: transparent;
       border: none;
       color: #71717a;
@@ -1223,6 +1231,20 @@ interface Message {
       border-radius: 50%;
       transition: color 0.15s, transform 0.15s;
       user-select: none;
+      overflow: hidden;
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+    }
+    .pill-native-file-input {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 2;
     }
     .pill-attach-btn.disabled {
       opacity: 0.4;
@@ -1232,6 +1254,8 @@ interface Message {
       font-size: 20px;
       width: 20px;
       height: 20px;
+      pointer-events: none;
+      z-index: 1;
     }
     .pill-attach-btn:hover {
       color: #111111;
@@ -1379,7 +1403,6 @@ interface Message {
 })
 export class P2pChatComponent implements OnInit, OnDestroy {
   @ViewChild('messagesContainer') private messagesContainer?: ElementRef;
-  @ViewChild('fileInput') private fileInputRef?: ElementRef<HTMLInputElement>;
 
   currentUser: any = null;
   dialogs: Dialog[] = [];
@@ -1498,7 +1521,9 @@ export class P2pChatComponent implements OnInit, OnDestroy {
           return {
             ...d,
             avatar_url: resolvedAvatar,
-            last_message_time: d.last_message_time ? new Date(d.last_message_time) : null
+            last_message_time: d.last_message_time ? new Date(d.last_message_time) : null,
+            is_online: !!d.is_online,
+            last_seen: d.last_seen
           };
         });
         this.loadingDialogs = false;
@@ -1532,7 +1557,8 @@ export class P2pChatComponent implements OnInit, OnDestroy {
             last_message_sender: '',
             unread_count: 0,
             avatar_url: resolvedAvatar,
-            isTemp: true
+            isTemp: true,
+            is_online: false
           };
           this.dialogs.unshift(tempDialog);
           this.selectDialog(tempDialog);
@@ -1546,7 +1572,8 @@ export class P2pChatComponent implements OnInit, OnDestroy {
             last_message_sender: '',
             unread_count: 0,
             avatar_url: this.userAvatarMap.get(username),
-            isTemp: true
+            isTemp: true,
+            is_online: false
           };
           this.dialogs.unshift(tempDialog);
           this.selectDialog(tempDialog);
@@ -1561,6 +1588,20 @@ export class P2pChatComponent implements OnInit, OnDestroy {
     this.showTypingIndicator = false;
     clearTimeout(this.typingTimer);
     this.loadingHistory = true;
+
+    // Fetch immediate presence for selected user
+    this.apiService.getUserPresence(dialog.username).subscribe({
+      next: (res) => {
+        if (this.selectedDialog?.username === dialog.username) {
+          this.selectedDialog.is_online = !!res.is_online;
+          this.selectedDialog.last_seen = res.last_seen;
+          dialog.is_online = !!res.is_online;
+          dialog.last_seen = res.last_seen;
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => {}
+    });
     
     // Clear route query params silently to clean url
     this.router.navigate([], {
@@ -1610,18 +1651,25 @@ export class P2pChatComponent implements OnInit, OnDestroy {
           match.last_message_content = updated.last_message_content;
           match.last_message_time = new Date(updated.last_message_time);
           match.last_message_sender = updated.last_message_sender;
+          match.is_online = !!updated.is_online;
+          match.last_seen = updated.last_seen;
           if (resolvedAvatar && !match.avatar_url) {
             match.avatar_url = resolvedAvatar;
           }
           
           if (this.selectedDialog?.username !== updated.username) {
             match.unread_count = updated.unread_count;
+          } else if (this.selectedDialog) {
+            this.selectedDialog.is_online = match.is_online;
+            this.selectedDialog.last_seen = match.last_seen;
           }
         } else {
           this.dialogs.push({
             ...updated,
             avatar_url: resolvedAvatar,
-            last_message_time: new Date(updated.last_message_time)
+            last_message_time: new Date(updated.last_message_time),
+            is_online: !!updated.is_online,
+            last_seen: updated.last_seen
           });
         }
       });
@@ -1810,14 +1858,23 @@ export class P2pChatComponent implements OnInit, OnDestroy {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
-  triggerFileInput(event?: MouseEvent) {
-    if (event) {
-      event.stopPropagation();
+  formatUserLastSeen(lastSeenTimestamp?: number): string {
+    if (!lastSeenTimestamp || lastSeenTimestamp <= 0) {
+      return 'не в сети';
     }
-    const input = this.fileInputRef?.nativeElement || (document.getElementById('chatFileInput') as HTMLInputElement);
-    if (input) {
-      input.click();
+    const now = Math.floor(Date.now() / 1000);
+    const diffSec = now - lastSeenTimestamp;
+    if (diffSec < 90) return 'в сети';
+    if (diffSec < 3600) {
+      const mins = Math.max(1, Math.floor(diffSec / 60));
+      return `был(а) ${mins} мин. назад`;
     }
+    if (diffSec < 86400) {
+      const hours = Math.floor(diffSec / 3600);
+      return `был(а) ${hours} ч. назад`;
+    }
+    const date = new Date(lastSeenTimestamp * 1000);
+    return `был(а) ${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`;
   }
 
   onFileSelected(event: any) {

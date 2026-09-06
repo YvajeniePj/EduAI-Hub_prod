@@ -108,6 +108,13 @@ export class ApiService {
     return this.http.get<any[]>(`${API_URL}/messages/dialogs`);
   }
 
+  getUserPresence(userName: string): Observable<{ username: string; is_online: boolean; last_seen?: number }> {
+    return this.http.get<{ username: string; is_online: boolean; last_seen?: number }>(
+      `${API_URL}/messages/presence`,
+      { params: new HttpParams().set('user', userName) }
+    );
+  }
+
   getChatHistory(withUser: string): Observable<any[]> {
     return this.http.get<any[]>(`${API_URL}/messages/history`, { params: new HttpParams().set('with_user', withUser) });
   }

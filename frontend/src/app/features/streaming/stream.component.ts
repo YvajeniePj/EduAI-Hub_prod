@@ -244,16 +244,13 @@ interface ChatMessage {
           </div>
 
           <div class="chat-input-bar">
-            <input id="streamFileInput" 
-                   #streamFileInput 
-                   type="file" 
-                   (change)="onFileSelected($event)" 
-                   style="position: absolute; left: -9999px; opacity: 0; width: 1px; height: 1px; pointer-events: none;" />
-            <label for="streamFileInput" 
-                   class="btn-stream-attach" 
-                   (click)="triggerFileInput($event)" 
+            <label class="btn-stream-attach" 
                    [class.disabled]="uploadingFile" 
                    title="Прикрепить файл или фото">
+              <input type="file" 
+                     (change)="onFileSelected($event)" 
+                     [disabled]="uploadingFile" 
+                     class="stream-native-file-input" />
               <mat-icon>attach_file</mat-icon>
             </label>
             <input 
@@ -880,6 +877,8 @@ interface ChatMessage {
 
     /* Attachment Styles in Stream Chat */
     .btn-stream-attach {
+      position: relative;
+      overflow: hidden;
       width: 38px;
       height: 38px;
       border-radius: 50%;
@@ -894,6 +893,16 @@ interface ChatMessage {
       flex-shrink: 0;
       user-select: none;
     }
+    .stream-native-file-input {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 2;
+    }
     .btn-stream-attach:hover {
       background: #f1f5f9;
       color: #09090b;
@@ -907,6 +916,8 @@ interface ChatMessage {
       font-size: 20px;
       width: 20px;
       height: 20px;
+      pointer-events: none;
+      z-index: 1;
     }
 
     /* Pending Attachment Chip */
@@ -1184,7 +1195,6 @@ export class StreamComponent implements OnInit, OnDestroy, AfterViewInit {
     messages: ChatMessage[] = [];
     newMessage: string = '';
 
-    @ViewChild('streamFileInput') streamFileInputRef?: ElementRef<HTMLInputElement>;
     selectedFile: File | null = null;
     selectedFilePreview: string | null = null;
     selectedFileIsImage: boolean = false;
@@ -1562,15 +1572,6 @@ export class StreamComponent implements OnInit, OnDestroy, AfterViewInit {
         }
     }
 
-    triggerFileInput(event?: MouseEvent) {
-        if (event) {
-            event.stopPropagation();
-        }
-        const input = this.streamFileInputRef?.nativeElement || (document.getElementById('streamFileInput') as HTMLInputElement);
-        if (input) {
-            input.click();
-        }
-    }
 
     onFileSelected(event: any) {
         const file = event.target?.files?.[0];

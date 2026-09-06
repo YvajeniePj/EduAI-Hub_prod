@@ -145,6 +145,7 @@ async def verify_jwt_token_keycloak(token: str) -> Optional[dict]:
 # In-memory cache for Keycloak -> Local user mapping
 # Key: Keycloak sub (UUID), Value: Local user dict
 _user_mapping_cache = {}
+_user_last_active = {}
 
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
     """Get current user from JWT token and link with internal DB"""
@@ -160,6 +161,9 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     # Check cache first
     if external_id in _user_mapping_cache:
         cached_user = _user_mapping_cache[external_id]
+        uname = cached_user.get("username")
+        if uname:
+            _user_last_active[uname] = time.time()
         # Refresh cache if older than 5 minutes (optional, but good for role updates)
         return cached_user
         
@@ -266,6 +270,9 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     
     # Cache it
     _user_mapping_cache[external_id] = internal_user
+    uname = internal_user.get("username")
+    if uname:
+        _user_last_active[uname] = time.time()
     return internal_user
 
 
@@ -1809,7 +1816,7 @@ async def get_dialogs(current_user: Optional[dict] = Depends(get_current_user)):
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to fetch dialogs")
 
-    # Enrich dialogs with avatars from submission-service
+    # Enrich dialogs with avatars from submission-service and online presence
     try:
         users_data, u_status, _ = await proxy_request(SUBMISSION_SERVICE_URL, "/users", "GET")
         if u_status == 200 and isinstance(users_data, list):
@@ -1820,7 +1827,28 @@ async def get_dialogs(current_user: Optional[dict] = Depends(get_current_user)):
     except Exception as e:
         logger.warning(f"Could not enrich dialog avatars: {e}")
 
+    now = time.time()
+    for d in data:
+        other_user = d.get("username")
+        last_active = _user_last_active.get(other_user, 0)
+        # Active in the last 90 seconds
+        d["is_online"] = (now - last_active) < 90
+        d["last_seen"] = int(last_active) if last_active > 0 else None
+
     return data
+
+
+@app.get("/messages/presence")
+async def get_user_presence(user: str = Query(...), current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    now = time.time()
+    last_active = _user_last_active.get(user, 0)
+    return {
+        "username": user,
+        "is_online": (now - last_active) < 90,
+        "last_seen": int(last_active) if last_active > 0 else None
+    }
 
 
 @app.get("/messages/history")
