@@ -116,6 +116,14 @@ export class ApiService {
     return this.http.post<any>(`${API_URL}/messages/mark-read`, {}, { params: new HttpParams().set('with_user', withUser) });
   }
 
+  clearChatHistory(withUser: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/messages/history`, { params: new HttpParams().set('with_user', withUser) });
+  }
+
+  deleteMessage(messageId: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/messages/${messageId}`);
+  }
+
   // Tests
   getTests(subjectId?: string): Observable<any[]> {
     let params = new HttpParams();

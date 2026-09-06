@@ -2,6 +2,7 @@
 Users router - Get list of users for group management
 """
 from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile, BackgroundTasks
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
@@ -23,7 +24,8 @@ async def get_users(search: Optional[str] = Query(None), db: Session = Depends(g
     query = db.query(User).filter(User.is_hidden_admin == False)
     
     if search:
-        query = query.filter(User.name.ilike(f"%{search}%"))
+        search_clean = search.strip().lower()
+        query = query.filter(func.lower(User.name).like(f"%{search_clean}%"))
     
     return query.all()
 

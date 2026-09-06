@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import List, Optional
 from urllib.parse import unquote
+import uuid
 
 from app.database import get_db
 from app.models import Message
@@ -126,3 +127,56 @@ async def mark_read(
 
     db.commit()
     return {"message": f"Marked {updated} messages as read"}
+
+
+@router.delete("/history")
+async def clear_history(
+    with_user: str = Query(..., description="The other user in the conversation"),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name"),
+    db: Session = Depends(get_db)
+):
+    """Delete all message history between current user and with_user"""
+    current_user = unquote(x_user_name) if x_user_name else None
+    if not current_user:
+        raise HTTPException(status_code=400, detail="X-User-Name header is required")
+
+    with_user_decoded = unquote(with_user)
+
+    deleted_count = db.query(Message).filter(
+        or_(
+            and_(Message.sender_name == current_user, Message.recipient_name == with_user_decoded),
+            and_(Message.sender_name == with_user_decoded, Message.recipient_name == current_user)
+        )
+    ).delete(synchronize_session=False)
+
+    db.commit()
+    return {"message": f"Deleted {deleted_count} messages", "deleted_count": deleted_count}
+
+
+@router.delete("/{message_id}")
+async def delete_single_message(
+    message_id: str,
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name"),
+    db: Session = Depends(get_db)
+):
+    """Delete a specific message by ID"""
+    current_user = unquote(x_user_name) if x_user_name else None
+    if not current_user:
+        raise HTTPException(status_code=400, detail="X-User-Name header is required")
+
+    try:
+        msg_uuid = uuid.UUID(message_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid message ID format")
+
+    message = db.query(Message).filter(Message.id == msg_uuid).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if message.sender_name != current_user and message.recipient_name != current_user:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this message")
+
+    db.delete(message)
+    db.commit()
+    return {"message": "Message deleted successfully"}
+

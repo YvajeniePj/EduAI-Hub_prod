@@ -11,10 +11,14 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { interval, Subscription, of } from 'rxjs';
-import { startWith, debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
+import { startWith, debounceTime, distinctUntilChanged, switchMap, catchError, map } from 'rxjs/operators';
 
 interface Dialog {
   username: string;
@@ -51,45 +55,53 @@ interface Message {
     MatProgressSpinnerModule,
     MatAutocompleteModule,
     MatBadgeModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatMenuModule,
+    MatDialogModule,
+    MatTooltipModule
   ],
   template: `
     <div class="chat-wrapper">
       <!-- Left sidebar: Dialogs list -->
       <div class="dialogs-sidebar">
         <div class="sidebar-header">
-          <h2>Сообщения</h2>
+          <h2 class="sidebar-title">Сообщения</h2>
         </div>
 
         <!-- Start new chat search box -->
         <div class="search-box">
-          <mat-form-field appearance="outline" class="search-field">
-            <mat-label>Начать новый чат...</mat-label>
-            <input matInput [formControl]="searchControl" [matAutocomplete]="auto" placeholder="Введите имя пользователя">
-            <mat-icon matSuffix>search</mat-icon>
-            <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onUserSelected($event)">
-              <mat-option *ngFor="let user of foundUsers" [value]="user.name">
-                <div class="user-option">
-                  <div class="avatar-mini" *ngIf="user.avatar_url">
-                    <img [src]="getAvatarUrl(user.avatar_url)" (error)="user.avatar_url = undefined" />
-                  </div>
-                  <div class="avatar-mini-placeholder" *ngIf="!user.avatar_url">
-                    <mat-icon>person</mat-icon>
-                  </div>
-                  <span>{{ user.name }}</span>
+          <div class="custom-search-pill">
+            <mat-icon class="search-icon">search</mat-icon>
+            <input 
+              type="text"
+              [formControl]="searchControl" 
+              [matAutocomplete]="auto" 
+              placeholder="Начать новый чат..."
+              class="search-input" />
+          </div>
+
+          <mat-autocomplete #auto="matAutocomplete" panelClass="search-autocomplete-panel" (optionSelected)="onUserSelected($event)">
+            <mat-option *ngFor="let user of foundUsers" [value]="user.name" class="search-user-option">
+              <div class="user-option-wrap">
+                <div class="avatar-mini" *ngIf="user.avatar_url && !avatarErrors.has(user.name)">
+                  <img [src]="getAvatarUrl(user.avatar_url)" (error)="avatarErrors.add(user.name)" />
                 </div>
-              </mat-option>
-              <mat-option *ngIf="foundUsers.length === 0 && searchControl.value" [disabled]="true">
-                Пользователи не найдены
-              </mat-option>
-            </mat-autocomplete>
-          </mat-form-field>
+                <div class="avatar-mini-initials" *ngIf="!user.avatar_url || avatarErrors.has(user.name)">
+                  {{ getInitials(user.name) }}
+                </div>
+                <span class="user-option-name">{{ user.name }}</span>
+              </div>
+            </mat-option>
+            <mat-option *ngIf="foundUsers.length === 0 && searchControl.value && searchControl.value.trim().length >= 1" [disabled]="true">
+              <span class="no-results-text">Пользователи не найдены</span>
+            </mat-option>
+          </mat-autocomplete>
         </div>
 
         <!-- List of dialogs -->
         <div class="dialogs-list">
           <div *ngIf="loadingDialogs" class="dialogs-spinner">
-            <mat-spinner diameter="35"></mat-spinner>
+            <mat-spinner diameter="32"></mat-spinner>
           </div>
 
           <div *ngIf="!loadingDialogs && dialogs.length === 0" class="empty-dialogs">
@@ -102,13 +114,16 @@ interface Message {
                [class.active]="selectedDialog?.username === dialog.username"
                (click)="selectDialog(dialog)">
             
+            <div class="active-indicator" *ngIf="selectedDialog?.username === dialog.username"></div>
+
             <div class="dialog-avatar">
               <div class="avatar-container" *ngIf="dialog.avatar_url && !avatarErrors.has(dialog.username)">
                 <img [src]="getAvatarUrl(dialog.avatar_url)" (error)="avatarErrors.add(dialog.username)" />
               </div>
-              <div class="avatar-placeholder" *ngIf="!dialog.avatar_url || avatarErrors.has(dialog.username)">
-                <mat-icon>person</mat-icon>
+              <div class="avatar-initials" *ngIf="!dialog.avatar_url || avatarErrors.has(dialog.username)">
+                {{ getInitials(dialog.username) }}
               </div>
+              <span class="status-dot online"></span>
             </div>
 
             <div class="dialog-info">
@@ -123,7 +138,12 @@ interface Message {
                   <span *ngIf="dialog.last_message_sender === currentUser?.name" class="you-label">Вы: </span>
                   {{ dialog.last_message_content || 'Нет сообщений' }}
                 </span>
-                <span class="unread-badge" *ngIf="dialog.unread_count > 0" [matBadge]="dialog.unread_count" matBadgeColor="warn"></span>
+                <div class="dialog-item-actions">
+                  <span class="unread-badge" *ngIf="dialog.unread_count > 0" [matBadge]="dialog.unread_count" matBadgeColor="warn"></span>
+                  <button type="button" class="btn-dialog-trash" (click)="openClearChatModal(dialog, $event)" title="Очистить чат">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -135,19 +155,30 @@ interface Message {
         <ng-container *ngIf="selectedDialog; else noSelectedDialog">
           <!-- Chat header -->
           <div class="chat-header">
-            <div class="chat-header-avatar">
-              <div class="avatar-container" *ngIf="selectedDialog.avatar_url && !avatarErrors.has(selectedDialog.username)">
-                <img [src]="getAvatarUrl(selectedDialog.avatar_url)" (error)="avatarErrors.add(selectedDialog.username)" />
+            <div class="chat-header-user">
+              <div class="chat-header-avatar">
+                <div class="avatar-container" *ngIf="selectedDialog.avatar_url && !avatarErrors.has(selectedDialog.username)">
+                  <img [src]="getAvatarUrl(selectedDialog.avatar_url)" (error)="avatarErrors.add(selectedDialog.username)" />
+                </div>
+                <div class="avatar-initials" *ngIf="!selectedDialog.avatar_url || avatarErrors.has(selectedDialog.username)">
+                  {{ getInitials(selectedDialog.username) }}
+                </div>
+                <span class="status-dot online"></span>
               </div>
-              <div class="avatar-placeholder" *ngIf="!selectedDialog.avatar_url || avatarErrors.has(selectedDialog.username)">
-                <mat-icon>person</mat-icon>
+              <div class="chat-header-info">
+                <span class="chat-title">{{ selectedDialog.username }}</span>
+                <span class="chat-status" [class.temp-chat]="selectedDialog.isTemp">
+                  <span class="status-dot-mini" [class.temp]="selectedDialog.isTemp"></span>
+                  {{ selectedDialog.isTemp ? 'Новый диалог' : 'в сети' }}
+                </span>
               </div>
             </div>
-            <div class="chat-header-info">
-              <span class="chat-title">{{ selectedDialog.username }}</span>
-              <span class="chat-status" [class.temp-chat]="selectedDialog.isTemp">
-                {{ selectedDialog.isTemp ? 'Новый диалог' : 'в сети' }}
-              </span>
+
+            <div class="chat-header-actions">
+              <button type="button" class="btn-clear-chat" (click)="openClearChatModal(selectedDialog)" title="Очистить историю чата">
+                <mat-icon>delete_outline</mat-icon>
+                <span>Очистить чат</span>
+              </button>
             </div>
           </div>
 
@@ -166,6 +197,13 @@ interface Message {
                    class="message-row"
                    [class.outgoing]="message.sender_name === currentUser?.name">
                 <div class="message-bubble">
+                  <button type="button" 
+                          *ngIf="message.id" 
+                          class="msg-delete-btn" 
+                          (click)="deleteSingleMessage(message, $event)" 
+                          title="Удалить сообщение">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
                   <div class="message-text">{{ message.content }}</div>
                   <div class="message-meta">
                     <span class="message-time">{{ formatMessageTime(message.created_at) }}</span>
@@ -177,23 +215,36 @@ interface Message {
                   </div>
                 </div>
               </div>
+
+              <!-- Typing indicator (3 dots wave) -->
+              <div class="typing-indicator-row" *ngIf="showTypingIndicator">
+                <div class="typing-bubble">
+                  <span class="typing-dot"></span>
+                  <span class="typing-dot"></span>
+                  <span class="typing-dot"></span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Message input bar -->
-          <div class="chat-input-bar">
-            <mat-form-field appearance="outline" class="input-field">
-              <input matInput 
+          <!-- Floating pill input bar -->
+          <div class="chat-pill-wrapper">
+            <div class="chat-pill-input-bar">
+              <input type="text" 
                      [(ngModel)]="newMessageContent" 
                      (keyup.enter)="sendChatMessage()"
                      placeholder="Напишите сообщение..."
-                     [disabled]="sending">
-            </mat-form-field>
-            <button mat-fab color="primary" 
-                    [disabled]="!newMessageContent.trim() || sending" 
-                    (click)="sendChatMessage()">
-              <mat-icon>send</mat-icon>
-            </button>
+                     [disabled]="sending"
+                     class="pill-input" />
+              <button type="button" 
+                      class="pill-send-btn" 
+                      [class.active]="!!newMessageContent.trim()" 
+                      [disabled]="!newMessageContent.trim() || sending" 
+                      (click)="sendChatMessage()"
+                      title="Отправить сообщение">
+                <mat-icon>arrow_upward</mat-icon>
+              </button>
+            </div>
           </div>
         </ng-container>
 
@@ -211,40 +262,117 @@ interface Message {
   styles: [`
     .chat-wrapper {
       display: flex;
-      height: calc(100vh - 120px);
-      background: #ffffff;
-      border: 1px solid #e0e0e0;
-      border-radius: 16px;
+      height: calc(100vh - 110px);
+      background: #fafafa;
+      border: 1px solid #eaeaea;
+      border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
 
     /* Sidebar styles */
     .dialogs-sidebar {
-      width: 320px;
-      border-right: 1px solid #e0e0e0;
+      width: 330px;
+      min-width: 330px;
+      border-right: 1px solid #eaeaea;
       display: flex;
       flex-direction: column;
-      background: #f8f9fa;
+      background: #ffffff;
     }
     .sidebar-header {
-      padding: 20px 20px 10px;
+      padding: 24px 20px 14px;
     }
-    .sidebar-header h2 {
+    .sidebar-title {
       margin: 0;
+      font-family: 'Newsreader', 'Playfair Display', Georgia, serif;
       font-weight: 500;
-      color: #202124;
-      font-size: 20px;
+      color: #111111;
+      font-size: 26px;
+      letter-spacing: -0.01em;
     }
     .search-box {
-      padding: 0 16px 10px;
+      padding: 0 16px 14px;
+      position: relative;
     }
-    .search-field {
+    .custom-search-pill {
+      display: flex;
+      align-items: center;
+      background: #ffffff;
+      border: 1px solid #dcdcdc;
+      border-radius: 12px;
+      padding: 8px 14px;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    }
+    .custom-search-pill:focus-within {
+      border-color: #111111;
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+    }
+    .search-icon {
+      color: #8e8e93;
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .search-input {
+      border: none;
+      outline: none;
+      background: transparent;
       width: 100%;
+      font-size: 14px;
+      color: #111111;
     }
-    ::ng-deep .search-field .mat-mdc-form-field-subscript-wrapper {
-      display: none;
+    .search-input::placeholder {
+      color: #8e8e93;
     }
+
+    /* Autocomplete dropdown styles with slide down + fade */
+    ::ng-deep .search-autocomplete-panel {
+      animation: dropdownSlideFade 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      border-radius: 16px !important;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08) !important;
+      border: 1px solid #eaeaea !important;
+      overflow: hidden !important;
+      background: #ffffff !important;
+      margin-top: 6px !important;
+      padding: 6px 0 !important;
+    }
+    @keyframes dropdownSlideFade {
+      0% {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .user-option-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 4px 0;
+    }
+    .user-option-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #111111;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .no-results-text {
+      font-size: 13px;
+      color: #8e8e93;
+    }
+
     .dialogs-list {
       flex: 1;
       overflow-y: auto;
@@ -256,59 +384,149 @@ interface Message {
     }
     .empty-dialogs {
       text-align: center;
-      padding: 40px 20px;
-      color: #5f6368;
+      padding: 48px 20px;
+      color: #8e8e93;
     }
     .empty-dialogs mat-icon {
-      font-size: 48px;
-      width: 48px;
-      height: 48px;
+      font-size: 40px;
+      width: 40px;
+      height: 40px;
       margin-bottom: 8px;
+      color: #d1d5db;
     }
+
     .dialog-item {
+      position: relative;
       display: flex;
+      align-items: center;
       padding: 12px 16px;
       gap: 12px;
       cursor: pointer;
-      transition: background 0.2s;
-      border-bottom: 1px solid #f1f3f4;
+      transition: background 0.15s ease;
+      border-bottom: 1px solid #f7f7f8;
     }
     .dialog-item:hover {
-      background: #f1f3f4;
+      background: #f9fafb;
     }
     .dialog-item.active {
-      background: #e8f0fe;
+      background: #f0f0f2;
     }
+    .active-indicator {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: #111111;
+      border-radius: 0 2px 2px 0;
+    }
+
     .dialog-avatar {
       position: relative;
+      flex-shrink: 0;
     }
-    .avatar-container, .avatar-placeholder {
+    .avatar-container, .avatar-initials {
       width: 44px;
       height: 44px;
+      min-width: 44px;
+      min-height: 44px;
+      max-width: 44px;
+      max-height: 44px;
+      aspect-ratio: 1 / 1;
       border-radius: 50%;
       overflow: hidden;
-      background: #e0e0e0;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
+      box-sizing: border-box;
+    }
+    .avatar-container {
+      background: #f4f4f5;
     }
     .avatar-container img {
       width: 100%;
       height: 100%;
+      aspect-ratio: 1 / 1;
       object-fit: cover;
+      display: block;
+      border-radius: 50%;
     }
-    .avatar-placeholder mat-icon {
-      color: #757575;
-      font-size: 24px;
-      width: 24px;
-      height: 24px;
+    .avatar-initials {
+      background: #e4e4e7;
+      color: #3f3f46;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
     }
+
+    .avatar-mini, .avatar-mini-initials {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      min-height: 32px;
+      max-width: 32px;
+      max-height: 32px;
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-sizing: border-box;
+    }
+    .avatar-mini {
+      background: #f4f4f5;
+    }
+    .avatar-mini img {
+      width: 100%;
+      height: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      display: block;
+      border-radius: 50%;
+    }
+    .avatar-mini-initials {
+      background: #e4e4e7;
+      color: #3f3f46;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* Online status pulsating dot */
+    .status-dot {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      background: #22c55e;
+      z-index: 1;
+    }
+    .status-dot.online {
+      animation: pulseAura 2s infinite ease-in-out;
+    }
+    @keyframes pulseAura {
+      0% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+      }
+    }
+
     .dialog-info {
       flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 4px;
+      gap: 3px;
       overflow: hidden;
     }
     .dialog-row {
@@ -319,34 +537,65 @@ interface Message {
     }
     .dialog-name {
       font-weight: 500;
-      color: #202124;
+      color: #111111;
+      font-size: 14px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .dialog-time {
       font-size: 11px;
-      color: #70757a;
+      color: #8e8e93;
       white-space: nowrap;
     }
     .dialog-preview {
       font-size: 13px;
-      color: #5f6368;
+      color: #71717a;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 180px;
+      max-width: 170px;
     }
     .dialog-preview.unread {
-      color: #202124;
-      font-weight: 500;
+      color: #111111;
+      font-weight: 600;
     }
     .you-label {
-      color: #1a73e8;
+      color: #71717a;
       font-weight: 500;
     }
+    .dialog-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-dialog-trash {
+      opacity: 0;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 3px;
+      color: #9ca3af;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .btn-dialog-trash mat-icon {
+      font-size: 17px;
+      width: 17px;
+      height: 17px;
+    }
+    .dialog-item:hover .btn-dialog-trash {
+      opacity: 1;
+    }
+    .btn-dialog-trash:hover {
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.08);
+    }
     .unread-badge {
-      margin-right: 12px;
+      margin-right: 4px;
     }
 
     /* Right Chat Pane styles */
@@ -354,46 +603,112 @@ interface Message {
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: #f1f3f4;
+      background: #fafafa;
+      position: relative;
     }
     .chat-header {
       background: #ffffff;
-      padding: 12px 24px;
-      border-bottom: 1px solid #e0e0e0;
+      padding: 14px 28px;
+      border-bottom: 1px solid #eaeaea;
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 16px;
     }
+    .chat-header-user {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .chat-header-avatar {
+      position: relative;
+    }
     .chat-header-avatar .avatar-container, 
-    .chat-header-avatar .avatar-placeholder {
+    .chat-header-avatar .avatar-initials {
       width: 40px;
       height: 40px;
+      min-width: 40px;
+      min-height: 40px;
+      max-width: 40px;
+      max-height: 40px;
+      font-size: 13px;
     }
     .chat-header-info {
       display: flex;
       flex-direction: column;
+      gap: 2px;
     }
     .chat-title {
-      font-weight: 500;
-      color: #202124;
-      font-size: 16px;
+      font-weight: 600;
+      color: #111111;
+      font-size: 15px;
     }
     .chat-status {
       font-size: 12px;
-      color: #34a853;
+      color: #22c55e;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .status-dot-mini {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+      display: inline-block;
+    }
+    .status-dot-mini.temp {
+      background: #f59e0b;
     }
     .chat-status.temp-chat {
-      color: #fbbc05;
+      color: #f59e0b;
     }
+    .btn-clear-chat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-clear-chat mat-icon {
+      font-size: 17px;
+      width: 17px;
+      height: 17px;
+    }
+    .btn-clear-chat:hover {
+      border-color: #fca5a5;
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    /* Messages stream & Animation */
     .chat-messages-container {
       flex: 1;
       overflow-y: auto;
-      padding: 24px;
+      padding: 24px 32px;
+      animation: chatFadeIn 0.25s ease-out;
+    }
+    @keyframes chatFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
     .messages-list {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
     .history-spinner {
       display: flex;
@@ -402,8 +717,9 @@ interface Message {
     }
     .empty-messages {
       text-align: center;
-      padding: 40px;
-      color: #5f6368;
+      padding: 60px 20px;
+      color: #8e8e93;
+      font-size: 14px;
     }
     .message-row {
       display: flex;
@@ -413,114 +729,264 @@ interface Message {
     .message-row.outgoing {
       justify-content: flex-end;
     }
+
+    /* Message bubbles with Spring animation */
+    @keyframes messageSpring {
+      0% {
+        opacity: 0;
+        transform: translateY(16px) scale(0.94);
+      }
+      60% {
+        opacity: 1;
+        transform: translateY(-2px) scale(1.01);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
     .message-bubble {
-      max-width: 65%;
-      padding: 10px 16px;
-      border-radius: 16px;
-      background: #ffffff;
-      color: #202124;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
       position: relative;
+      max-width: 65%;
+      padding: 10px 18px;
       display: flex;
       flex-direction: column;
       gap: 4px;
+      animation: messageSpring 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
     }
+
+    /* Outgoing: Dark #111, radius: 18px 18px 4px 18px */
     .message-row.outgoing .message-bubble {
-      background: #e8f0fe;
-      border-bottom-right-radius: 4px;
+      background: #111111;
+      color: #ffffff;
+      border-radius: 18px 18px 4px 18px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
     }
+
+    /* Incoming: Glass white with backdrop-blur, radius: 18px 18px 18px 4px */
     .message-row:not(.outgoing) .message-bubble {
-      border-bottom-left-radius: 4px;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: #111111;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      border-radius: 18px 18px 18px 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
     }
+
     .message-text {
       font-size: 14px;
       line-height: 1.5;
       word-break: break-word;
       white-space: pre-wrap;
     }
+
+    /* Time and read receipts appear ONLY ON HOVER */
     .message-meta {
       display: flex;
       align-self: flex-end;
       align-items: center;
       gap: 4px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      height: 14px;
     }
+    .message-bubble:hover .message-meta {
+      opacity: 1;
+    }
+
     .message-time {
       font-size: 10px;
-      color: #70757a;
     }
+    .message-row.outgoing .message-time {
+      color: #9ca3af;
+    }
+    .message-row:not(.outgoing) .message-time {
+      color: #8e8e93;
+    }
+
     .message-status-icon {
+      font-size: 13px;
+      width: 13px;
+      height: 13px;
+      color: #9ca3af;
+    }
+    .message-status-icon.read {
+      color: #38bdf8;
+    }
+
+    /* Delete message icon button on hover */
+    .msg-delete-btn {
+      position: absolute;
+      top: -10px;
+      background: #ffffff;
+      border: 1px solid #eaeaea;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #9ca3af;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      opacity: 0;
+      transition: all 0.15s ease;
+      z-index: 2;
+    }
+    .message-row.outgoing .msg-delete-btn {
+      left: -12px;
+    }
+    .message-row:not(.outgoing) .msg-delete-btn {
+      right: -12px;
+    }
+    .message-bubble:hover .msg-delete-btn {
+      opacity: 0.85;
+    }
+    .msg-delete-btn:hover {
+      opacity: 1 !important;
+      color: #ef4444;
+      transform: scale(1.1);
+    }
+    .msg-delete-btn mat-icon {
       font-size: 14px;
       width: 14px;
       height: 14px;
-      color: #5f6368;
     }
-    .message-status-icon.read {
-      color: #1a73e8;
+
+    /* Typing indicator: 3 bouncing dots wave */
+    .typing-indicator-row {
+      display: flex;
+      width: 100%;
+      justify-content: flex-start;
+      margin-top: 4px;
+      animation: messageSpring 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
     }
-    .chat-input-bar {
+    .typing-bubble {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      border-radius: 18px 18px 18px 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #71717a;
+      display: inline-block;
+      animation: typingWave 1.4s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(1) { animation-delay: 0s; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typingWave {
+      0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.35;
+      }
+      30% {
+        transform: translateY(-5px);
+        opacity: 1;
+      }
+    }
+
+    /* Floating Pill Input Bar */
+    .chat-pill-wrapper {
+      padding: 14px 28px 20px;
+      background: transparent;
+      display: flex;
+      justify-content: center;
+    }
+    .chat-pill-input-bar {
+      width: 100%;
       background: #ffffff;
-      padding: 16px 24px;
-      border-top: 1px solid #e0e0e0;
+      border: 1px solid #e5e7eb;
+      border-radius: 9999px;
+      padding: 6px 10px 6px 20px;
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      transition: all 0.2s ease;
     }
-    .input-field {
+    .chat-pill-input-bar:focus-within {
+      border-color: #111111;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+    }
+    .pill-input {
       flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 14px;
+      color: #111111;
+      padding: 6px 0;
     }
-    ::ng-deep .input-field .mat-mdc-form-field-subscript-wrapper {
-      display: none;
+    .pill-input::placeholder {
+      color: #8e8e93;
     }
+
+    /* Send button: scale up on text, scale on hover */
+    .pill-send-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #111111;
+      color: #ffffff;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s, opacity 0.2s;
+      transform: scale(0.85);
+      opacity: 0.45;
+    }
+    .pill-send-btn.active {
+      transform: scale(1);
+      opacity: 1;
+    }
+    .pill-send-btn.active:hover {
+      transform: scale(1.12);
+      background: #000000;
+    }
+    .pill-send-btn mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Placeholder when no chat is selected */
     .no-chat-selected {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       height: 100%;
-      color: #5f6368;
+      color: #8e8e93;
       text-align: center;
       padding: 40px;
     }
     .no-chat-selected mat-icon {
-      font-size: 72px;
-      width: 72px;
-      height: 72px;
-      color: #bdc1c6;
+      font-size: 64px;
+      width: 64px;
+      height: 64px;
+      color: #d1d5db;
       margin-bottom: 16px;
     }
     .no-chat-selected h3 {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 500;
       margin: 0 0 8px;
-      color: #202124;
-    }
-
-    /* Autocomplete user option styles */
-    .user-option {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .avatar-mini, .avatar-mini-placeholder {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      overflow: hidden;
-      background: #e0e0e0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .avatar-mini img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .avatar-mini-placeholder mat-icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-      color: #757575;
+      color: #111111;
     }
   `]
 })
@@ -540,6 +1006,8 @@ export class P2pChatComponent implements OnInit, OnDestroy {
   searchControl = new FormControl('');
   foundUsers: any[] = [];
   avatarErrors = new Set<string>();
+  showTypingIndicator: boolean = false;
+  private typingTimer?: any;
 
   private pollingSub?: Subscription;
   private routeParamSub?: Subscription;
@@ -550,27 +1018,33 @@ export class P2pChatComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private snackBar: MatSnackBar,
+    private dialog: MatDialog,
     private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
     this.currentUser = this.authService.getCurrentUser();
 
-    // Set up user search autocomplete
+    // Set up user search autocomplete (triggers from 1st character)
     this.searchControl.valueChanges.pipe(
-      debounceTime(300),
+      debounceTime(200),
       distinctUntilChanged(),
       switchMap(value => {
-        if (typeof value === 'string' && value.trim().length > 1) {
-          return this.apiService.getUsers(value.trim()).pipe(
+        const query = typeof value === 'string' ? value.trim() : '';
+        if (query.length >= 1) {
+          const queryLower = query.toLowerCase();
+          return this.apiService.getUsers(query).pipe(
+            map(users => users.filter((u: any) => 
+              u.name !== this.currentUser?.name && 
+              u.name.toLowerCase().includes(queryLower)
+            )),
             catchError(() => of([]))
           );
         }
         return of([]);
       })
     ).subscribe(users => {
-      // Exclude current user from search
-      this.foundUsers = users.filter((u: any) => u.name !== this.currentUser?.name);
+      this.foundUsers = users;
       this.cdr.markForCheck();
     });
 
@@ -680,6 +1154,8 @@ export class P2pChatComponent implements OnInit, OnDestroy {
   selectDialog(dialog: Dialog) {
     this.selectedDialog = dialog;
     this.messages = [];
+    this.showTypingIndicator = false;
+    clearTimeout(this.typingTimer);
     this.loadingHistory = true;
     
     // Clear route query params silently to clean url
@@ -792,6 +1268,20 @@ export class P2pChatComponent implements OnInit, OnDestroy {
     this.messages.push(tempMsg);
     this.scrollToBottom();
 
+    // Trigger typing indicator 800ms after sending to simulate response/reading
+    clearTimeout(this.typingTimer);
+    this.typingTimer = setTimeout(() => {
+      if (this.selectedDialog?.username === recipient) {
+        this.showTypingIndicator = true;
+        this.scrollToBottom();
+        this.cdr.markForCheck();
+        setTimeout(() => {
+          this.showTypingIndicator = false;
+          this.cdr.markForCheck();
+        }, 2200);
+      }
+    }, 800);
+
     // Call API
     this.apiService.sendMessage(recipient, content).subscribe({
       next: (res) => {
@@ -819,6 +1309,80 @@ export class P2pChatComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       }
     });
+  }
+
+  openClearChatModal(dialog: Dialog | null, event?: Event) {
+    if (event) event.stopPropagation();
+    if (!dialog) return;
+
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Очистить историю чата?',
+        message: `Вы действительно хотите удалить все сообщения в диалоге с ${dialog.username}? Это действие нельзя отменить.`,
+        confirmText: 'Удалить',
+        cancelText: 'Отмена',
+        isDestructive: true,
+        icon: 'delete_forever'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(confirmed => {
+      if (confirmed) {
+        this.clearChat(dialog);
+      }
+    });
+  }
+
+  clearChat(dialog: Dialog) {
+    this.apiService.clearChatHistory(dialog.username).subscribe({
+      next: () => {
+        this.snackBar.open(`Чат с ${dialog.username} очищен`, 'OK', { duration: 3000 });
+        this.dialogs = this.dialogs.filter(d => d.username !== dialog.username);
+        if (this.selectedDialog?.username === dialog.username) {
+          this.messages = [];
+          this.selectedDialog = null;
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error clearing chat:', err);
+        this.snackBar.open('Не удалось очистить чат: ' + (err.error?.detail || err.message), 'OK', { duration: 3000 });
+      }
+    });
+  }
+
+  deleteSingleMessage(message: Message, event: Event) {
+    event.stopPropagation();
+    if (!message.id) return;
+
+    this.apiService.deleteMessage(message.id).subscribe({
+      next: () => {
+        this.messages = this.messages.filter(m => m.id !== message.id);
+        if (this.selectedDialog && this.messages.length > 0) {
+          const last = this.messages[this.messages.length - 1];
+          this.selectedDialog.last_message_content = last.content;
+          this.selectedDialog.last_message_time = last.created_at;
+          this.selectedDialog.last_message_sender = last.sender_name;
+        } else if (this.selectedDialog) {
+          this.selectedDialog.last_message_content = '';
+        }
+        this.snackBar.open('Сообщение удалено', 'OK', { duration: 2000 });
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error deleting message:', err);
+        this.snackBar.open('Не удалось удалить сообщение', 'OK', { duration: 3000 });
+      }
+    });
+  }
+
+  getInitials(name: string | undefined): string {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
   }
 
   onUserSelected(event: any) {

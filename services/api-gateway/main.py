@@ -988,8 +988,11 @@ async def delete_submission(submission_id: str, current_user: dict = Depends(get
 
 # Users (handled in submission-service)
 @app.get("/users")
-async def get_users():
-    data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, "/users", "GET")
+async def get_users(search: Optional[str] = None):
+    params = {}
+    if search:
+        params["search"] = search
+    data, status, error = await proxy_request(SUBMISSION_SERVICE_URL, "/users", "GET", params=params)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to fetch users")
     return data
@@ -1832,6 +1835,32 @@ async def mark_messages_read(with_user: str, current_user: Optional[dict] = Depe
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to mark messages as read")
     return data
+
+
+@app.delete("/messages/history")
+async def clear_chat_history(with_user: str, current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    encoded_name = quote(current_user["username"])
+    headers = {"X-User-Name": encoded_name}
+    params = {"with_user": with_user}
+    data, status, error = await proxy_request(NOTIFICATION_SERVICE_URL, "/messages/history", "DELETE", params=params, headers=headers)
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to clear chat history")
+    return data
+
+
+@app.delete("/messages/{message_id}")
+async def delete_message(message_id: str, current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    encoded_name = quote(current_user["username"])
+    headers = {"X-User-Name": encoded_name}
+    data, status, error = await proxy_request(NOTIFICATION_SERVICE_URL, f"/messages/{message_id}", "DELETE", headers=headers)
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to delete message")
+    return data
+
 
 
 # Feedback Service Routes
