@@ -176,3 +176,39 @@ async def upload_news_image(file: UploadFile = File(...)):
         
     image_url = f"/static/news/{file_name}"
     return {"image_url": image_url}
+
+
+@router.post("/messages/upload")
+async def upload_chat_file(file: UploadFile = File(...)):
+    """Upload chat attachment (photo, document, file) to static storage"""
+    import uuid
+    import os
+    from pathlib import Path
+    import shutil
+
+    chat_dir = Path("static/chat")
+    chat_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod("static/chat", 0o777)
+    except:
+        pass
+
+    file_extension = Path(file.filename).suffix
+    unique_id = uuid.uuid4()
+    file_name = f"{unique_id}{file_extension}"
+    file_path = chat_dir / file_name
+
+    file.file.seek(0)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    file_size = os.path.getsize(file_path)
+    file_url = f"/static/chat/{file_name}"
+
+    return {
+        "url": file_url,
+        "file_name": file.filename,
+        "content_type": file.content_type or "application/octet-stream",
+        "size": file_size
+    }
+

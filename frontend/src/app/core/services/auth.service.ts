@@ -78,6 +78,7 @@ export class AuthService {
         this.tokenSubject.next(mockData.token);
         this.isInitializedSubject.next(true);
         console.log('Mock student user loaded from storage:', mockData.user.name);
+        this.syncUserWithBackend(mockData.user).subscribe();
       } catch (e) {
         localStorage.removeItem('mockUser');
         this.loadOidcUser();
@@ -191,14 +192,25 @@ export class AuthService {
         const current = fallbackUser || this.currentUserSubject.value;
         if (current) {
           const effectiveAvatar = backendUser.avatar_url || current.avatar_url;
-          this.currentUserSubject.next({
+          const updatedUser: CurrentUser = {
             ...current,
             id: backendUser.user_id,
             name: backendUser.username || current.name,
             role: backendUser.role,
             avatar_url: effectiveAvatar,
             is_hidden_admin: backendUser.is_hidden_admin || false
-          });
+          };
+          this.currentUserSubject.next(updatedUser);
+
+          // Update localStorage mockUser if present so avatar persists on reload
+          const mockUserStr = localStorage.getItem('mockUser');
+          if (mockUserStr) {
+            try {
+              const mockData = JSON.parse(mockUserStr);
+              mockData.user = updatedUser;
+              localStorage.setItem('mockUser', JSON.stringify(mockData));
+            } catch (e) {}
+          }
 
           // If backend has no avatar, but frontend got one from Keycloak profile, sync it to backend
           if (!backendUser.avatar_url && current.avatar_url && backendUser.user_id) {

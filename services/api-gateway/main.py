@@ -1808,6 +1808,18 @@ async def get_dialogs(current_user: Optional[dict] = Depends(get_current_user)):
     data, status, error = await proxy_request(NOTIFICATION_SERVICE_URL, "/messages/dialogs", "GET", headers=headers)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to fetch dialogs")
+
+    # Enrich dialogs with avatars from submission-service
+    try:
+        users_data, u_status, _ = await proxy_request(SUBMISSION_SERVICE_URL, "/users", "GET")
+        if u_status == 200 and isinstance(users_data, list):
+            avatar_map = {u["name"]: u.get("avatar_url") for u in users_data if "name" in u}
+            for d in data:
+                if not d.get("avatar_url") and d.get("username") in avatar_map:
+                    d["avatar_url"] = avatar_map[d["username"]]
+    except Exception as e:
+        logger.warning(f"Could not enrich dialog avatars: {e}")
+
     return data
 
 
@@ -1860,6 +1872,43 @@ async def delete_message(message_id: str, current_user: Optional[dict] = Depends
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to delete message")
     return data
+
+
+@app.post("/messages/upload")
+async def upload_chat_attachment(file: UploadFile = File(...), current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            file_content = await file.read()
+            files = {'file': (file.filename, file_content, file.content_type or "application/octet-stream")}
+            response = await client.post(
+                f"{SUBMISSION_SERVICE_URL}/messages/upload",
+                files=files
+            )
+            if response.status_code >= 400:
+                raise HTTPException(status_code=response.status_code, detail=response.text)
+            return response.json()
+    except httpx.RequestError as e:
+        logger.error(f"Request error to submission service for chat file upload: {e}")
+        raise HTTPException(status_code=503, detail="Submission service unavailable")
+
+
+@app.get("/static/chat/{filename}")
+async def get_chat_static_file(filename: str):
+    """Proxy chat attachment files from submission-service"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{SUBMISSION_SERVICE_URL}/static/chat/{filename}")
+            if response.status_code == 200:
+                content_type = response.headers.get("content-type", "application/octet-stream")
+                return Response(content=response.content, media_type=content_type)
+            else:
+                raise HTTPException(status_code=response.status_code, detail="Chat file not found")
+    except httpx.RequestError as e:
+        logger.error(f"Request error to submission service for chat file: {e}")
+        raise HTTPException(status_code=503, detail="Submission service unavailable")
+
 
 
 

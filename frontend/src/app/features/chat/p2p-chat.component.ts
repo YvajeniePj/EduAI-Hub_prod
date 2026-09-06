@@ -30,6 +30,18 @@ interface Dialog {
   isTemp?: boolean;
 }
 
+interface ChatAttachment {
+  url: string;
+  file_name: string;
+  content_type: string;
+  size: number;
+}
+
+interface ParsedMessageContent {
+  text: string;
+  attachment?: ChatAttachment;
+}
+
 interface Message {
   id?: string;
   sender_name: string;
@@ -38,6 +50,7 @@ interface Message {
   is_read: boolean;
   created_at: Date;
 }
+
 
 @Component({
   selector: 'app-p2p-chat',
@@ -83,10 +96,10 @@ interface Message {
           <mat-autocomplete #auto="matAutocomplete" panelClass="search-autocomplete-panel" (optionSelected)="onUserSelected($event)">
             <mat-option *ngFor="let user of foundUsers" [value]="user.name" class="search-user-option">
               <div class="user-option-wrap">
-                <div class="avatar-mini" *ngIf="user.avatar_url && !avatarErrors.has(user.name)">
-                  <img [src]="getAvatarUrl(user.avatar_url)" (error)="avatarErrors.add(user.name)" />
+                <div class="avatar-mini" *ngIf="getResolvedAvatar(user.name, user.avatar_url) && !avatarErrors.has(user.name)">
+                  <img [src]="getAvatarUrl(getResolvedAvatar(user.name, user.avatar_url))" (error)="avatarErrors.add(user.name)" />
                 </div>
-                <div class="avatar-mini-initials" *ngIf="!user.avatar_url || avatarErrors.has(user.name)">
+                <div class="avatar-mini-initials" *ngIf="!getResolvedAvatar(user.name, user.avatar_url) || avatarErrors.has(user.name)">
                   {{ getInitials(user.name) }}
                 </div>
                 <span class="user-option-name">{{ user.name }}</span>
@@ -117,10 +130,10 @@ interface Message {
             <div class="active-indicator" *ngIf="selectedDialog?.username === dialog.username"></div>
 
             <div class="dialog-avatar">
-              <div class="avatar-container" *ngIf="dialog.avatar_url && !avatarErrors.has(dialog.username)">
-                <img [src]="getAvatarUrl(dialog.avatar_url)" (error)="avatarErrors.add(dialog.username)" />
+              <div class="avatar-container" *ngIf="getResolvedAvatar(dialog.username, dialog.avatar_url) && !avatarErrors.has(dialog.username)">
+                <img [src]="getAvatarUrl(getResolvedAvatar(dialog.username, dialog.avatar_url))" (error)="avatarErrors.add(dialog.username)" />
               </div>
-              <div class="avatar-initials" *ngIf="!dialog.avatar_url || avatarErrors.has(dialog.username)">
+              <div class="avatar-initials" *ngIf="!getResolvedAvatar(dialog.username, dialog.avatar_url) || avatarErrors.has(dialog.username)">
                 {{ getInitials(dialog.username) }}
               </div>
               <span class="status-dot online"></span>
@@ -136,7 +149,7 @@ interface Message {
               <div class="dialog-row">
                 <span class="dialog-preview" [class.unread]="dialog.unread_count > 0">
                   <span *ngIf="dialog.last_message_sender === currentUser?.name" class="you-label">Вы: </span>
-                  {{ dialog.last_message_content || 'Нет сообщений' }}
+                  {{ getDialogPreviewText(dialog.last_message_content) }}
                 </span>
                 <div class="dialog-item-actions">
                   <span class="unread-badge" *ngIf="dialog.unread_count > 0" [matBadge]="dialog.unread_count" matBadgeColor="warn"></span>
@@ -157,10 +170,10 @@ interface Message {
           <div class="chat-header">
             <div class="chat-header-user">
               <div class="chat-header-avatar">
-                <div class="avatar-container" *ngIf="selectedDialog.avatar_url && !avatarErrors.has(selectedDialog.username)">
-                  <img [src]="getAvatarUrl(selectedDialog.avatar_url)" (error)="avatarErrors.add(selectedDialog.username)" />
+                <div class="avatar-container" *ngIf="getResolvedAvatar(selectedDialog.username, selectedDialog.avatar_url) && !avatarErrors.has(selectedDialog.username)">
+                  <img [src]="getAvatarUrl(getResolvedAvatar(selectedDialog.username, selectedDialog.avatar_url))" (error)="avatarErrors.add(selectedDialog.username)" />
                 </div>
-                <div class="avatar-initials" *ngIf="!selectedDialog.avatar_url || avatarErrors.has(selectedDialog.username)">
+                <div class="avatar-initials" *ngIf="!getResolvedAvatar(selectedDialog.username, selectedDialog.avatar_url) || avatarErrors.has(selectedDialog.username)">
                   {{ getInitials(selectedDialog.username) }}
                 </div>
                 <span class="status-dot online"></span>
@@ -193,7 +206,7 @@ interface Message {
                 <p>Напишите первое сообщение, чтобы начать диалог</p>
               </div>
 
-              <div *ngFor="let message of messages; let idx = index" 
+              <div *ngFor="let message of messages; let idx = index; trackBy: trackByMessageId" 
                    class="message-row"
                    [class.outgoing]="message.sender_name === currentUser?.name">
                 <div class="message-bubble">
@@ -204,7 +217,39 @@ interface Message {
                           title="Удалить сообщение">
                     <mat-icon>delete_outline</mat-icon>
                   </button>
-                  <div class="message-text">{{ message.content }}</div>
+
+                  <ng-container *ngIf="parseMessage(message.content) as parsed">
+                    <!-- Photo attachment -->
+                    <div *ngIf="parsed.attachment && isImageAttachment(parsed.attachment)" class="msg-image-wrap">
+                      <img [src]="getAttachmentUrl(parsed.attachment.url)" 
+                           [alt]="parsed.attachment.file_name"
+                           class="msg-image-thumb"
+                           (click)="openImageModal(getAttachmentUrl(parsed.attachment.url))" />
+                    </div>
+
+                    <!-- File / Document attachment -->
+                    <a *ngIf="parsed.attachment && !isImageAttachment(parsed.attachment)" 
+                       [href]="getAttachmentUrl(parsed.attachment.url)" 
+                       [download]="parsed.attachment.file_name"
+                       target="_blank"
+                       class="msg-file-card"
+                       [class.outgoing-file]="message.sender_name === currentUser?.name">
+                      <div class="file-icon-box">
+                        <mat-icon>insert_drive_file</mat-icon>
+                      </div>
+                      <div class="file-card-info">
+                        <span class="file-card-name" [title]="parsed.attachment.file_name">{{ parsed.attachment.file_name }}</span>
+                        <span class="file-card-size">{{ formatFileSize(parsed.attachment.size) }}</span>
+                      </div>
+                      <div class="file-download-btn">
+                        <mat-icon>download</mat-icon>
+                      </div>
+                    </a>
+
+                    <!-- Text content -->
+                    <div class="message-text" *ngIf="parsed.text">{{ parsed.text }}</div>
+                  </ng-container>
+
                   <div class="message-meta">
                     <span class="message-time">{{ formatMessageTime(message.created_at) }}</span>
                     <mat-icon *ngIf="message.sender_name === currentUser?.name" 
@@ -227,22 +272,49 @@ interface Message {
             </div>
           </div>
 
-          <!-- Floating pill input bar -->
+          <!-- Floating pill input bar & attachment preview -->
           <div class="chat-pill-wrapper">
+            <!-- Pending attachment preview card -->
+            <div class="attachment-preview-bar" *ngIf="selectedFile">
+              <div class="attachment-chip">
+                <div class="attachment-thumb" *ngIf="selectedFileIsImage && selectedFilePreview">
+                  <img [src]="selectedFilePreview" alt="preview" />
+                </div>
+                <mat-icon *ngIf="!selectedFileIsImage" class="attachment-file-icon">insert_drive_file</mat-icon>
+                <div class="attachment-details">
+                  <span class="attachment-name">{{ selectedFile.name }}</span>
+                  <span class="attachment-size">{{ formatFileSize(selectedFile.size) }}</span>
+                </div>
+                <button type="button" class="attachment-remove-btn" (click)="removeSelectedFile()" title="Удалить прикрепленный файл">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+            </div>
+
             <div class="chat-pill-input-bar">
+              <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;" />
+              <button type="button" 
+                      class="pill-attach-btn" 
+                      (click)="fileInput.click()" 
+                      [disabled]="sending" 
+                      title="Прикрепить файл или фото">
+                <mat-icon>attach_file</mat-icon>
+              </button>
               <input type="text" 
                      [(ngModel)]="newMessageContent" 
                      (keyup.enter)="sendChatMessage()"
+                     (paste)="onPaste($event)"
                      placeholder="Напишите сообщение..."
                      [disabled]="sending"
                      class="pill-input" />
               <button type="button" 
                       class="pill-send-btn" 
-                      [class.active]="!!newMessageContent.trim()" 
-                      [disabled]="!newMessageContent.trim() || sending" 
+                      [class.active]="!!newMessageContent.trim() || !!selectedFile" 
+                      [disabled]="(!newMessageContent.trim() && !selectedFile) || sending" 
                       (click)="sendChatMessage()"
                       title="Отправить сообщение">
-                <mat-icon>arrow_upward</mat-icon>
+                <mat-spinner diameter="18" *ngIf="sending" class="send-spinner"></mat-spinner>
+                <mat-icon *ngIf="!sending">arrow_upward</mat-icon>
               </button>
             </div>
           </div>
@@ -257,17 +329,32 @@ interface Message {
           </div>
         </ng-template>
       </div>
+
+      <!-- Full-screen Image Modal Preview -->
+      <div class="image-modal-overlay" *ngIf="selectedModalImage" (click)="selectedModalImage = null">
+        <div class="image-modal-content" (click)="$event.stopPropagation()">
+          <img [src]="selectedModalImage" class="modal-large-img" />
+          <button type="button" class="modal-close-btn" (click)="selectedModalImage = null" title="Закрыть">
+            <mat-icon>close</mat-icon>
+          </button>
+          <a [href]="selectedModalImage" download target="_blank" class="modal-download-btn" title="Открыть в полном размере">
+            <mat-icon>open_in_new</mat-icon>
+          </a>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
     .chat-wrapper {
       display: flex;
       height: calc(100vh - 110px);
-      background: #fafafa;
-      border: 1px solid #eaeaea;
+      background: rgba(255, 255, 255, 0.45);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
       border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
 
@@ -275,10 +362,12 @@ interface Message {
     .dialogs-sidebar {
       width: 330px;
       min-width: 330px;
-      border-right: 1px solid #eaeaea;
+      border-right: 1px solid rgba(0, 0, 0, 0.06);
       display: flex;
       flex-direction: column;
-      background: #ffffff;
+      background: rgba(255, 255, 255, 0.62);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
     .sidebar-header {
       padding: 24px 20px 14px;
@@ -298,8 +387,8 @@ interface Message {
     .custom-search-pill {
       display: flex;
       align-items: center;
-      background: #ffffff;
-      border: 1px solid #dcdcdc;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(0, 0, 0, 0.08);
       border-radius: 12px;
       padding: 8px 14px;
       transition: all 0.2s ease;
@@ -403,13 +492,14 @@ interface Message {
       gap: 12px;
       cursor: pointer;
       transition: background 0.15s ease;
-      border-bottom: 1px solid #f7f7f8;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.03);
     }
     .dialog-item:hover {
-      background: #f9fafb;
+      background: rgba(255, 255, 255, 0.6);
     }
     .dialog-item.active {
-      background: #f0f0f2;
+      background: rgba(255, 255, 255, 0.85);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
     }
     .active-indicator {
       position: absolute;
@@ -603,13 +693,15 @@ interface Message {
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: #fafafa;
+      background: transparent;
       position: relative;
     }
     .chat-header {
-      background: #ffffff;
+      background: rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       padding: 14px 28px;
-      border-bottom: 1px solid #eaeaea;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -708,7 +800,10 @@ interface Message {
     .messages-list {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
+      max-width: 820px;
+      width: 100%;
+      margin: 0 auto;
     }
     .history-spinner {
       display: flex;
@@ -748,31 +843,32 @@ interface Message {
 
     .message-bubble {
       position: relative;
-      max-width: 65%;
-      padding: 10px 18px;
+      max-width: 68%;
+      padding: 10px 16px;
       display: flex;
       flex-direction: column;
       gap: 4px;
+      border-radius: 18px;
       animation: messageSpring 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
     }
 
-    /* Outgoing: Dark #111, radius: 18px 18px 4px 18px */
+    /* Outgoing: Dark #111, clean symmetrical 18px radius */
     .message-row.outgoing .message-bubble {
       background: #111111;
       color: #ffffff;
-      border-radius: 18px 18px 4px 18px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
+      border-radius: 18px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
     }
 
-    /* Incoming: Glass white with backdrop-blur, radius: 18px 18px 18px 4px */
+    /* Incoming: Glass white with backdrop-blur, clean symmetrical 18px radius */
     .message-row:not(.outgoing) .message-bubble {
       background: rgba(255, 255, 255, 0.88);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       color: #111111;
-      border: 1px solid rgba(0, 0, 0, 0.05);
-      border-radius: 18px 18px 18px 4px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      border-radius: 18px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
     }
 
     .message-text {
@@ -780,6 +876,97 @@ interface Message {
       line-height: 1.5;
       word-break: break-word;
       white-space: pre-wrap;
+    }
+
+    /* Attached image styling */
+    .msg-image-wrap {
+      border-radius: 12px;
+      overflow: hidden;
+      max-width: 320px;
+      cursor: pointer;
+      margin-bottom: 4px;
+    }
+    .msg-image-thumb {
+      width: 100%;
+      max-height: 280px;
+      object-fit: cover;
+      display: block;
+      border-radius: 12px;
+      transition: transform 0.2s ease;
+    }
+    .msg-image-thumb:hover {
+      transform: scale(1.02);
+    }
+
+    /* Attached document card styling */
+    .msg-file-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 12px;
+      text-decoration: none;
+      color: inherit;
+      margin-bottom: 4px;
+      max-width: 320px;
+      transition: background 0.15s ease;
+    }
+    .msg-file-card:hover {
+      background: rgba(0, 0, 0, 0.08);
+    }
+    .msg-file-card.outgoing-file {
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+    }
+    .msg-file-card.outgoing-file:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+    .file-icon-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .outgoing-file .file-icon-box {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .file-icon-box mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+    .file-card-info {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .file-card-name {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-card-size {
+      font-size: 11px;
+      opacity: 0.65;
+    }
+    .file-download-btn {
+      opacity: 0.7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .file-download-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
     }
 
     /* Time and read receipts appear ONLY ON HOVER */
@@ -791,6 +978,8 @@ interface Message {
       opacity: 0;
       transition: opacity 0.2s ease;
       height: 14px;
+      margin-top: 2px;
+      margin-left: 8px;
     }
     .message-bubble:hover .message-meta {
       opacity: 1;
@@ -872,7 +1061,7 @@ interface Message {
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
       border: 1px solid rgba(0, 0, 0, 0.05);
-      border-radius: 18px 18px 18px 4px;
+      border-radius: 18px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
     }
     .typing-dot {
@@ -900,26 +1089,132 @@ interface Message {
 
     /* Floating Pill Input Bar */
     .chat-pill-wrapper {
-      padding: 14px 28px 20px;
+      padding: 14px 32px 20px;
       background: transparent;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
     }
-    .chat-pill-input-bar {
+
+    /* Pending attachment chip preview */
+    .attachment-preview-bar {
+      max-width: 820px;
       width: 100%;
-      background: #ffffff;
-      border: 1px solid #e5e7eb;
-      border-radius: 9999px;
-      padding: 6px 10px 6px 20px;
+      display: flex;
+      justify-content: flex-start;
+      animation: dropdownSlideFade 0.2s ease-out;
+    }
+    .attachment-chip {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 14px;
+      padding: 6px 12px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+      max-width: 320px;
+    }
+    .attachment-thumb {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .attachment-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .attachment-file-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+      color: #4b5563;
+    }
+    .attachment-details {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .attachment-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: #111111;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .attachment-size {
+      font-size: 10px;
+      color: #8e8e93;
+    }
+    .attachment-remove-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #8e8e93;
+      border-radius: 50%;
+      transition: color 0.15s;
+    }
+    .attachment-remove-btn mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+    .attachment-remove-btn:hover {
+      color: #ef4444;
+    }
+
+    .chat-pill-input-bar {
+      max-width: 820px;
+      width: 100%;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 9999px;
+      padding: 6px 10px 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
       transition: all 0.2s ease;
     }
     .chat-pill-input-bar:focus-within {
       border-color: #111111;
       box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+    }
+    .pill-attach-btn {
+      background: transparent;
+      border: none;
+      color: #71717a;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      border-radius: 50%;
+      transition: color 0.15s, transform 0.15s;
+    }
+    .pill-attach-btn mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+    .pill-attach-btn:hover {
+      color: #111111;
+      transform: scale(1.1);
     }
     .pill-input {
       flex: 1;
@@ -959,6 +1254,77 @@ interface Message {
       background: #000000;
     }
     .pill-send-btn mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+    .send-spinner {
+      display: inline-block;
+    }
+    ::ng-deep .send-spinner circle {
+      stroke: #ffffff !important;
+    }
+
+    /* Fullscreen image modal overlay */
+    .image-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: modalFadeIn 0.2s ease-out;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .image-modal-content {
+      position: relative;
+      max-width: 90vw;
+      max-height: 90vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-large-img {
+      max-width: 90vw;
+      max-height: 85vh;
+      border-radius: 12px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+      object-fit: contain;
+    }
+    .modal-close-btn, .modal-download-btn {
+      position: absolute;
+      top: -44px;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .modal-close-btn:hover, .modal-download-btn:hover {
+      background: rgba(255, 255, 255, 0.35);
+    }
+    .modal-close-btn {
+      right: 0;
+    }
+    .modal-download-btn {
+      right: 46px;
+    }
+    .modal-close-btn mat-icon, .modal-download-btn mat-icon {
       font-size: 20px;
       width: 20px;
       height: 20px;
@@ -1006,8 +1372,15 @@ export class P2pChatComponent implements OnInit, OnDestroy {
   searchControl = new FormControl('');
   foundUsers: any[] = [];
   avatarErrors = new Set<string>();
+  userAvatarMap = new Map<string, string>();
   showTypingIndicator: boolean = false;
   private typingTimer?: any;
+
+  selectedFile: File | null = null;
+  selectedFilePreview: string | null = null;
+  selectedFileIsImage: boolean = false;
+  uploadingFile: boolean = false;
+  selectedModalImage: string | null = null;
 
   private pollingSub?: Subscription;
   private routeParamSub?: Subscription;
@@ -1024,6 +1397,27 @@ export class P2pChatComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.currentUser = this.authService.getCurrentUser();
+    if (this.currentUser?.avatar_url) {
+      this.userAvatarMap.set(this.currentUser.name, this.currentUser.avatar_url);
+    }
+
+    // Preload users into avatar map to ensure avatars show immediately
+    this.apiService.getUsers().subscribe({
+      next: (users) => {
+        if (Array.isArray(users)) {
+          users.forEach((u: any) => {
+            if (u.name && u.avatar_url) {
+              this.userAvatarMap.set(u.name, u.avatar_url);
+            }
+          });
+          if (this.currentUser && !this.currentUser.avatar_url && this.userAvatarMap.has(this.currentUser.name)) {
+            this.currentUser.avatar_url = this.userAvatarMap.get(this.currentUser.name);
+          }
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => {}
+    });
 
     // Set up user search autocomplete (triggers from 1st character)
     this.searchControl.valueChanges.pipe(
@@ -1097,11 +1491,17 @@ export class P2pChatComponent implements OnInit, OnDestroy {
     this.loadingDialogs = this.dialogs.length === 0;
     this.apiService.getDialogs().subscribe({
       next: (dialogs) => {
-        // Map avatars if not present
-        this.dialogs = dialogs.map((d: any) => ({
-          ...d,
-          last_message_time: d.last_message_time ? new Date(d.last_message_time) : null
-        }));
+        this.dialogs = dialogs.map((d: any) => {
+          const resolvedAvatar = d.avatar_url || this.userAvatarMap.get(d.username);
+          if (resolvedAvatar) {
+            this.userAvatarMap.set(d.username, resolvedAvatar);
+          }
+          return {
+            ...d,
+            avatar_url: resolvedAvatar,
+            last_message_time: d.last_message_time ? new Date(d.last_message_time) : null
+          };
+        });
         this.loadingDialogs = false;
         this.cdr.markForCheck();
         if (callback) callback();
@@ -1122,13 +1522,17 @@ export class P2pChatComponent implements OnInit, OnDestroy {
       // Find user details to create a temporary dialog
       this.apiService.getUserByName(username).subscribe({
         next: (user) => {
+          const resolvedAvatar = user.avatar_url || this.userAvatarMap.get(user.name);
+          if (resolvedAvatar) {
+            this.userAvatarMap.set(user.name, resolvedAvatar);
+          }
           const tempDialog: Dialog = {
             username: user.name,
             last_message_content: '',
             last_message_time: new Date(),
             last_message_sender: '',
             unread_count: 0,
-            avatar_url: user.avatar_url,
+            avatar_url: resolvedAvatar,
             isTemp: true
           };
           this.dialogs.unshift(tempDialog);
@@ -1142,6 +1546,7 @@ export class P2pChatComponent implements OnInit, OnDestroy {
             last_message_time: new Date(),
             last_message_sender: '',
             unread_count: 0,
+            avatar_url: this.userAvatarMap.get(username),
             isTemp: true
           };
           this.dialogs.unshift(tempDialog);
@@ -1196,28 +1601,32 @@ export class P2pChatComponent implements OnInit, OnDestroy {
   pollUpdates() {
     // Poll dialogs list
     this.apiService.getDialogs().subscribe(dialogs => {
-      // Update unread badges and previews
       dialogs.forEach((updated: any) => {
+        const resolvedAvatar = updated.avatar_url || this.userAvatarMap.get(updated.username);
+        if (resolvedAvatar) {
+          this.userAvatarMap.set(updated.username, resolvedAvatar);
+        }
         const match = this.dialogs.find(d => d.username === updated.username);
         if (match) {
           match.last_message_content = updated.last_message_content;
           match.last_message_time = new Date(updated.last_message_time);
           match.last_message_sender = updated.last_message_sender;
+          if (resolvedAvatar && !match.avatar_url) {
+            match.avatar_url = resolvedAvatar;
+          }
           
-          // Only update unread if we aren't currently reading this dialog
           if (this.selectedDialog?.username !== updated.username) {
             match.unread_count = updated.unread_count;
           }
         } else {
-          // New dialog arrived
           this.dialogs.push({
             ...updated,
+            avatar_url: resolvedAvatar,
             last_message_time: new Date(updated.last_message_time)
           });
         }
       });
 
-      // Sort dialogs by last message time
       this.dialogs.sort((a, b) => {
         const timeA = a.last_message_time?.getTime() || 0;
         const timeB = b.last_message_time?.getTime() || 0;
@@ -1231,84 +1640,234 @@ export class P2pChatComponent implements OnInit, OnDestroy {
     if (this.selectedDialog) {
       const activeUser = this.selectedDialog.username;
       this.apiService.getChatHistory(activeUser).subscribe(messages => {
-        const prevLength = this.messages.length;
-        this.messages = messages.map((m: any) => ({
-          ...m,
-          created_at: new Date(m.created_at)
-        }));
-        
-        this.cdr.markForCheck();
+        // Smart diff: only replace array when message IDs or statuses changed to eliminate flicker
+        const hasChanges = messages.length !== this.messages.length ||
+          messages.some((m: any, i: number) => {
+            const current = this.messages[i];
+            return !current || current.id !== m.id || current.is_read !== m.is_read;
+          });
 
-        // If new message arrived, scroll down
-        if (messages.length > prevLength) {
-          this.scrollToBottom();
-          // Mark read immediately
-          this.apiService.markChatRead(activeUser).subscribe();
+        if (hasChanges) {
+          const prevLength = this.messages.length;
+          this.messages = messages.map((m: any) => ({
+            ...m,
+            created_at: new Date(m.created_at)
+          }));
+          
+          this.cdr.markForCheck();
+
+          if (messages.length > prevLength) {
+            this.scrollToBottom();
+            this.apiService.markChatRead(activeUser).subscribe();
+          }
         }
       });
     }
   }
 
   sendChatMessage() {
-    if (!this.newMessageContent.trim() || !this.selectedDialog || this.sending) return;
+    const textContent = this.newMessageContent.trim();
+    if ((!textContent && !this.selectedFile) || !this.selectedDialog || this.sending) return;
 
-    const content = this.newMessageContent.trim();
     const recipient = this.selectedDialog.username;
+    const fileToUpload = this.selectedFile;
+    
     this.newMessageContent = '';
+    this.selectedFile = null;
+    this.selectedFilePreview = null;
+    this.selectedFileIsImage = false;
     this.sending = true;
 
-    // Add message locally for immediate display
-    const tempMsg: Message = {
-      sender_name: this.currentUser.name,
-      recipient_name: recipient,
-      content: content,
-      is_read: false,
-      created_at: new Date()
-    };
-    this.messages.push(tempMsg);
-    this.scrollToBottom();
+    const proceedWithSend = (attachment?: ChatAttachment) => {
+      const payloadContent = attachment
+        ? JSON.stringify({ text: textContent, attachment })
+        : textContent;
 
-    // Trigger typing indicator 800ms after sending to simulate response/reading
-    clearTimeout(this.typingTimer);
-    this.typingTimer = setTimeout(() => {
-      if (this.selectedDialog?.username === recipient) {
-        this.showTypingIndicator = true;
-        this.scrollToBottom();
-        this.cdr.markForCheck();
-        setTimeout(() => {
-          this.showTypingIndicator = false;
+      const tempMsg: Message = {
+        sender_name: this.currentUser.name,
+        recipient_name: recipient,
+        content: payloadContent,
+        is_read: false,
+        created_at: new Date()
+      };
+      this.messages.push(tempMsg);
+      this.scrollToBottom();
+
+      clearTimeout(this.typingTimer);
+      this.typingTimer = setTimeout(() => {
+        if (this.selectedDialog?.username === recipient) {
+          this.showTypingIndicator = true;
+          this.scrollToBottom();
           this.cdr.markForCheck();
-        }, 2200);
-      }
-    }, 800);
-
-    // Call API
-    this.apiService.sendMessage(recipient, content).subscribe({
-      next: (res) => {
-        this.sending = false;
-        // Update temporary message with real ID and timestamp
-        tempMsg.id = res.id;
-        tempMsg.created_at = new Date(res.created_at);
-        
-        // Remove temp state of dialog if applicable
-        if (this.selectedDialog) {
-          this.selectedDialog.isTemp = false;
-          this.selectedDialog.last_message_content = content;
-          this.selectedDialog.last_message_time = tempMsg.created_at;
-          this.selectedDialog.last_message_sender = this.currentUser.name;
+          setTimeout(() => {
+            this.showTypingIndicator = false;
+            this.cdr.markForCheck();
+          }, 2200);
         }
+      }, 800);
 
-        this.cdr.markForCheck();
-      },
-      error: (err) => {
-        this.sending = false;
-        console.error('Error sending message:', err);
-        this.snackBar.open('Не удалось отправить сообщение: ' + (err.error?.detail || err.message), 'OK', { duration: 3000 });
-        // Remove temp message on error
-        this.messages = this.messages.filter(m => m !== tempMsg);
-        this.cdr.markForCheck();
+      this.apiService.sendMessage(recipient, payloadContent).subscribe({
+        next: (res) => {
+          this.sending = false;
+          tempMsg.id = res.id;
+          tempMsg.created_at = new Date(res.created_at);
+          
+          if (this.selectedDialog) {
+            this.selectedDialog.isTemp = false;
+            this.selectedDialog.last_message_content = payloadContent;
+            this.selectedDialog.last_message_time = tempMsg.created_at;
+            this.selectedDialog.last_message_sender = this.currentUser.name;
+          }
+
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          this.sending = false;
+          console.error('Error sending message:', err);
+          this.snackBar.open('Не удалось отправить сообщение: ' + (err.error?.detail || err.message), 'OK', { duration: 3000 });
+          this.messages = this.messages.filter(m => m !== tempMsg);
+          this.cdr.markForCheck();
+        }
+      });
+    };
+
+    if (fileToUpload) {
+      this.uploadingFile = true;
+      this.apiService.uploadChatFile(fileToUpload).subscribe({
+        next: (uploaded) => {
+          this.uploadingFile = false;
+          proceedWithSend({
+            url: uploaded.url,
+            file_name: uploaded.file_name,
+            content_type: uploaded.content_type,
+            size: uploaded.size
+          });
+        },
+        error: (err) => {
+          this.uploadingFile = false;
+          this.sending = false;
+          console.error('Error uploading file:', err);
+          this.snackBar.open('Не удалось загрузить файл: ' + (err.error?.detail || err.message), 'OK', { duration: 3000 });
+          this.cdr.markForCheck();
+        }
+      });
+    } else {
+      proceedWithSend();
+    }
+  }
+
+  trackByMessageId(index: number, message: Message): string {
+    return message.id || `${message.sender_name}-${message.created_at?.getTime?.() || index}`;
+  }
+
+  getResolvedAvatar(username?: string, existingUrl?: string): string | undefined {
+    if (!username) return existingUrl;
+    if (this.currentUser && this.currentUser.name === username && this.currentUser.avatar_url) {
+      return this.currentUser.avatar_url;
+    }
+    return existingUrl || this.userAvatarMap.get(username);
+  }
+
+  getDialogPreviewText(content: string): string {
+    if (!content) return 'Нет сообщений';
+    const parsed = this.parseMessage(content);
+    if (parsed.attachment) {
+      if (this.isImageAttachment(parsed.attachment)) {
+        return parsed.text ? `[Фото] ${parsed.text}` : '📷 Фотография';
       }
-    });
+      return parsed.text ? `[Файл] ${parsed.text}` : `📎 ${parsed.attachment.file_name}`;
+    }
+    return content;
+  }
+
+  parseMessage(content: string): ParsedMessageContent {
+    if (!content) return { text: '' };
+    if (content.startsWith('{') && content.includes('"attachment"')) {
+      try {
+        const data = JSON.parse(content);
+        if (data && (data.attachment || data.text !== undefined)) {
+          return {
+            text: data.text || '',
+            attachment: data.attachment
+          };
+        }
+      } catch (e) {}
+    }
+    return { text: content };
+  }
+
+  isImageAttachment(attachment: ChatAttachment): boolean {
+    if (!attachment) return false;
+    if (attachment.content_type && attachment.content_type.startsWith('image/')) return true;
+    const name = (attachment.file_name || attachment.url || '').toLowerCase();
+    return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(name);
+  }
+
+  formatFileSize(bytes: number): string {
+    if (!bytes || bytes <= 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  onFileSelected(event: any) {
+    const file = event.target?.files?.[0];
+    if (file) {
+      this.handleFileChosen(file);
+    }
+    if (event.target) {
+      event.target.value = '';
+    }
+  }
+
+  onPaste(event: ClipboardEvent) {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type && items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          this.handleFileChosen(file);
+          event.preventDefault();
+          break;
+        }
+      }
+    }
+  }
+
+  handleFileChosen(file: File) {
+    if (file.size > 50 * 1024 * 1024) {
+      this.snackBar.open('Файл слишком большой. Максимальный размер 50 МБ.', 'OK', { duration: 3000 });
+      return;
+    }
+    this.selectedFile = file;
+    this.selectedFileIsImage = file.type.startsWith('image/');
+    if (this.selectedFileIsImage) {
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        this.selectedFilePreview = e.target.result;
+        this.cdr.markForCheck();
+      };
+      reader.readAsDataURL(file);
+    } else {
+      this.selectedFilePreview = null;
+    }
+    this.cdr.markForCheck();
+  }
+
+  removeSelectedFile() {
+    this.selectedFile = null;
+    this.selectedFilePreview = null;
+    this.selectedFileIsImage = false;
+    this.cdr.markForCheck();
+  }
+
+  openImageModal(url: string | undefined) {
+    if (url) {
+      this.selectedModalImage = url;
+      this.cdr.markForCheck();
+    }
   }
 
   openClearChatModal(dialog: Dialog | null, event?: Event) {
@@ -1399,6 +1958,14 @@ export class P2pChatComponent implements OnInit, OnDestroy {
     return `/api/${url}`;
   }
 
+  getAttachmentUrl(url: string | undefined): string {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    if (url.startsWith('/static')) return `/api${url}`;
+    if (url.startsWith('/api/')) return url;
+    return `/api/${url}`;
+  }
+
   formatTime(date: Date): string {
     const today = new Date();
     if (date.toDateString() === today.toDateString()) {
@@ -1423,3 +1990,4 @@ export class P2pChatComponent implements OnInit, OnDestroy {
     }, 50);
   }
 }
+

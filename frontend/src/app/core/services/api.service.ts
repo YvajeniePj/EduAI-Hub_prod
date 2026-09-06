@@ -124,6 +124,12 @@ export class ApiService {
     return this.http.delete<any>(`${API_URL}/messages/${messageId}`);
   }
 
+  uploadChatFile(file: File): Observable<{ url: string; file_name: string; content_type: string; size: number }> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    return this.http.post<{ url: string; file_name: string; content_type: string; size: number }>(`${API_URL}/messages/upload`, formData);
+  }
+
   // Tests
   getTests(subjectId?: string): Observable<any[]> {
     let params = new HttpParams();

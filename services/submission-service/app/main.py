@@ -18,9 +18,11 @@ app = FastAPI(
 
 # Create static directories with broad permissions
 os.makedirs("static/avatars", exist_ok=True)
+os.makedirs("static/chat", exist_ok=True)
 try:
     os.chmod("static", 0o777)
     os.chmod("static/avatars", 0o777)
+    os.chmod("static/chat", 0o777)
 except:
     pass
 

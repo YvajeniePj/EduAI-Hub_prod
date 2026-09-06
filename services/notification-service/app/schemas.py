@@ -58,5 +58,6 @@ class DialogResponse(BaseModel):
     last_message_time: datetime
     last_message_sender: str
     unread_count: int
+    avatar_url: Optional[str] = None
 
 
