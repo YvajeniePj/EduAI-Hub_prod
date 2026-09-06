@@ -40,9 +40,7 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
           </span>
         </div>
 
-        <div class="news-text-content" style="font-size: 15px; line-height: 1.7; color: #334155; white-space: pre-wrap; word-break: break-word;">
-          {{ data.news.content }}
-        </div>
+        <div class="news-text-content" style="font-size: 15px; line-height: 1.7; color: #334155; white-space: pre-wrap; word-break: break-word;" [innerHTML]="data.news.content"></div>
       </div>
     </div>
   `
@@ -170,7 +168,7 @@ export class NewsDialogCnComponent {
                   <span class="news-date">{{ item.created_at | russianDate:'datetime' }}</span>
                 </div>
                 <h4 class="news-title">{{ item.title }}</h4>
-                <p class="news-excerpt">{{ item.content | slice:0:100 }}{{ item.content?.length > 100 ? '...' : '' }}</p>
+                <p class="news-excerpt">{{ stripHtml(item.content) | slice:0:100 }}{{ stripHtml(item.content).length > 100 ? '...' : '' }}</p>
               </div>
             </mat-card>
           </div>
@@ -633,6 +631,11 @@ export class CalendarNewsComponent implements OnInit {
     private authService: AuthService,
     private dialog: MatDialog
   ) {}
+
+  stripHtml(html?: string): string {
+    if (!html) return '';
+    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
 
   ngOnInit() {
     this.loadSubjects();

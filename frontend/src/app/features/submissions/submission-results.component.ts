@@ -1278,14 +1278,15 @@ export class SubmissionResultsComponent implements OnInit {
   }
 
   getBackButtonLabel(): string {
-    return this.source === 'courses' ? 'Вернуться к курсу' : 'Вернуться к тестам';
+    const courseId = this.subjectId || this.route.snapshot.queryParams['courseId'];
+    return (this.source === 'courses' || courseId) ? 'Вернуться к курсу' : 'Вернуться назад';
   }
 
   goBack() {
     const courseId = this.subjectId || this.route.snapshot.queryParams['courseId'];
-    const tab = this.route.snapshot.queryParams['tab'];
+    const tab = this.route.snapshot.queryParams['tab'] || 'assignments';
     const lessonId = this.route.snapshot.queryParams['lessonId'];
-    if (this.source === 'courses' && courseId) {
+    if (courseId) {
       const qParams: any = {};
       if (tab !== undefined && tab !== null) {
         qParams.tab = tab;
@@ -1294,8 +1295,10 @@ export class SubmissionResultsComponent implements OnInit {
         qParams.lessonId = lessonId;
       }
       this.router.navigate(['/courses', courseId], { queryParams: qParams });
+    } else if (window.history.length > 1) {
+      window.history.back();
     } else {
-      this.router.navigate(['/tests']);
+      this.router.navigate(['/']);
     }
   }
 }

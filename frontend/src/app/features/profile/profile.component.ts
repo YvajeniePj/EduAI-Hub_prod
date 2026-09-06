@@ -178,7 +178,7 @@ import { HttpEventType } from '@angular/common/http';
             <div class="submission-cards">
               <div *ngFor="let s of submissions" class="submission-card glass-panel">
                 <div class="subm-header">
-                  <h4 class="subm-title">{{ getTestName(s.test_id) || s.test_id }}</h4>
+                  <h4 class="subm-title">{{ getTestName(s.test_id) || 'Тестовое задание' }}</h4>
                   <span class="subm-date">Дата: {{ s.finished_at | date:'dd.MM.yyyy HH:mm' }}</span>
                 </div>
                 

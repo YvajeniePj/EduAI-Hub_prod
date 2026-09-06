@@ -91,19 +91,11 @@ interface Particle {
             <div class="nav-block-header">УПРАВЛЕНИЕ</div>
             <a mat-list-item routerLink="/analytics" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
               <mat-icon matListItemIcon class="nav-icon">insights</mat-icon>
-              <span matListItemTitle class="nav-title">Аналитика</span>
-            </a>
-            <a mat-list-item routerLink="/activity-monitor" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
-              <mat-icon matListItemIcon class="nav-icon">visibility</mat-icon>
-              <span matListItemTitle class="nav-title">Мониторинг</span>
+              <span matListItemTitle class="nav-title">Аналитика и БД</span>
             </a>
             <a mat-list-item routerLink="/news/manage" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
               <mat-icon matListItemIcon class="nav-icon">feed</mat-icon>
               <span matListItemTitle class="nav-title">Новости</span>
-            </a>
-            <a mat-list-item routerLink="/admin/db" (click)="sidenav.close()" routerLinkActive="active-link" class="nav-item">
-              <mat-icon matListItemIcon class="nav-icon">database</mat-icon>
-              <span matListItemTitle class="nav-title">База данных</span>
             </a>
           </ng-container>
 

@@ -1586,7 +1586,12 @@ export class TestTakeComponent implements OnInit, OnDestroy {
               }
 
               alert('Время на прохождение теста истекло. Тест автоматически завершен.');
-              this.router.navigate(['/submissions', this.submissionId, 'results']);
+              const courseId = this.courseId || this.test?.subject_id || null;
+              const resParams: any = { source: this.source || 'courses' };
+              if (courseId) resParams.courseId = courseId;
+              if (this.returnTab !== undefined) resParams.tab = this.returnTab;
+              if (this.returnLessonId) resParams.lessonId = this.returnLessonId;
+              this.router.navigate(['/submissions', this.submissionId, 'results'], { queryParams: resParams });
             },
             error: (err) => {
               console.error('Error finishing submission:', err);
@@ -1686,13 +1691,13 @@ export class TestTakeComponent implements OnInit, OnDestroy {
 
             // Redirect based on source
             const isMultipleChoice = this.test && this.test.test_type === 'multiple_choice';
-            const courseId = this.courseId || (this.source === 'courses' ? this.test?.subject_id : null);
+            const courseId = this.courseId || this.test?.subject_id || null;
+            const resParams: any = { source: this.source || 'courses' };
+            if (courseId) resParams.courseId = courseId;
+            if (this.returnTab !== undefined) resParams.tab = this.returnTab;
+            if (this.returnLessonId) resParams.lessonId = this.returnLessonId;
             
             if (isMultipleChoice) {
-              const resParams: any = { source: this.source };
-              if (courseId) resParams.courseId = courseId;
-              if (this.returnTab !== undefined) resParams.tab = this.returnTab;
-              if (this.returnLessonId) resParams.lessonId = this.returnLessonId;
               this.router.navigate(['/submissions', this.submissionId, 'results'], { queryParams: resParams });
             } else {
               if (this.source === 'courses' && courseId) {
@@ -1704,7 +1709,7 @@ export class TestTakeComponent implements OnInit, OnDestroy {
               } else if (this.source === 'tests') {
                 this.router.navigate(['/tests']);
               } else {
-                this.router.navigate(['/submissions', this.submissionId, 'results']);
+                this.router.navigate(['/submissions', this.submissionId, 'results'], { queryParams: resParams });
               }
             }
           },

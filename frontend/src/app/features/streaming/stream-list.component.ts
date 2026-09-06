@@ -471,9 +471,20 @@ export class StreamListComponent implements OnInit, OnDestroy {
     return `Группы: ${groups.join(', ')}`;
   }
 
+  parseUtcDate(val: string | Date | undefined): Date {
+    if (!val) return new Date();
+    if (val instanceof Date) return val;
+    let s = String(val).trim();
+    if (!s) return new Date();
+    if (!s.endsWith('Z') && !s.includes('+')) {
+      s = s.replace(' ', 'T') + 'Z';
+    }
+    return new Date(s);
+  }
+
   getStreamDuration(createdAt: string | Date): string {
     if (!createdAt) return '00:00';
-    const start = new Date(createdAt).getTime();
+    const start = this.parseUtcDate(createdAt).getTime();
     const diff = Math.max(0, Math.floor((Date.now() - start) / 1000));
     const hours = Math.floor(diff / 3600);
     const minutes = Math.floor((diff % 3600) / 60);

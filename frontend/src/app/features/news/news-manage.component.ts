@@ -9,6 +9,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 import { ApiService } from '../../core/services/api.service';
 import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
 
@@ -27,6 +30,9 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
     MatSelectModule,
     MatIconModule,
     MatChipsModule,
+    MatSnackBarModule,
+    MatDialogModule,
+    ConfirmDialogComponent,
     RussianDatePipe
   ],
   template: `
@@ -50,7 +56,7 @@ import { RussianDatePipe } from '../../core/pipes/russian-date.pipe';
                 <span class="news-date">{{ news.created_at | russianDate:'datetime' }}</span>
               </div>
               <h3 class="news-item-title">{{ news.title }}</h3>
-              <p class="news-item-text">{{ news.content }}</p>
+              <div class="news-item-text" [innerHTML]="news.content"></div>
             </mat-card-content>
             <mat-card-actions class="news-item-actions">
               <button mat-button color="primary" (click)="editNews(news)">
@@ -404,7 +410,9 @@ export class NewsManageComponent implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private apiService: ApiService
+    private apiService: ApiService,
+    private snackBar: MatSnackBar,
+    private dialog: MatDialog
   ) {
     this.newsForm = this.fb.group({
       subject_id: ['', Validators.required],
@@ -456,10 +464,11 @@ export class NewsManageComponent implements OnInit {
             this.submitting = false;
             this.resetForm();
             this.loadAllNews();
+            this.snackBar.open('Новость успешно обновлена', 'OK', { duration: 3000 });
           },
           error: (err) => {
             console.error('Error updating news:', err);
-            alert('Ошибка при обновлении новости');
+            this.snackBar.open('Ошибка при обновлении новости', 'Закрыть', { duration: 4000 });
             this.submitting = false;
           }
         });
@@ -469,10 +478,11 @@ export class NewsManageComponent implements OnInit {
             this.submitting = false;
             this.resetForm();
             this.loadAllNews();
+            this.snackBar.open('Новость успешно опубликована', 'OK', { duration: 3000 });
           },
           error: (err) => {
             console.error('Error creating news:', err);
-            alert('Ошибка при создании новости');
+            this.snackBar.open('Ошибка при создании новости', 'Закрыть', { duration: 4000 });
             this.submitting = false;
           }
         });
@@ -492,17 +502,31 @@ export class NewsManageComponent implements OnInit {
   }
 
   deleteNews(newsId: string) {
-    if (confirm('Вы уверены, что хотите удалить эту новость?')) {
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'Удалить новость?',
+        message: 'Вы уверены, что хотите удалить эту новость? Это действие нельзя отменить.',
+        confirmText: 'Удалить',
+        cancelText: 'Отмена',
+        isDestructive: true,
+        icon: 'delete'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed) => {
+      if (!confirmed) return;
       this.apiService.deleteNews(newsId).subscribe({
         next: () => {
           this.loadAllNews();
+          this.snackBar.open('Новость удалена', 'OK', { duration: 3000 });
         },
         error: (err) => {
           console.error('Error deleting news:', err);
-          alert('Ошибка при удалении новости');
+          this.snackBar.open('Ошибка при удалении новости', 'Закрыть', { duration: 4000 });
         }
       });
-    }
+    });
   }
 
   onFileSelected(event: any) {

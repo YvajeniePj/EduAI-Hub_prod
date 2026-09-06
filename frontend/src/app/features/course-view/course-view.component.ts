@@ -93,7 +93,7 @@ interface TreeNode {
             <button class="pill-btn pill-btn-outline" [routerLink]="['/course-builder', subjectId]">
               ⚙️ Конструктор курса
             </button>
-            <button class="pill-btn pill-btn-outline" [routerLink]="['/ai-test']" [queryParams]="{ subjectId: subjectId }">
+            <button class="pill-btn pill-btn-outline" (click)="goToAiTest()">
               ☆ AI-тест
             </button>
             <button class="pill-btn pill-btn-red" (click)="startStream()">
@@ -2830,8 +2830,16 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     }
   }
 
+  goToAiTest() {
+    this.router.navigate(['/ai-test'], { queryParams: { subjectId: this.subjectId } });
+  }
+
   openCreateTest() {
-    this.router.navigate(['/tests/create'], { queryParams: { subjectId: this.subjectId } });
+    const qParams: any = { subjectId: this.subjectId, returnTo: this.router.url };
+    if (this.selectedLesson?.id) {
+      qParams.lessonId = this.selectedLesson.id;
+    }
+    this.router.navigate(['/tests/create'], { queryParams: qParams });
   }
 
   openUploadMaterial() {
@@ -2863,11 +2871,11 @@ export class CourseViewComponent implements OnInit, OnDestroy {
         this.apiService.createGroup(result).subscribe({
           next: () => {
             this.loadGroups();
-            alert('Группа создана!');
+            this.snackBar.open('Группа создана!', 'OK', { duration: 3000 });
           },
           error: (err) => {
             console.error('Error creating group:', err);
-            alert('Ошибка при создании группы: ' + (err.error?.detail || err.message));
+            this.snackBar.open('Ошибка при создании группы: ' + (err.error?.detail || err.message), 'Закрыть', { duration: 4000 });
           }
         });
       }

@@ -934,11 +934,30 @@ export class TestCreateComponent implements OnInit {
           next: (response) => {
             console.log('Test created successfully:', response);
             const testId = response.id;
+            const lessonId = this.route.snapshot.queryParams['lessonId'];
             
-            if (this.selectedFiles.length > 0) {
-              this.uploadAssets(testId, testData.subject_id);
+            const proceedAfterAttach = () => {
+              if (this.selectedFiles.length > 0) {
+                this.uploadAssets(testId, testData.subject_id);
+              } else {
+                this.finishCreation(testData.subject_id);
+              }
+            };
+
+            if (lessonId) {
+              this.apiService.createContent(lessonId, {
+                content_type: 'test',
+                test_id: testId,
+                order_index: 1
+              }).subscribe({
+                next: () => proceedAfterAttach(),
+                error: (attachErr) => {
+                  console.warn('Could not auto-attach test to lesson:', attachErr);
+                  proceedAfterAttach();
+                }
+              });
             } else {
-              this.finishCreation(testData.subject_id);
+              proceedAfterAttach();
             }
           },
           error: (err) => {

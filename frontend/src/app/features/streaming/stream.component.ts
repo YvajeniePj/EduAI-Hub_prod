@@ -6,6 +6,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
@@ -47,6 +49,8 @@ interface ChatMessage {
         MatIconModule,
         MatProgressSpinnerModule,
         MatSnackBarModule,
+        MatDialogModule,
+        ConfirmDialogComponent,
         MatFormFieldModule,
         MatInputModule,
         FormsModule
@@ -842,7 +846,8 @@ export class StreamComponent implements OnInit, OnDestroy, AfterViewInit {
         private router: Router,
         private apiService: ApiService,
         private auth: AuthService,
-        private snackBar: MatSnackBar
+        private snackBar: MatSnackBar,
+        private dialog: MatDialog
     ) { }
 
     ngOnInit() {
@@ -928,6 +933,17 @@ export class StreamComponent implements OnInit, OnDestroy, AfterViewInit {
         this.targetAudienceLabel = 'Для всех групп';
     }
 
+    parseUtcDate(val: string | Date | undefined): Date {
+        if (!val) return new Date();
+        if (val instanceof Date) return val;
+        let s = String(val).trim();
+        if (!s) return new Date();
+        if (!s.endsWith('Z') && !s.includes('+')) {
+            s = s.replace(' ', 'T') + 'Z';
+        }
+        return new Date(s);
+    }
+
     async checkRoom() {
         this.loading = true;
         this.connectionError = '';
@@ -938,7 +954,7 @@ export class StreamComponent implements OnInit, OnDestroy, AfterViewInit {
             if (room) {
                 this.roomName = room.room_name;
                 this.isActive = true;
-                this.streamCreatedAt = room.created_at ? new Date(room.created_at) : new Date();
+                this.streamCreatedAt = this.parseUtcDate(room.created_at);
                 this.parseAudienceLabel(room);
                 await this.connect();
             } else {
@@ -968,7 +984,7 @@ export class StreamComponent implements OnInit, OnDestroy, AfterViewInit {
 
             this.roomName = room.room_name;
             this.isActive = true;
-            this.streamCreatedAt = room.created_at ? new Date(room.created_at) : new Date();
+            this.streamCreatedAt = this.parseUtcDate(room.created_at);
             this.parseAudienceLabel(room);
             await this.connect(true);
             this.isBroadcasting = true;
@@ -1241,17 +1257,31 @@ export class StreamComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     async endRoom() {
-        if (!confirm('Вы уверены, что хотите завершить трансляцию для всех участников?')) return;
+        const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+            width: '420px',
+            data: {
+                title: 'Завершить трансляцию?',
+                message: 'Вы уверены, что хотите завершить онлайн пару для всех участников?',
+                confirmText: 'Завершить пару',
+                cancelText: 'Отмена',
+                isDestructive: true,
+                icon: 'videocam_off'
+            }
+        });
 
-        try {
-            await this.apiService.endStreamingRoom(this.roomName).toPromise();
-            await this.room?.disconnect();
-            this.cleanup();
-            this.isActive = false;
-            this.snackBar.open('Трансляция завершена', 'OK', { duration: 3000 });
-        } catch (err) {
-            console.error('Error ending broadcast:', err);
-        }
+        dialogRef.afterClosed().subscribe(async (confirmed) => {
+            if (!confirmed) return;
+            try {
+                await this.apiService.endStreamingRoom(this.roomName).toPromise();
+                await this.room?.disconnect();
+                this.cleanup();
+                this.isActive = false;
+                this.snackBar.open('Трансляция завершена', 'OK', { duration: 3000 });
+            } catch (err) {
+                console.error('Error ending broadcast:', err);
+                this.snackBar.open('Ошибка при завершении трансляции', 'Закрыть', { duration: 3000 });
+            }
+        });
     }
 
     cleanup() {

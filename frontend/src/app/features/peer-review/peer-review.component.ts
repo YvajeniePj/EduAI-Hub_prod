@@ -8,6 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 
@@ -24,7 +25,8 @@ import { AuthService } from '../../core/services/auth.service';
     MatSelectModule,
     MatListModule,
     MatIconModule,
-    MatTabsModule
+    MatTabsModule,
+    MatSnackBarModule
   ],
   template: `
     <div class="peer-review-container">
@@ -68,7 +70,14 @@ import { AuthService } from '../../core/services/auth.service';
       <div *ngIf="step === 1" class="glass-card selection-card">
         <h2 class="section-title">Шаг 1: Выберите курс для рецензирования</h2>
         <p class="section-desc">Выберите дисциплину, по заданиям которой хотите провести взаимную оценку</p>
-        <mat-form-field appearance="outline" class="clean-field full-width">
+
+        <div *ngIf="subjects.length === 0" class="empty-works-box" style="margin-top: 16px;">
+          <mat-icon class="empty-icon">school</mat-icon>
+          <h3>Нет доступных курсов</h3>
+          <p>У вас пока нет курсов для взаимного оценивания. Доступ к курсам появляется после вступления в группу или принятия приглашения преподавателя.</p>
+        </div>
+
+        <mat-form-field appearance="outline" class="clean-field full-width" *ngIf="subjects.length > 0">
           <mat-label>Курс</mat-label>
           <mat-select [(ngModel)]="selectedSubjectId" (selectionChange)="onSubjectSelected()" placeholder="Выберите курс">
             <mat-option *ngFor="let subject of subjects" [value]="subject.id">
@@ -871,7 +880,8 @@ export class PeerReviewComponent implements OnInit {
     private apiService: ApiService, 
     private auth: AuthService,
     private fb: FormBuilder,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private snackBar: MatSnackBar
   ) {
     // Не создаем форму в конструкторе, создадим позже
   }
@@ -880,7 +890,7 @@ export class PeerReviewComponent implements OnInit {
     const user = this.auth.getCurrentUser();
     this.currentUser = user?.name || '';
     if (!this.currentUser) {
-      alert('Войдите, чтобы проверять работы');
+      this.snackBar.open('Войдите, чтобы проверять работы', 'Закрыть', { duration: 3000 });
       return;
     }
     this.loadSubjects();
@@ -907,9 +917,14 @@ export class PeerReviewComponent implements OnInit {
   loadSubjects() {
     this.apiService.getSubjects().subscribe({
       next: (subjects) => {
-        this.subjects = subjects;
+        this.subjects = subjects || [];
+        this.cdr.markForCheck();
       },
-      error: (err) => console.error('Error loading subjects:', err)
+      error: (err) => {
+        console.error('Error loading subjects:', err);
+        this.subjects = [];
+        this.cdr.markForCheck();
+      }
     });
   }
 
@@ -927,8 +942,12 @@ export class PeerReviewComponent implements OnInit {
         if (tests.length > 0) {
           this.step = 2;
         }
+        this.cdr.markForCheck();
       },
-      error: (err) => console.error('Error loading tests:', err)
+      error: (err) => {
+        console.error('Error loading tests:', err);
+        this.cdr.markForCheck();
+      }
     });
   }
 
@@ -940,7 +959,7 @@ export class PeerReviewComponent implements OnInit {
   loadSubmissionsForReview() {
     if (!this.selectedTestId) return;
     if (!this.currentUser) {
-      alert('Войдите, чтобы проверять работы');
+      this.snackBar.open('Войдите, чтобы проверять работы', 'Закрыть', { duration: 3000 });
       return;
     }
 

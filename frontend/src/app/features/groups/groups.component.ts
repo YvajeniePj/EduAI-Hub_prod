@@ -264,11 +264,13 @@ import { AuthService } from '../../core/services/auth.service';
     }
 
     .page-title {
-      font-size: 32px;
-      font-weight: 600;
-      margin: 0 0 8px 0;
-      color: #1a237e;
-      line-height: 1.2;
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 38px;
+      font-weight: 400;
+      margin: 0 0 6px 0;
+      color: #09090b;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
     }
 
     .page-subtitle {
