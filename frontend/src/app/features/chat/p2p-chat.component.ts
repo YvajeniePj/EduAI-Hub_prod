@@ -292,14 +292,18 @@ interface Message {
             </div>
 
             <div class="chat-pill-input-bar">
-              <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;" />
-              <button type="button" 
-                      class="pill-attach-btn" 
-                      (click)="fileInput.click()" 
-                      [disabled]="sending" 
-                      title="Прикрепить файл или фото">
+              <input id="chatFileInput" 
+                     #fileInput 
+                     type="file" 
+                     (change)="onFileSelected($event)" 
+                     style="position: absolute; left: -9999px; opacity: 0; width: 1px; height: 1px; pointer-events: none;" />
+              <label for="chatFileInput" 
+                     class="pill-attach-btn" 
+                     (click)="triggerFileInput($event)" 
+                     [class.disabled]="sending" 
+                     title="Прикрепить файл или фото">
                 <mat-icon>attach_file</mat-icon>
-              </button>
+              </label>
               <input type="text" 
                      [(ngModel)]="newMessageContent" 
                      (keyup.enter)="sendChatMessage()"
@@ -345,16 +349,29 @@ interface Message {
     </div>
   `,
   styles: [`
+    :host {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: calc(100vh - 112px);
+      box-sizing: border-box;
+    }
+
     .chat-wrapper {
       display: flex;
-      height: calc(100vh - 110px);
-      background: rgba(255, 255, 255, 0.45);
+      height: 100%;
+      max-height: 860px;
+      width: 100%;
+      max-width: 1080px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.42);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
-      border: 1px solid rgba(255, 255, 255, 0.5);
-      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      border-radius: 24px;
       overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.08);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
 
@@ -784,7 +801,8 @@ interface Message {
     .chat-messages-container {
       flex: 1;
       overflow-y: auto;
-      padding: 24px 32px;
+      padding: 20px 24px;
+      box-sizing: border-box;
       animation: chatFadeIn 0.25s ease-out;
     }
     @keyframes chatFadeIn {
@@ -801,9 +819,7 @@ interface Message {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      max-width: 820px;
       width: 100%;
-      margin: 0 auto;
     }
     .history-spinner {
       display: flex;
@@ -1089,17 +1105,18 @@ interface Message {
 
     /* Floating Pill Input Bar */
     .chat-pill-wrapper {
-      padding: 14px 32px 20px;
+      padding: 14px 24px 20px;
       background: transparent;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 8px;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     /* Pending attachment chip preview */
     .attachment-preview-bar {
-      max-width: 820px;
       width: 100%;
       display: flex;
       justify-content: flex-start;
@@ -1176,9 +1193,7 @@ interface Message {
     }
 
     .chat-pill-input-bar {
-      max-width: 820px;
       width: 100%;
-      margin: 0 auto;
       background: rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
@@ -1190,6 +1205,7 @@ interface Message {
       gap: 8px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
       transition: all 0.2s ease;
+      box-sizing: border-box;
     }
     .chat-pill-input-bar:focus-within {
       border-color: #111111;
@@ -1206,6 +1222,11 @@ interface Message {
       padding: 6px;
       border-radius: 50%;
       transition: color 0.15s, transform 0.15s;
+      user-select: none;
+    }
+    .pill-attach-btn.disabled {
+      opacity: 0.4;
+      pointer-events: none;
     }
     .pill-attach-btn mat-icon {
       font-size: 20px;
@@ -1358,6 +1379,7 @@ interface Message {
 })
 export class P2pChatComponent implements OnInit, OnDestroy {
   @ViewChild('messagesContainer') private messagesContainer?: ElementRef;
+  @ViewChild('fileInput') private fileInputRef?: ElementRef<HTMLInputElement>;
 
   currentUser: any = null;
   dialogs: Dialog[] = [];
@@ -1453,36 +1475,13 @@ export class P2pChatComponent implements OnInit, OnDestroy {
       });
     });
 
-    // Connect WebSocket for instant real-time message delivery
-    this.connectWebSocket();
-
-    // Start background polling every 2 seconds as fallback
+    // Start background polling every 2 seconds for real-time synchronization
     this.pollingSub = interval(2000).subscribe(() => {
       this.pollUpdates();
     });
   }
 
-  private socket?: WebSocket;
-
-  private connectWebSocket() {
-    if (!this.currentUser?.name) return;
-    try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/chat?user=${encodeURIComponent(this.currentUser.name)}`;
-      this.socket = new WebSocket(wsUrl);
-      this.socket.onmessage = () => {
-        this.pollUpdates();
-      };
-      this.socket.onerror = () => {};
-    } catch (e) {
-      console.log('WebSocket fallback to HTTP polling active');
-    }
-  }
-
   ngOnDestroy() {
-    if (this.socket) {
-      try { this.socket.close(); } catch (e) {}
-    }
     if (this.pollingSub) this.pollingSub.unsubscribe();
     if (this.routeParamSub) this.routeParamSub.unsubscribe();
   }
@@ -1809,6 +1808,16 @@ export class P2pChatComponent implements OnInit, OnDestroy {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  triggerFileInput(event?: MouseEvent) {
+    if (event) {
+      event.stopPropagation();
+    }
+    const input = this.fileInputRef?.nativeElement || (document.getElementById('chatFileInput') as HTMLInputElement);
+    if (input) {
+      input.click();
+    }
   }
 
   onFileSelected(event: any) {

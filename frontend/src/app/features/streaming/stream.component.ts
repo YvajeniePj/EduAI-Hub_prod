@@ -31,11 +31,19 @@ import {
     ParticipantEvent
 } from 'livekit-client';
 
+interface ChatAttachment {
+  url: string;
+  file_name: string;
+  content_type: string;
+  size: number;
+}
+
 interface ChatMessage {
     user: string;
     text: string;
     time: Date;
     isMe: boolean;
+    attachment?: ChatAttachment;
 }
 
 @Component({
@@ -185,22 +193,96 @@ interface ChatMessage {
                 <span class="msg-author">{{ msg.user }}</span>
                 <span class="msg-time">{{ msg.time | date:'HH:mm' }}</span>
               </div>
-              <div class="msg-bubble">{{ msg.text }}</div>
+              <div class="msg-bubble">
+                <!-- Attached photo -->
+                <div *ngIf="msg.attachment && isImageAttachment(msg.attachment)" class="stream-msg-img-wrap">
+                  <img [src]="getAttachmentUrl(msg.attachment.url)" 
+                       [alt]="msg.attachment.file_name"
+                       class="stream-msg-img-thumb"
+                       (click)="openImageModal(getAttachmentUrl(msg.attachment.url))" />
+                </div>
+
+                <!-- Attached document -->
+                <a *ngIf="msg.attachment && !isImageAttachment(msg.attachment)" 
+                   [href]="getAttachmentUrl(msg.attachment.url)" 
+                   [download]="msg.attachment.file_name"
+                   target="_blank"
+                   class="stream-msg-file-card"
+                   [class.is-me-file]="msg.isMe">
+                  <div class="file-icon-box">
+                    <mat-icon>insert_drive_file</mat-icon>
+                  </div>
+                  <div class="file-card-info">
+                    <span class="file-card-name" [title]="msg.attachment.file_name">{{ msg.attachment.file_name }}</span>
+                    <span class="file-card-size">{{ formatFileSize(msg.attachment.size) }}</span>
+                  </div>
+                  <div class="file-download-btn">
+                    <mat-icon>download</mat-icon>
+                  </div>
+                </a>
+
+                <div class="msg-text" *ngIf="msg.text">{{ msg.text }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pending attachment preview chip -->
+          <div class="stream-attachment-preview-bar" *ngIf="selectedFile">
+            <div class="stream-attachment-chip">
+              <div class="stream-attachment-thumb" *ngIf="selectedFileIsImage && selectedFilePreview">
+                <img [src]="selectedFilePreview" alt="preview" />
+              </div>
+              <mat-icon *ngIf="!selectedFileIsImage" class="stream-attachment-file-icon">insert_drive_file</mat-icon>
+              <div class="stream-attachment-details">
+                <span class="stream-attachment-name">{{ selectedFile.name }}</span>
+                <span class="stream-attachment-size">{{ formatFileSize(selectedFile.size) }}</span>
+              </div>
+              <button type="button" class="stream-attachment-remove-btn" (click)="removeSelectedFile()" title="Удалить прикрепленный файл">
+                <mat-icon>close</mat-icon>
+              </button>
             </div>
           </div>
 
           <div class="chat-input-bar">
+            <input id="streamFileInput" 
+                   #streamFileInput 
+                   type="file" 
+                   (change)="onFileSelected($event)" 
+                   style="position: absolute; left: -9999px; opacity: 0; width: 1px; height: 1px; pointer-events: none;" />
+            <label for="streamFileInput" 
+                   class="btn-stream-attach" 
+                   (click)="triggerFileInput($event)" 
+                   [class.disabled]="uploadingFile" 
+                   title="Прикрепить файл или фото">
+              <mat-icon>attach_file</mat-icon>
+            </label>
             <input 
               type="text" 
               class="chat-text-input" 
               [(ngModel)]="newMessage" 
               (keyup.enter)="sendMessage()" 
+              (paste)="onPaste($event)"
               placeholder="Напишите сообщение..." 
+              [disabled]="uploadingFile"
             />
-            <button class="btn-send-msg" (click)="sendMessage()" [disabled]="!newMessage.trim()" title="Отправить">
-              <mat-icon style="font-size: 18px; width: 18px; height: 18px;">send</mat-icon>
+            <button class="btn-send-msg" (click)="sendMessage()" [disabled]="(!newMessage.trim() && !selectedFile) || uploadingFile" title="Отправить">
+              <mat-spinner diameter="16" *ngIf="uploadingFile" class="stream-send-spinner"></mat-spinner>
+              <mat-icon *ngIf="!uploadingFile" style="font-size: 18px; width: 18px; height: 18px;">send</mat-icon>
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Full-screen Image Modal Preview -->
+      <div class="image-modal-overlay" *ngIf="selectedModalImage" (click)="selectedModalImage = null">
+        <div class="image-modal-content" (click)="$event.stopPropagation()">
+          <img [src]="selectedModalImage" class="modal-large-img" />
+          <button type="button" class="modal-close-btn" (click)="selectedModalImage = null" title="Закрыть">
+            <mat-icon>close</mat-icon>
+          </button>
+          <a [href]="selectedModalImage" download target="_blank" class="modal-download-btn" title="Открыть в полном размере">
+            <mat-icon>open_in_new</mat-icon>
+          </a>
         </div>
       </div>
     </div>
@@ -796,6 +878,277 @@ interface ChatMessage {
       cursor: not-allowed;
     }
 
+    /* Attachment Styles in Stream Chat */
+    .btn-stream-attach {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: transparent;
+      border: 1px solid #e4e4e7;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .btn-stream-attach:hover {
+      background: #f1f5f9;
+      color: #09090b;
+      border-color: #cbd5e1;
+    }
+    .btn-stream-attach.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    .btn-stream-attach mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Pending Attachment Chip */
+    .stream-attachment-preview-bar {
+      padding: 6px 14px;
+      background: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: flex-start;
+    }
+    .stream-attachment-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 4px 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+      max-width: 100%;
+      overflow: hidden;
+    }
+    .stream-attachment-thumb {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .stream-attachment-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .stream-attachment-file-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      color: #64748b;
+    }
+    .stream-attachment-details {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .stream-attachment-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: #09090b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stream-attachment-size {
+      font-size: 10px;
+      color: #94a3b8;
+    }
+    .stream-attachment-remove-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      border-radius: 50%;
+      transition: color 0.15s;
+    }
+    .stream-attachment-remove-btn:hover {
+      color: #ef4444;
+    }
+    .stream-attachment-remove-btn mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Attached image styling in messages */
+    .stream-msg-img-wrap {
+      border-radius: 10px;
+      overflow: hidden;
+      max-width: 240px;
+      cursor: pointer;
+      margin-bottom: 4px;
+    }
+    .stream-msg-img-thumb {
+      width: 100%;
+      max-height: 200px;
+      object-fit: cover;
+      display: block;
+      border-radius: 10px;
+      transition: transform 0.2s ease;
+    }
+    .stream-msg-img-thumb:hover {
+      transform: scale(1.02);
+    }
+
+    /* Attached document card styling in messages */
+    .stream-msg-file-card {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 10px;
+      text-decoration: none;
+      color: inherit;
+      margin-bottom: 4px;
+      max-width: 240px;
+      transition: background 0.15s ease;
+    }
+    .stream-msg-file-card:hover {
+      background: rgba(0, 0, 0, 0.08);
+    }
+    .stream-msg-file-card.is-me-file {
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+    }
+    .stream-msg-file-card.is-me-file:hover {
+      background: rgba(255, 255, 255, 0.26);
+    }
+    .file-icon-box {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .is-me-file .file-icon-box {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .file-icon-box mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    .file-card-info {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .file-card-name {
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-card-size {
+      font-size: 10px;
+      opacity: 0.7;
+    }
+    .file-download-btn {
+      opacity: 0.7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .file-download-btn mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+
+    .stream-send-spinner {
+      display: inline-block;
+    }
+    ::ng-deep .stream-send-spinner circle {
+      stroke: #ffffff !important;
+    }
+
+    /* Fullscreen image modal overlay */
+    .image-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: modalFadeIn 0.2s ease-out;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .image-modal-content {
+      position: relative;
+      max-width: 90vw;
+      max-height: 90vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-large-img {
+      max-width: 90vw;
+      max-height: 85vh;
+      border-radius: 12px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+      object-fit: contain;
+    }
+    .modal-close-btn, .modal-download-btn {
+      position: absolute;
+      top: -44px;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .modal-close-btn:hover, .modal-download-btn:hover {
+      background: rgba(255, 255, 255, 0.35);
+    }
+    .modal-close-btn {
+      right: 0;
+    }
+    .modal-download-btn {
+      right: 46px;
+    }
+    .modal-close-btn mat-icon, .modal-download-btn mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
     @media (max-width: 960px) {
       .main-layout {
         flex-direction: column;
@@ -830,6 +1183,13 @@ export class StreamComponent implements OnInit, OnDestroy, AfterViewInit {
 
     messages: ChatMessage[] = [];
     newMessage: string = '';
+
+    @ViewChild('streamFileInput') streamFileInputRef?: ElementRef<HTMLInputElement>;
+    selectedFile: File | null = null;
+    selectedFilePreview: string | null = null;
+    selectedFileIsImage: boolean = false;
+    uploadingFile: boolean = false;
+    selectedModalImage: string | null = null;
 
     currentUser: any;
     isTeacher: boolean = false;
@@ -1190,7 +1550,8 @@ export class StreamComponent implements OnInit, OnDestroy, AfterViewInit {
             if (data.type === 'chat') {
                 this.messages.push({
                     user: participant?.identity || 'Аноним',
-                    text: data.text,
+                    text: data.text || '',
+                    attachment: data.attachment,
                     time: new Date(),
                     isMe: false
                 });
@@ -1201,29 +1562,151 @@ export class StreamComponent implements OnInit, OnDestroy, AfterViewInit {
         }
     }
 
-    sendMessage() {
-        if (!this.newMessage.trim() || !this.room) return;
+    triggerFileInput(event?: MouseEvent) {
+        if (event) {
+            event.stopPropagation();
+        }
+        const input = this.streamFileInputRef?.nativeElement || (document.getElementById('streamFileInput') as HTMLInputElement);
+        if (input) {
+            input.click();
+        }
+    }
 
-        const payload = {
-            type: 'chat',
-            text: this.newMessage
+    onFileSelected(event: any) {
+        const file = event.target?.files?.[0];
+        if (file) {
+            this.handleFileChosen(file);
+        }
+        if (event.target) {
+            event.target.value = '';
+        }
+    }
+
+    onPaste(event: ClipboardEvent) {
+        const items = event.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type && items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    this.handleFileChosen(file);
+                    event.preventDefault();
+                    break;
+                }
+            }
+        }
+    }
+
+    handleFileChosen(file: File) {
+        if (file.size > 50 * 1024 * 1024) {
+            this.snackBar.open('Файл слишком большой. Максимальный размер 50 МБ.', 'OK', { duration: 3000 });
+            return;
+        }
+        this.selectedFile = file;
+        this.selectedFileIsImage = file.type.startsWith('image/');
+        if (this.selectedFileIsImage) {
+            const reader = new FileReader();
+            reader.onload = (e: any) => {
+                this.selectedFilePreview = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            this.selectedFilePreview = null;
+        }
+    }
+
+    removeSelectedFile() {
+        this.selectedFile = null;
+        this.selectedFilePreview = null;
+        this.selectedFileIsImage = false;
+    }
+
+    isImageAttachment(attachment?: ChatAttachment): boolean {
+        if (!attachment) return false;
+        if (attachment.content_type && attachment.content_type.startsWith('image/')) return true;
+        const name = (attachment.file_name || attachment.url || '').toLowerCase();
+        return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(name);
+    }
+
+    formatFileSize(bytes: number): string {
+        if (!bytes || bytes <= 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    getAttachmentUrl(url: string | undefined): string {
+        if (!url) return '';
+        if (url.startsWith('http')) return url;
+        if (url.startsWith('/static')) return `/api${url}`;
+        if (url.startsWith('/api/')) return url;
+        return `/api/${url}`;
+    }
+
+    openImageModal(url: string | undefined) {
+        if (url) {
+            this.selectedModalImage = url;
+        }
+    }
+
+    sendMessage() {
+        const text = this.newMessage.trim();
+        if ((!text && !this.selectedFile) || !this.room) return;
+
+        const fileToUpload = this.selectedFile;
+        this.newMessage = '';
+        this.selectedFile = null;
+        this.selectedFilePreview = null;
+        this.selectedFileIsImage = false;
+
+        const proceed = (attachment?: ChatAttachment) => {
+            const payload: any = {
+                type: 'chat',
+                text: text
+            };
+            if (attachment) {
+                payload.attachment = attachment;
+            }
+
+            const encoder = new TextEncoder();
+            this.room?.localParticipant.publishData(
+                encoder.encode(JSON.stringify(payload)),
+                { reliable: true }
+            );
+
+            this.messages.push({
+                user: 'Вы',
+                text: text,
+                time: new Date(),
+                isMe: true,
+                attachment: attachment
+            });
+
+            this.scrollToBottom();
         };
 
-        const encoder = new TextEncoder();
-        this.room.localParticipant.publishData(
-            encoder.encode(JSON.stringify(payload)),
-            { reliable: true }
-        );
-
-        this.messages.push({
-            user: 'Вы',
-            text: this.newMessage,
-            time: new Date(),
-            isMe: true
-        });
-
-        this.newMessage = '';
-        this.scrollToBottom();
+        if (fileToUpload) {
+            this.uploadingFile = true;
+            this.apiService.uploadChatFile(fileToUpload).subscribe({
+                next: (uploaded) => {
+                    this.uploadingFile = false;
+                    proceed({
+                        url: uploaded.url,
+                        file_name: uploaded.file_name,
+                        content_type: uploaded.content_type,
+                        size: uploaded.size
+                    });
+                },
+                error: (err) => {
+                    this.uploadingFile = false;
+                    console.error('Error uploading file in stream:', err);
+                    this.snackBar.open('Не удалось загрузить файл: ' + (err.error?.detail || err.message), 'OK', { duration: 3000 });
+                }
+            });
+        } else {
+            proceed();
+        }
     }
 
     toggleCamera() {
