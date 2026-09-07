@@ -20,7 +20,7 @@ from app.database import get_db
 from app.models import Material
 from app.schemas import MaterialCreate, MaterialResponse
 from app.services.text_extraction import extract_text_from_file
-from app.utils.converters import convert_latex_to_pdf, convert_jupyter_to_html
+from app.utils.converters import convert_latex_to_pdf, convert_jupyter_to_html, convert_docx_to_html
 import asyncio
 
 router = APIRouter()
@@ -147,6 +147,8 @@ async def create_material(
             asyncio.create_task(convert_latex_to_pdf(file_path))
         elif mime_type == "application/x-ipynb+json" or original_name.endswith(".ipynb"):
             asyncio.create_task(convert_jupyter_to_html(file_path))
+        elif original_name.lower().endswith((".docx", ".doc")):
+            asyncio.create_task(convert_docx_to_html(file_path))
         
         # Notify about new material
         await create_notification(
@@ -333,10 +335,15 @@ async def download_material(
         guessed, _ = mimetypes.guess_type(filename)
         if guessed:
             mime_type = guessed
+        elif filename.endswith((".txt", ".md", ".py", ".csv", ".json", ".sql", ".sh")):
+            mime_type = "text/plain; charset=utf-8"
         elif filename.endswith(".tex"):
-            mime_type = "text/plain"
+            mime_type = "text/plain; charset=utf-8"
         elif filename.endswith(".ipynb"):
             mime_type = "application/json"
+        
+    if mime_type and mime_type.startswith("text/") and "charset" not in mime_type:
+        mime_type = f"{mime_type}; charset=utf-8"
         
     return FileResponse(
         path=target_path, 
@@ -393,6 +400,9 @@ async def get_material_status(
     elif format == 'html' and (mime_type == "application/x-ipynb+json" or filename.lower().endswith(".ipynb")):
         should_convert = True
         conversion_task = convert_jupyter_to_html
+    elif format == 'html' and filename.lower().endswith((".docx", ".doc")):
+        should_convert = True
+        conversion_task = convert_docx_to_html
         
     logger.info(f"Checking status for material {material_id}, format {format}. MIME: {mime_type}, Filename: {filename}")
     

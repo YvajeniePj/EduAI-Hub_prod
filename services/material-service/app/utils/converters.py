@@ -187,3 +187,102 @@ async def convert_jupyter_to_html(ipynb_filepath: str) -> str | None:
     finally:
         if os.path.exists(processing_file):
             os.remove(processing_file)
+
+
+async def convert_docx_to_html(docx_filepath: str) -> str | None:
+    """
+    Converts a .docx document to clean, styled semantic HTML for direct preview.
+    Supports paragraphs, bold/italic runs, headings, and tables.
+    """
+    base_path = docx_filepath.rsplit(".", 1)[0]
+    html_path = base_path + ".html"
+    processing_file = html_path + ".processing"
+    error_file = html_path + ".error"
+    
+    if os.path.exists(processing_file):
+        return None
+        
+    Path(processing_file).touch()
+    if os.path.exists(error_file):
+        try: os.remove(error_file)
+        except: pass
+        
+    try:
+        from docx import Document
+        import html
+        
+        doc = Document(docx_filepath)
+        html_parts = [
+            "<!DOCTYPE html>",
+            "<html><head><meta charset='utf-8'>",
+            "<meta name='viewport' content='width=device-width, initial-scale=1.0'>",
+            "<style>",
+            "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.65; max-width: 860px; margin: 36px auto; padding: 0 24px; color: #18181b; background: #ffffff; }",
+            "h1 { font-size: 26px; border-bottom: 2px solid #e4e4e7; padding-bottom: 8px; margin-top: 32px; color: #09090b; }",
+            "h2 { font-size: 21px; margin-top: 26px; color: #09090b; }",
+            "h3 { font-size: 17px; margin-top: 20px; color: #18181b; }",
+            "p { margin: 12px 0; font-size: 15px; color: #27272a; word-wrap: break-word; }",
+            "table { border-collapse: collapse; width: 100%; margin: 24px 0; font-size: 14px; }",
+            "th, td { border: 1px solid #d4d4d8; padding: 10px 14px; text-align: left; vertical-align: top; }",
+            "th { background: #f4f4f5; font-weight: 600; color: #09090b; }",
+            "tr:nth-child(even) td { background: #fafafa; }",
+            "ul, ol { padding-left: 24px; margin: 12px 0; }",
+            "li { margin-bottom: 6px; font-size: 15px; }",
+            "</style></head><body>"
+        ]
+        
+        for p in doc.paragraphs:
+            text = p.text.strip()
+            if not text:
+                continue
+            
+            p_html = ""
+            for run in p.runs:
+                run_text = html.escape(run.text)
+                if run.bold and run.italic:
+                    run_text = f"<strong><em>{run_text}</em></strong>"
+                elif run.bold:
+                    run_text = f"<strong>{run_text}</strong>"
+                elif run.italic:
+                    run_text = f"<em>{run_text}</em>"
+                p_html += run_text
+                
+            style_name = (p.style.name or "").lower() if p.style else ""
+            if "heading 1" in style_name or "заголовок 1" in style_name:
+                html_parts.append(f"<h1>{p_html}</h1>")
+            elif "heading 2" in style_name or "заголовок 2" in style_name:
+                html_parts.append(f"<h2>{p_html}</h2>")
+            elif "heading 3" in style_name or "заголовок 3" in style_name:
+                html_parts.append(f"<h3>{p_html}</h3>")
+            elif "list" in style_name or style_name.startswith("список"):
+                html_parts.append(f"<ul><li>{p_html}</li></ul>")
+            else:
+                html_parts.append(f"<p>{p_html}</p>")
+                
+        for table in doc.tables:
+            html_parts.append("<table>")
+            for i, row in enumerate(table.rows):
+                html_parts.append("<tr>")
+                for cell in row.cells:
+                    tag = "th" if i == 0 else "td"
+                    cell_text = html.escape(cell.text.strip())
+                    html_parts.append(f"<{tag}>{cell_text}</{tag}>")
+                html_parts.append("</tr>")
+            html_parts.append("</table>")
+            
+        html_parts.append("</body></html>")
+        
+        full_html = "\n".join(html_parts)
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(full_html)
+            
+        return html_path
+    except Exception as e:
+        logger.error(f"Error converting docx to html: {e}")
+        Path(error_file).write_text(str(e))
+        return None
+    finally:
+        if os.path.exists(processing_file):
+            try: os.remove(processing_file)
+            except: pass
+

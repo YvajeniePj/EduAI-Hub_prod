@@ -24,6 +24,8 @@ interface Particle {
   baseAlpha: number;
 }
 
+import { CourseGenerationDockComponent } from './core/components/course-generation-dock.component';
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -38,7 +40,8 @@ interface Particle {
     MatIconModule,
     MatTooltipModule,
     MatBadgeModule,
-    MatMenuModule
+    MatMenuModule,
+    CourseGenerationDockComponent
   ],
   template: `
     <!-- Global Animated Constellation Canvas Background -->
@@ -231,6 +234,9 @@ interface Particle {
         <router-outlet></router-outlet>
       </div>
     </ng-template>
+
+    <!-- Global Floating Background Course Generation Dock -->
+    <app-course-generation-dock></app-course-generation-dock>
   `,
   styles: [`
     .global-particle-canvas {

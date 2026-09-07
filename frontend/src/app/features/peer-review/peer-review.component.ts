@@ -106,40 +106,175 @@ import { AuthService } from '../../core/services/auth.service';
         </mat-form-field>
       </div>
 
-      <!-- Шаг 3: Список анонимных работ -->
+      <!-- Шаг 3: Дашборд рецензирования (Работы на проверку и Рецензии на мою работу) -->
       <div *ngIf="step === 3" class="glass-card selection-card">
         <div class="card-header-bar">
           <button type="button" class="btn-icon-pill" (click)="goToStep(2)">
             <mat-icon>arrow_back</mat-icon>
           </button>
-          <h2 class="section-title">Шаг 3: Выберите работу для рецензии</h2>
-        </div>
-        
-        <div *ngIf="submissionsForReview.length === 0" class="empty-works-box">
-          <mat-icon class="empty-icon">task_alt</mat-icon>
-          <h3>Нет доступных работ для проверки</h3>
-          <p>Либо все сданные работы уже оценены, либо другие студенты пока не отправили свои решения на этот тест.</p>
+          <div class="step-title-wrap">
+            <h2 class="section-title">Шаг 3: Дашборд кросс-проверки</h2>
+            <span class="anonymity-subtext">{{ getSelectedTestTitle() }}</span>
+          </div>
         </div>
 
-        <div class="submissions-cards-grid" *ngIf="submissionsForReview.length > 0">
-          <div *ngFor="let submission of submissionsForReview; let i = index" 
-               class="submission-review-card"
-               (click)="onSubmissionSelected(submission, i)">
-            <div class="work-badge-row">
-              <span class="anonymous-work-tag">
-                <mat-icon>person_outline</mat-icon>
-                Работа сокурсника #{{ i + 1 }}
-              </span>
-              <span class="score-pill-tag">
-                {{ submission.total_score }} / {{ submission.total_max }} баллов
-              </span>
+        <!-- Dashboard Sub-Tabs -->
+        <div class="dashboard-tabs-bar">
+          <button type="button" 
+                  class="dash-tab-btn" 
+                  [class.active]="activeTab === 'to_review'" 
+                  (click)="activeTab = 'to_review'">
+            <mat-icon>assignment_turned_in</mat-icon>
+            <span>Работы на проверку</span>
+            <span class="tab-badge" [class.badge-done]="getReviewedCount() >= submissionsForReview.length && submissionsForReview.length > 0">
+              {{ getReviewedCount() }}/{{ submissionsForReview.length }}
+            </span>
+          </button>
+
+          <button type="button" 
+                  class="dash-tab-btn" 
+                  [class.active]="activeTab === 'my_reviews'" 
+                  (click)="activeTab = 'my_reviews'">
+            <mat-icon>rate_review</mat-icon>
+            <span>Рецензии на мою работу</span>
+            <span class="tab-badge" *ngIf="myReviews.length > 0">
+              {{ myReviews.length }}
+            </span>
+          </button>
+        </div>
+
+        <!-- TAB 1: РАБОТЫ НА ПРОВЕРКУ -->
+        <div *ngIf="activeTab === 'to_review'" class="tab-panel-content">
+          <div class="distribution-info-banner">
+            <div class="info-banner-left">
+              <div class="info-progress-title">
+                Прогресс взаимной проверки: <strong>{{ getReviewedCount() }} из {{ submissionsForReview.length }} проверено</strong>
+              </div>
+              <div class="info-progress-bar">
+                <div class="info-progress-fill" [style.width.%]="submissionsForReview.length > 0 ? (getReviewedCount() / submissionsForReview.length * 100) : 0"></div>
+              </div>
             </div>
-            <div class="work-assignment-text" *ngIf="submission.assignment">
-              <strong>Задание:</strong> {{ submission.assignment }}
+            <span class="info-banner-tag">
+              <mat-icon>shuffle</mat-icon>
+              K = 2 циклический сдвиг
+            </span>
+          </div>
+
+          <div *ngIf="submissionsForReview.length === 0" class="empty-works-box">
+            <mat-icon class="empty-icon">task_alt</mat-icon>
+            <h3>Нет доступных работ для проверки</h3>
+            <p>Либо другие студенты пока не отправили решения на этот тест, либо все сданные работы уже получили необходимое число рецензий.</p>
+          </div>
+
+          <div class="submissions-cards-grid" *ngIf="submissionsForReview.length > 0">
+            <div *ngFor="let submission of submissionsForReview; let i = index" 
+                 class="submission-review-card"
+                 [class.card-reviewed]="submission.reviewed_by_me"
+                 (click)="onSubmissionSelected(submission, i)">
+              <div class="work-badge-row">
+                <span class="anonymous-work-tag">
+                  <mat-icon>person_outline</mat-icon>
+                  {{ submission.anonymous_title || ('Работа на проверку #' + (i + 1)) }}
+                </span>
+                <span class="review-status-pill" [class.reviewed]="submission.reviewed_by_me">
+                  <span *ngIf="submission.reviewed_by_me">✓ Проверено ({{ submission.my_review?.avg_score }} ★)</span>
+                  <span *ngIf="!submission.reviewed_by_me">Ожидает проверки</span>
+                </span>
+              </div>
+
+              <div class="work-assignment-text" *ngIf="submission.assignment">
+                <strong>Задание:</strong> {{ submission.assignment }}
+              </div>
+
+              <div class="work-meta-row">
+                <span class="meta-item">
+                  <mat-icon>article</mat-icon>
+                  {{ submission.answers?.length || 0 }} ответов
+                </span>
+                <span class="meta-item" *ngIf="submission.total_max">
+                  <mat-icon>score</mat-icon>
+                  {{ submission.total_score }} / {{ submission.total_max }} баллов
+                </span>
+              </div>
+
+              <div class="card-bottom-action">
+                <span class="action-prompt" *ngIf="!submission.reviewed_by_me">Оценить работу</span>
+                <span class="action-prompt prompt-edit" *ngIf="submission.reviewed_by_me">Редактировать оценку</span>
+                <mat-icon>arrow_forward</mat-icon>
+              </div>
             </div>
-            <div class="card-bottom-action">
-              <span class="action-prompt">Оценить работу</span>
-              <mat-icon>arrow_forward</mat-icon>
+          </div>
+        </div>
+
+        <!-- TAB 2: РЕЦЕНЗИИ НА МОЮ РАБОТУ -->
+        <div *ngIf="activeTab === 'my_reviews'" class="tab-panel-content">
+          <div *ngIf="myReviewsLoading" class="reviews-loading-box">
+            <p>Загрузка рецензий...</p>
+          </div>
+
+          <div *ngIf="!myReviewsLoading && myReviews.length === 0" class="empty-works-box">
+            <mat-icon class="empty-icon">hourglass_empty</mat-icon>
+            <h3>Пока нет рецензий на вашу работу</h3>
+            <p>Когда сокурсники проверят ваше решение, здесь появятся их оценки по критериям и комментарии.</p>
+          </div>
+
+          <div *ngIf="!myReviewsLoading && myReviews.length > 0" class="my-reviews-wrapper">
+            <!-- Overall Score Banner -->
+            <div class="score-summary-banner">
+              <div class="summary-score-big">
+                <span class="big-num">{{ getMyAveragePeerScore() }}</span>
+                <div class="score-stars">
+                  <mat-icon>star</mat-icon>
+                  <span class="scale-text">из 5.0</span>
+                </div>
+              </div>
+              <div class="summary-text-col">
+                <span class="summary-title">Средняя оценка сокурсников</span>
+                <span class="summary-sub">Получено {{ myReviews.length }} {{ myReviews.length === 1 ? 'рецензия' : 'рецензии' }} от анонимных проверяющих</span>
+              </div>
+            </div>
+
+            <!-- List of Peer Reviews -->
+            <div class="peer-reviews-list">
+              <div *ngFor="let rev of myReviews; let idx = index" class="peer-review-item-card">
+                <div class="rev-header">
+                  <div class="rev-author-badge">
+                    <mat-icon>shield</mat-icon>
+                    <span>{{ rev.reviewer || ('Рецензент #' + (idx + 1)) }}</span>
+                  </div>
+                  <div class="rev-score-pill">
+                    <mat-icon>star</mat-icon>
+                    <span>{{ rev.avg_score }} / 5.0</span>
+                  </div>
+                </div>
+
+                <div class="rev-criteria-chips">
+                  <div class="crit-chip">
+                    <span class="crit-lbl">Соответствие:</span>
+                    <strong>{{ rev.relevance }}/5</strong>
+                  </div>
+                  <div class="crit-chip">
+                    <span class="crit-lbl">Структура:</span>
+                    <strong>{{ rev.structure }}/5</strong>
+                  </div>
+                  <div class="crit-chip">
+                    <span class="crit-lbl">Аргументация:</span>
+                    <strong>{{ rev.argument }}/5</strong>
+                  </div>
+                  <div class="crit-chip">
+                    <span class="crit-lbl">Ясность:</span>
+                    <strong>{{ rev.clarity }}/5</strong>
+                  </div>
+                </div>
+
+                <div class="rev-comment-box" *ngIf="rev.comment">
+                  <div class="comment-quote-icon">“</div>
+                  <p class="comment-text">{{ rev.comment }}</p>
+                </div>
+                <div class="rev-no-comment" *ngIf="!rev.comment">
+                  <em>Рецензент не оставил текстового комментария</em>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -582,6 +717,328 @@ import { AuthService } from '../../core/services/auth.service';
       transform: translateX(4px);
     }
 
+    /* Dashboard Tabs */
+    .dashboard-tabs-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      padding-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .dash-tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      font-size: 13.5px;
+      font-weight: 500;
+      color: #52525b;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .dash-tab-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .dash-tab-btn:hover {
+      background: #ffffff;
+      color: #18181b;
+    }
+
+    .dash-tab-btn.active {
+      background: #18181b;
+      color: #ffffff;
+      border-color: #18181b;
+    }
+
+    .tab-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.08);
+      color: #18181b;
+    }
+
+    .dash-tab-btn.active .tab-badge {
+      background: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+    }
+
+    .tab-badge.badge-done {
+      background: #10b981;
+      color: #ffffff;
+    }
+
+    /* Distribution banner */
+    .distribution-info-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+    }
+
+    .info-banner-left {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .info-progress-title {
+      font-size: 13.5px;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+
+    .info-progress-bar {
+      height: 6px;
+      border-radius: 3px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+
+    .info-progress-fill {
+      height: 100%;
+      background: #10b981;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .info-banner-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 4px 10px;
+    }
+
+    .info-banner-tag mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+    }
+
+    /* Card reviewed states */
+    .submission-review-card.card-reviewed {
+      border-color: #bbf7d0;
+      background: rgba(240, 253, 244, 0.6);
+    }
+
+    .review-status-pill {
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 12px;
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .review-status-pill.reviewed {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .prompt-edit {
+      color: #15803d;
+    }
+
+    .work-meta-row {
+      display: flex;
+      gap: 14px;
+      font-size: 12.5px;
+      color: #71717a;
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .meta-item mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+    }
+
+    /* My reviews tab styles */
+    .score-summary-banner {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: linear-gradient(135deg, #18181b 0%, #27272a 100%);
+      color: #ffffff;
+      border-radius: 16px;
+      padding: 22px 26px;
+      margin-bottom: 22px;
+    }
+
+    .summary-score-big {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .big-num {
+      font-size: 38px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .score-stars {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      color: #f59e0b;
+    }
+
+    .scale-text {
+      font-size: 13px;
+      color: #a1a1aa;
+      margin-left: 4px;
+    }
+
+    .summary-title {
+      font-size: 16px;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .summary-sub {
+      font-size: 13px;
+      color: #a1a1aa;
+    }
+
+    .peer-reviews-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .peer-review-item-card {
+      background: #ffffff;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.02);
+    }
+
+    .rev-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .rev-author-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #18181b;
+    }
+
+    .rev-author-badge mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #10b981;
+    }
+
+    .rev-score-pill {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+
+    .rev-score-pill mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+      color: #f59e0b;
+    }
+
+    .rev-criteria-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .crit-chip {
+      background: #f4f4f5;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #3f3f46;
+      display: flex;
+      gap: 4px;
+    }
+
+    .crit-lbl {
+      color: #71717a;
+    }
+
+    .rev-comment-box {
+      background: #fafafa;
+      border-left: 3px solid #18181b;
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      position: relative;
+    }
+
+    .comment-quote-icon {
+      font-size: 24px;
+      line-height: 1;
+      color: #d4d4d8;
+      font-family: serif;
+      margin-bottom: -6px;
+    }
+
+    .comment-text {
+      font-size: 13.5px;
+      color: #27272a;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .rev-no-comment {
+      font-size: 12.5px;
+      color: #a1a1aa;
+    }
+
+    .reviews-loading-box {
+      text-align: center;
+      padding: 30px;
+      color: #71717a;
+    }
+
     /* Step 4 Review details */
     .step-title-wrap {
       display: flex;
@@ -874,7 +1331,10 @@ export class PeerReviewComponent implements OnInit {
   selectedSubmissionIndex: number = 0;
   reviewForm: FormGroup | null = null;
   currentUser: string = '';
-  step: number = 1; // 1 - выбор курса, 2 - выбор теста, 3 - выбор пользователя, 4 - форма оценки
+  step: number = 1; // 1 - выбор курса, 2 - выбор теста, 3 - дашборд работ, 4 - форма оценки
+  activeTab: 'to_review' | 'my_reviews' = 'to_review';
+  myReviews: any[] = [];
+  myReviewsLoading: boolean = false;
 
   constructor(
     private apiService: ApiService, 
@@ -883,7 +1343,6 @@ export class PeerReviewComponent implements OnInit {
     private cdr: ChangeDetectorRef,
     private snackBar: MatSnackBar
   ) {
-    // Не создаем форму в конструкторе, создадим позже
   }
 
   ngOnInit() {
@@ -904,10 +1363,12 @@ export class PeerReviewComponent implements OnInit {
       this.selectedSubmission = null;
       this.tests = [];
       this.submissionsForReview = [];
+      this.myReviews = [];
     } else if (stepNumber === 2) {
       this.selectedTestId = '';
       this.selectedSubmission = null;
       this.submissionsForReview = [];
+      this.myReviews = [];
     } else if (stepNumber === 3) {
       this.selectedSubmission = null;
       this.reviewForm = null;
@@ -965,15 +1426,52 @@ export class PeerReviewComponent implements OnInit {
 
     this.apiService.getSubmissionsForReview(this.selectedTestId, this.currentUser).subscribe({
       next: (submissions) => {
-        // Фильтруем только завершенные работы
-        this.submissionsForReview = submissions.filter(s => s.is_finished === 'true');
+        this.submissionsForReview = submissions || [];
         this.step = 3;
+        this.loadMyReviews();
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Error loading submissions:', err);
         this.submissionsForReview = [];
+        this.loadMyReviews();
+        this.step = 3;
+        this.cdr.markForCheck();
       }
     });
+  }
+
+  loadMyReviews() {
+    if (!this.selectedTestId || !this.currentUser) return;
+    this.myReviewsLoading = true;
+    this.apiService.getMyReviews(this.currentUser, this.selectedTestId).subscribe({
+      next: (reviews) => {
+        this.myReviews = reviews || [];
+        this.myReviewsLoading = false;
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Error loading my reviews:', err);
+        this.myReviews = [];
+        this.myReviewsLoading = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  getReviewedCount(): number {
+    return this.submissionsForReview.filter(s => s.reviewed_by_me).length;
+  }
+
+  getMyAveragePeerScore(): number {
+    if (!this.myReviews || this.myReviews.length === 0) return 0;
+    const sum = this.myReviews.reduce((acc, r) => acc + (r.avg_score || 0), 0);
+    return Math.round((sum / this.myReviews.length) * 10) / 10;
+  }
+
+  getSelectedTestTitle(): string {
+    const t = this.tests.find(x => x.id === this.selectedTestId);
+    return t ? t.title : 'Тест / Задание';
   }
 
   onSubmissionSelected(submission: any, index: number = 0) {
@@ -981,7 +1479,7 @@ export class PeerReviewComponent implements OnInit {
     this.selectedSubmissionIndex = index;
     this.step = 4;
     
-    // Создаем форму сразу с начальными значениями
+    // Создаем форму с начальными значениями (или ранее выставленными)
     this.initializeForm();
   }
 
@@ -996,13 +1494,13 @@ export class PeerReviewComponent implements OnInit {
   }
 
   initializeForm() {
-    // Создаем форму с начальными значениями 1
+    const existing = this.selectedSubmission?.my_review;
     this.reviewForm = this.fb.group({
-      relevance: [1, [Validators.required, Validators.min(1), Validators.max(5)]],
-      structure: [1, [Validators.required, Validators.min(1), Validators.max(5)]],
-      argument: [1, [Validators.required, Validators.min(1), Validators.max(5)]],
-      clarity: [1, [Validators.required, Validators.min(1), Validators.max(5)]],
-      comment: ['']
+      relevance: [existing?.relevance || 1, [Validators.required, Validators.min(1), Validators.max(5)]],
+      structure: [existing?.structure || 1, [Validators.required, Validators.min(1), Validators.max(5)]],
+      argument: [existing?.argument || 1, [Validators.required, Validators.min(1), Validators.max(5)]],
+      clarity: [existing?.clarity || 1, [Validators.required, Validators.min(1), Validators.max(5)]],
+      comment: [existing?.comment || '']
     });
     
     // Подписываемся на изменения значений для автоматического обновления отображения
@@ -1045,17 +1543,17 @@ export class PeerReviewComponent implements OnInit {
 
   submitReview() {
     if (!this.currentUser) {
-      alert('Войдите, чтобы отправить отзыв');
+      this.snackBar.open('Войдите, чтобы отправить отзыв', 'Закрыть', { duration: 3000 });
       return;
     }
     
     if (!this.reviewForm || !this.reviewForm.valid) {
-      alert('Пожалуйста, заполните все поля оценки');
+      this.snackBar.open('Пожалуйста, заполните все поля оценки', 'Закрыть', { duration: 3000 });
       return;
     }
 
     if (!this.selectedSubmission) {
-      alert('Работа не выбрана');
+      this.snackBar.open('Работа не выбрана', 'Закрыть', { duration: 3000 });
       return;
     }
 
@@ -1072,15 +1570,15 @@ export class PeerReviewComponent implements OnInit {
 
     this.apiService.createReview(review).subscribe({
       next: () => {
-        alert('Отзыв сохранен! Вам начислено +1 очко за кросс-проверку.');
-        // Возвращаемся к списку пользователей
+        this.snackBar.open('Отзыв сохранен! Вам начислено +1 очко за кросс-проверку.', 'Отлично', { duration: 4000 });
+        // Возвращаемся к дашборду
         this.goToStep(3);
-        // Перезагружаем список, чтобы исключить проверенную работу (если нужно)
+        // Перезагружаем список
         this.loadSubmissionsForReview();
       },
       error: (err) => {
         console.error('Error creating review:', err);
-        alert('Ошибка при сохранении отзыва: ' + (err.error?.detail || err.message));
+        this.snackBar.open('Ошибка при сохранении отзыва: ' + (err.error?.detail || err.message), 'Закрыть', { duration: 5000 });
       }
     });
   }

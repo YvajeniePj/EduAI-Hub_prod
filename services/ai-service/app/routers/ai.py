@@ -1,7 +1,7 @@
 """
 AI router - Ollama functions endpoints
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import json
@@ -727,12 +727,14 @@ class GenerateCourseRequest(BaseModel):
     topic: str
     target_audience: str = "Beginners"
     additional_info: Optional[str] = None
+    user_name: Optional[str] = None
 
 
 @router.post("/generate-course")
-async def generate_course(request: GenerateCourseRequest):
+async def generate_course(request: GenerateCourseRequest, x_user_name: Optional[str] = Header(None)):
     """Generate a full course structure using AI"""
     try:
+        effective_user = request.user_name or x_user_name
         # Prompt for GigaChat
         system_msg = (
             "Ты - методист и создатель образовательных курсов. "
@@ -832,14 +834,30 @@ async def generate_course(request: GenerateCourseRequest):
             
         # Create Course via Subject Service
         async with httpx.AsyncClient(timeout=60.0) as client:
-            # 1. Create Subject
+            headers = {}
+            if effective_user:
+                from urllib.parse import quote
+                headers["X-User-Name"] = quote(effective_user)
+
+            base_title = (course_data.get("title") or request.topic).strip()
             subject_payload = {
-                "name": course_data.get("title", request.topic),
+                "name": base_title,
                 "description": course_data.get("description", f"Generated course on {request.topic}")
             }
-            resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects", json=subject_payload)
+            resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects", json=subject_payload, headers=headers)
             if resp.status_code not in [200, 201]:
-                raise HTTPException(status_code=500, detail=f"Failed to create subject: {resp.text}")
+                # If subject with this name already exists, retry with timestamp suffix
+                from datetime import datetime
+                suffix = datetime.now().strftime("%d.%m %H:%M")
+                subject_payload["name"] = f"{base_title} ({suffix})"
+                resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects", json=subject_payload, headers=headers)
+                if resp.status_code not in [200, 201]:
+                    import uuid
+                    subject_payload["name"] = f"{base_title} #{str(uuid.uuid4())[:4]}"
+                    resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects", json=subject_payload, headers=headers)
+                    if resp.status_code not in [200, 201]:
+                        raise HTTPException(status_code=500, detail=f"Failed to create subject: {resp.text}")
+
             subject = resp.json()
             subject_id = subject["id"]
             

@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, Inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { MatCardModule } from '@angular/material/card';
@@ -78,9 +78,9 @@ interface TreeNode {
     <div class="course-hub-container">
       <div class="course-header" *ngIf="!loading">
         <div class="course-header-left">
-          <a class="header-back-btn" [routerLink]="['/']" matTooltip="Назад на главную">
+          <button type="button" class="header-back-btn" (click)="onHeaderBack()" [matTooltip]="viewingLessonMode ? 'Вернуться к урокам' : 'Назад'">
             <mat-icon>chevron_left</mat-icon>
-          </a>
+          </button>
           <h1 class="course-header-title">{{ courseName }}</h1>
           <!-- Small red pulse/dot indicator if stream is live -->
           <div *ngIf="isStreamActive" class="live-pulse-dot" matTooltip="Трансляция в эфире!"></div>
@@ -438,11 +438,6 @@ interface TreeNode {
                        <h1>Учебник</h1>
                        <div class="lesson-title">{{ selectedLesson.title }}</div>
                     </div>
-                    <span class="spacer"></span>
-                    <button mat-raised-button color="warn" *ngIf="isStreamActive" [routerLink]="['/courses', subjectId, 'stream']" class="live-btn">
-                      <mat-icon>videocam</mat-icon>
-                      В ЭФИРЕ
-                    </button>
                   </div>
 
                   <div class="content-body">
@@ -453,12 +448,18 @@ interface TreeNode {
 
                       <!-- Video content -->
                       <div *ngIf="selectedLesson.content?.video_url" class="video-section">
-                        <h3>Видеоматериал</h3>
-                        <div class="video-container" style="position: relative;">
+                        <div class="video-section-header">
+                          <mat-icon>play_circle</mat-icon>
+                          <h3>Видеоматериал к уроку</h3>
+                        </div>
+                        <div class="video-container">
                           <!-- Video overlay for students to track play click -->
                           <div *ngIf="!isVideoStarted && currentUser?.role === 'student'" class="video-overlay" (click)="startVideo()">
-                            <mat-icon style="font-size: 64px; width: 64px; height: 64px; color: white; margin: 0;">play_circle_filled</mat-icon>
-                            <span style="color: white; font-weight: 500; font-size: 16px; margin-top: 8px;">Нажмите для просмотра видео-урока</span>
+                            <div class="play-pulse-btn">
+                              <mat-icon>play_arrow</mat-icon>
+                            </div>
+                            <span class="video-overlay-text">Нажмите для воспроизведения видео</span>
+                            <span class="video-overlay-sub">Просмотр урока будет учтён в вашем прогрессе</span>
                           </div>
 
                           <iframe
@@ -473,28 +474,33 @@ interface TreeNode {
                         </div>
                       </div>
 
-                       <!-- Material link -->
+                      <!-- Material link -->
                       <ng-container *ngIf="selectedLesson.content?.material_id">
-                          <div *ngIf="lessonMetadata.materialAllowed" class="resource-card">
-                            <mat-icon class="resource-icon">description</mat-icon>
+                          <div *ngIf="lessonMetadata.materialAllowed" class="resource-card modern-material-card">
+                            <div class="material-badge-pill" [attr.data-ext]="lessonMetadata.materialFormat">
+                              {{ lessonMetadata.materialFormat || 'FILE' }}
+                            </div>
                             <div class="resource-info">
                                <div class="resource-title">
                                  {{ lessonMetadata.materialName }}
                                </div>
-                               <div class="resource-actions">
-                                 <button mat-button color="primary" (click)="viewMaterial(selectedLesson.content.material_id)">
-                                   <mat-icon>visibility</mat-icon> Просмотр
-                                 </button>
-                                 <button mat-button (click)="downloadMaterial(selectedLesson.content.material_id)">
-                                   <mat-icon>download</mat-icon>
-                                 </button>
-                                 <button mat-stroked-button color="accent" *ngIf="lessonMetadata.isLatex" (click)="viewMaterialAs(selectedLesson.content.material_id, 'pdf')">
-                                   <mat-icon>picture_as_pdf</mat-icon> PDF
-                                 </button>
-                                 <button mat-stroked-button color="accent" *ngIf="lessonMetadata.isJupyter" (click)="viewMaterialAs(selectedLesson.content.material_id, 'html')">
-                                   <mat-icon>html</mat-icon> HTML
-                                 </button>
+                               <div class="resource-meta-size" *ngIf="lessonMetadata.materialSize">
+                                 {{ lessonMetadata.materialSize }}
                                </div>
+                            </div>
+                            <div class="resource-actions">
+                              <button type="button" class="pill-btn pill-btn-dark" (click)="viewMaterial(selectedLesson.content.material_id)">
+                                <mat-icon>visibility</mat-icon> Просмотр
+                              </button>
+                              <button type="button" class="pill-btn pill-btn-outline icon-only" (click)="downloadMaterial(selectedLesson.content.material_id)" matTooltip="Скачать материал">
+                                <mat-icon>download</mat-icon>
+                              </button>
+                              <button type="button" class="pill-btn pill-btn-outline" *ngIf="lessonMetadata.isLatex" (click)="viewMaterialAs(selectedLesson.content.material_id, 'pdf')">
+                                <mat-icon>picture_as_pdf</mat-icon> PDF
+                              </button>
+                              <button type="button" class="pill-btn pill-btn-outline" *ngIf="lessonMetadata.isJupyter" (click)="viewMaterialAs(selectedLesson.content.material_id, 'html')">
+                                <mat-icon>html</mat-icon> HTML
+                              </button>
                             </div>
                           </div>
                           <div *ngIf="!lessonMetadata.materialAllowed" class="resource-card locked">
@@ -847,6 +853,8 @@ interface TreeNode {
       width: 32px;
       height: 32px;
       border-radius: 50%;
+      border: none;
+      background: transparent;
       color: #09090b;
       text-decoration: none;
       transition: background 0.15s ease;
@@ -2112,55 +2120,183 @@ interface TreeNode {
       color: #09090b;
     }
 
+    /* Modern Resource Card */
     .resource-card {
       display: flex;
       align-items: center;
       gap: 16px;
-      padding: 16px;
-      background: rgba(0, 0, 0, 0.02);
-      border: 1px solid rgba(0, 0, 0, 0.06);
-      border-radius: 10px;
-      margin-top: 16px;
+      padding: 16px 20px;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      margin-top: 18px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+      transition: all 0.2s ease;
     }
 
-    .resource-icon {
-      font-size: 28px;
-      width: 28px;
-      height: 28px;
-      color: #09090b;
+    .resource-card:hover {
+      border-color: rgba(0, 0, 0, 0.16);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+    }
+
+    .material-badge-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      background: #f4f4f5;
+      color: #18181b;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      flex-shrink: 0;
+    }
+
+    .material-badge-pill[data-ext="PDF"] { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+    .material-badge-pill[data-ext="DOCX"], .material-badge-pill[data-ext="DOC"] { background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
+    .material-badge-pill[data-ext="TEX"] { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+    .material-badge-pill[data-ext="PY"], .material-badge-pill[data-ext="IPYNB"] { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .material-badge-pill[data-ext="ZIP"], .material-badge-pill[data-ext="RAR"] { background: #f3e8ff; color: #6b21a8; border-color: #e9d5ff; }
+
+    .resource-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
     }
 
     .resource-title {
       font-weight: 600;
       font-size: 14.5px;
       color: #09090b;
+      word-break: break-word;
+    }
+
+    .resource-meta-size {
+      font-size: 12px;
+      color: #71717a;
+    }
+
+    .resource-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill-btn.icon-only {
+      padding: 6px 10px;
+    }
+
+    /* Video Player Section & Overlay */
+    .video-section {
+      margin: 24px 0;
+    }
+
+    .video-section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .video-section-header mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      color: #09090b;
+    }
+
+    .video-section-header h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: #09090b;
     }
 
     .video-container {
       position: relative;
-      margin-top: 16px;
-      border-radius: 12px;
+      width: 100%;
+      max-width: 900px;
+      aspect-ratio: 16 / 9;
+      min-height: 260px;
+      background: #09090b;
+      border-radius: 16px;
       overflow: hidden;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
     }
 
     .video-overlay {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.6);
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.75) 0%, rgba(9, 9, 11, 0.92) 100%);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       z-index: 10;
-      transition: background 0.3s;
+      transition: all 0.25s ease;
+      gap: 12px;
+      padding: 20px;
+      text-align: center;
     }
 
     .video-overlay:hover {
-      background: rgba(0, 0, 0, 0.7);
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(9, 9, 11, 0.88) 100%);
+    }
+
+    .video-overlay:hover .play-pulse-btn {
+      transform: scale(1.08);
+      box-shadow: 0 0 30px rgba(255, 255, 255, 0.35);
+    }
+
+    .play-pulse-btn {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      transition: all 0.25s ease;
+    }
+
+    .play-pulse-btn mat-icon {
+      font-size: 38px;
+      width: 38px;
+      height: 38px;
+      color: #09090b;
+      margin-left: 3px;
+    }
+
+    .video-overlay-text {
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+    }
+
+    .video-overlay-sub {
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 12.5px;
     }
   `]
 })
@@ -2232,7 +2368,9 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     materialAllowed: false,
     testAllowed: false,
     isLatex: false,
-    isJupyter: false
+    isJupyter: false,
+    materialFormat: '',
+    materialSize: ''
   };
 
   materials: any[] = [];
@@ -2253,7 +2391,8 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     private dialog: MatDialog,
     private cdr: ChangeDetectorRef,
     private fb: FormBuilder,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private location: Location
   ) {
     this.announcementForm = this.fb.group({
       title: ['', Validators.required],
@@ -2626,6 +2765,38 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  onHeaderBack(): void {
+    if (this.viewingLessonMode) {
+      this.exitLessonView();
+    } else {
+      if (window.history.length > 1) {
+        this.location.back();
+      } else {
+        this.router.navigate(['/']);
+      }
+    }
+  }
+
+  getMaterialFormat(materialId: string): string {
+    const m = this.materials.find(mat => mat.id === materialId);
+    if (!m) return 'FILE';
+    const name = (m.original_name || m.name || '').toLowerCase();
+    const ext = name.split('.').pop() || '';
+    if (['pdf', 'docx', 'doc', 'tex', 'py', 'ipynb', 'zip', 'rar', 'xlsx', 'pptx', 'txt'].includes(ext)) {
+      return ext.toUpperCase();
+    }
+    return 'FILE';
+  }
+
+  getMaterialSizeFormatted(materialId: string): string {
+    const m = this.materials.find(mat => mat.id === materialId);
+    if (!m || !m.file_size) return '';
+    const bytes = m.file_size;
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
   updateLessonMetadata(node: TreeNode) {
     this.lessonMetadata = {
       moduleName: this.getModuleName(node.moduleId),
@@ -2633,7 +2804,9 @@ export class CourseViewComponent implements OnInit, OnDestroy {
       materialAllowed: node.content?.material_id ? this.isContentAllowed(node.content.material_id, 'material') : false,
       testAllowed: node.content?.test_id ? this.isContentAllowed(node.content.test_id, 'test') : false,
       isLatex: node.content?.material_id ? this.isLatex(node.content.material_id) : false,
-      isJupyter: node.content?.material_id ? this.isJupyter(node.content.material_id) : false
+      isJupyter: node.content?.material_id ? this.isJupyter(node.content.material_id) : false,
+      materialFormat: node.content?.material_id ? this.getMaterialFormat(node.content.material_id) : '',
+      materialSize: node.content?.material_id ? this.getMaterialSizeFormatted(node.content.material_id) : ''
     };
   }
 

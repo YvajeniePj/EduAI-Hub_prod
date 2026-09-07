@@ -20,104 +20,367 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
     MatSnackBarModule
   ],
   template: `
-    <div class="invite-container">
-      <mat-card class="invite-card" *ngIf="subject && !isTeacherOfCourse">
-        <mat-card-header>
-          <mat-icon mat-card-avatar class="invite-icon">mail_outline</mat-icon>
-          <mat-card-title>Приглашение на курс</mat-card-title>
-          <mat-card-subtitle>Вас пригласили присоединиться к обучению</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content class="invite-content">
-          <p class="invite-text" *ngIf="group">
-            Вы приглашены на курс <strong class="highlight">{{ subject.name }}</strong> в группу <strong class="highlight">{{ group.name }}</strong>.
-          </p>
-          <p class="invite-text" *ngIf="!group">
-            Вы приглашены на курс <strong class="highlight">{{ subject.name }}</strong>.
-          </p>
-        </mat-card-content>
-        <mat-card-actions align="end">
-          <button mat-button (click)="decline()">Отклонить</button>
-          <button mat-raised-button color="primary" (click)="acceptInvite()">Принять приглашение</button>
-        </mat-card-actions>
-      </mat-card>
+    <div class="invite-page-container">
+      <!-- Normal Invite Card -->
+      <div class="invite-glass-card" *ngIf="subject && !isTeacherOfCourse">
+        <div class="card-glow-icon">
+          <div class="icon-circle">
+            <mat-icon>mark_email_unread</mat-icon>
+          </div>
+        </div>
 
-      <mat-card class="invite-card" *ngIf="subject && isTeacherOfCourse">
-        <mat-card-header>
-          <mat-icon mat-card-avatar class="invite-icon">info</mat-icon>
-          <mat-card-title>Управление курсом</mat-card-title>
-          <mat-card-subtitle>Информация для преподавателя</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content class="invite-content">
-          <p class="invite-text">
-            Вы являетесь преподавателем на курсе <strong class="highlight">{{ subject.name }}</strong>.
+        <div class="invite-header">
+          <span class="invite-badge">Приглашение на курс</span>
+          <h1 class="invite-course-title">{{ subject.name }}</h1>
+          <p class="invite-subtitle" *ngIf="group">
+            Вас приглашают присоединиться к академической группе
           </p>
-          <p class="invite-text" *ngIf="group" style="margin-top: 8px;">
-            Эта ссылка предназначена для приглашения учащихся в группу <strong class="highlight">{{ group.name }}</strong>.
+          <p class="invite-subtitle" *ngIf="!group">
+            Вас приглашают присоединиться к обучению
           </p>
-          <p class="invite-text" *ngIf="!group" style="margin-top: 8px;">
-            Эта ссылка предназначена для приглашения учащихся на курс напрямую.
-          </p>
-        </mat-card-content>
-        <mat-card-actions align="end">
-          <button mat-raised-button color="primary" [routerLink]="['/courses', subjectId]">Перейти к курсу</button>
-        </mat-card-actions>
-      </mat-card>
+        </div>
 
-      <mat-card class="invite-card loading-card" *ngIf="loading">
-        <mat-card-content>
-          <p>Загрузка деталей приглашения...</p>
-        </mat-card-content>
-      </mat-card>
+        <div class="invite-details-box" *ngIf="group">
+          <div class="detail-row">
+            <mat-icon class="detail-icon">groups</mat-icon>
+            <div class="detail-text">
+              <span class="detail-label">Учебная группа</span>
+              <span class="detail-value">{{ group.name }}</span>
+            </div>
+          </div>
+        </div>
 
-      <mat-card class="invite-card error-card" *ngIf="!loading && !subject">
-        <mat-card-content>
-          <p>Не удалось загрузить данные приглашения. Ссылка может быть недействительной.</p>
-        </mat-card-content>
-        <mat-card-actions align="end">
-          <button mat-raised-button color="primary" routerLink="/">На главную</button>
-        </mat-card-actions>
-      </mat-card>
+        <div class="invite-actions">
+          <button type="button" class="pill-btn pill-btn-outline" (click)="decline()">
+            Отклонить
+          </button>
+          <button type="button" class="pill-btn pill-btn-dark" (click)="acceptInvite()">
+            <mat-icon>check</mat-icon>
+            Принять приглашение
+          </button>
+        </div>
+      </div>
+
+      <!-- Teacher View Card -->
+      <div class="invite-glass-card" *ngIf="subject && isTeacherOfCourse">
+        <div class="card-glow-icon teacher-glow">
+          <div class="icon-circle teacher-circle">
+            <mat-icon>school</mat-icon>
+          </div>
+        </div>
+
+        <div class="invite-header">
+          <span class="invite-badge teacher-badge">Преподаватель курса</span>
+          <h1 class="invite-course-title">{{ subject.name }}</h1>
+          <p class="invite-subtitle">
+            Вы являетесь преподавателем на данном курсе
+          </p>
+        </div>
+
+        <div class="teacher-info-banner">
+          <p *ngIf="group">
+            Эта ссылка сформирована для приглашения учащихся в группу <strong>{{ group.name }}</strong>.
+          </p>
+          <p *ngIf="!group">
+            Эта ссылка предназначена для прямого приглашения учащихся на курс.
+          </p>
+        </div>
+
+        <div class="invite-actions single-action">
+          <button type="button" class="pill-btn pill-btn-dark" [routerLink]="['/courses', subjectId]">
+            <mat-icon>arrow_forward</mat-icon>
+            Перейти к курсу
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div class="invite-glass-card status-card" *ngIf="loading">
+        <div class="spinner-wrap">
+          <div class="custom-spinner"></div>
+        </div>
+        <h3>Загрузка приглашения...</h3>
+        <p>Пожалуйста, подождите, проверяем параметры ссылки</p>
+      </div>
+
+      <!-- Error State -->
+      <div class="invite-glass-card status-card error" *ngIf="!loading && !subject">
+        <div class="card-glow-icon error-glow">
+          <div class="icon-circle error-circle">
+            <mat-icon>error_outline</mat-icon>
+          </div>
+        </div>
+        <h3>Приглашение не найдено</h3>
+        <p>Ссылка может быть устаревшей или указан неверный идентификатор курса</p>
+        <div class="invite-actions single-action" style="margin-top: 24px;">
+          <button type="button" class="pill-btn pill-btn-dark" routerLink="/">
+            На главную
+          </button>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
-    .invite-container {
+    .invite-page-container {
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: calc(100vh - 120px);
-      padding: 24px;
+      padding: 32px 20px;
+      position: relative;
+      z-index: 1;
     }
-    .invite-card {
-      max-width: 500px;
+
+    .invite-glass-card {
+      max-width: 480px;
       width: 100%;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-      border: 1px solid #e0e0e0;
-      padding: 16px;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02);
+      padding: 36px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      box-sizing: border-box;
+      animation: cardAppear 0.35s ease-out;
     }
-    .invite-icon {
-      font-size: 40px;
-      width: 40px;
-      height: 40px;
-      color: #3f51b5;
+
+    @keyframes cardAppear {
+      from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .card-glow-icon {
+      margin-bottom: 20px;
+    }
+
+    .icon-circle {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+    }
+
+    .icon-circle mat-icon {
+      font-size: 30px;
+      width: 30px;
+      height: 30px;
+    }
+
+    .teacher-glow .teacher-circle {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+    }
+
+    .error-glow .error-circle {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+    }
+
+    .invite-header {
+      margin-bottom: 24px;
+    }
+
+    .invite-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: rgba(59, 130, 246, 0.1);
+      color: #2563eb;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .teacher-badge {
+      background: rgba(16, 185, 129, 0.1);
+      color: #059669;
+    }
+
+    .invite-course-title {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 32px;
+      font-weight: 400;
+      color: #09090b;
+      margin: 0 0 8px;
+      line-height: 1.25;
+      letter-spacing: -0.01em;
+    }
+
+    .invite-subtitle {
+      font-size: 14.5px;
+      color: #71717a;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .invite-details-box {
+      width: 100%;
+      background: #f8fafc;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 16px;
+      padding: 14px 18px;
+      margin-bottom: 28px;
+      box-sizing: border-box;
+    }
+
+    .detail-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-align: left;
+    }
+
+    .detail-icon {
+      font-size: 22px;
+      width: 22px;
+      height: 22px;
+      color: #2563eb;
+    }
+
+    .detail-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .detail-label {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #71717a;
+      font-weight: 600;
+    }
+
+    .detail-value {
+      font-size: 15px;
+      font-weight: 600;
+      color: #09090b;
+    }
+
+    .teacher-info-banner {
+      width: 100%;
+      background: #f0fdf4;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: 16px;
+      padding: 14px 18px;
+      margin-bottom: 28px;
+      box-sizing: border-box;
+      font-size: 13.5px;
+      color: #065f46;
+      line-height: 1.5;
+      text-align: left;
+    }
+
+    .invite-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .invite-actions.single-action {
+      justify-content: center;
+    }
+
+    .invite-actions .pill-btn {
+      flex: 1;
+      justify-content: center;
+    }
+
+    .pill-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 22px;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      box-sizing: border-box;
+    }
+
+    .pill-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .pill-btn-dark {
+      background: #09090b;
+      color: #ffffff;
+    }
+
+    .pill-btn-dark:hover {
+      background: #27272a;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .pill-btn-outline {
+      background: transparent;
+      color: #09090b;
+      border: 1px solid rgba(0, 0, 0, 0.16);
+    }
+
+    .pill-btn-outline:hover {
+      background: rgba(0, 0, 0, 0.04);
+      border-color: rgba(0, 0, 0, 0.3);
+    }
+
+    .status-card {
+      padding: 48px 32px;
+    }
+
+    .status-card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #09090b;
+      margin: 16px 0 6px;
+    }
+
+    .status-card p {
+      font-size: 14px;
+      color: #71717a;
+      margin: 0;
+    }
+
+    .spinner-wrap {
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .invite-content {
-      margin: 24px 0;
+
+    .custom-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-top-color: #09090b;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
     }
-    .invite-text {
-      font-size: 16px;
-      line-height: 1.6;
-      color: #37474f;
-    }
-    .highlight {
-      color: #3f51b5;
-      font-weight: 600;
-    }
-    .loading-card, .error-card {
-      text-align: center;
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   `]
 })

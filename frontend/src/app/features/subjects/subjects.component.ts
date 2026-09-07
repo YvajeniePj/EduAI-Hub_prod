@@ -14,6 +14,7 @@ import { RouterModule } from '@angular/router';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { CourseGenerationService } from '../../core/services/course-generation.service';
 
 @Component({
   selector: 'app-generate-course-dialog',
@@ -162,7 +163,7 @@ export class GenerateCourseDialogComponent {
   constructor(
     private fb: FormBuilder,
     private dialogRef: MatDialogRef<GenerateCourseDialogComponent>,
-    private apiService: ApiService
+    private courseGenService: CourseGenerationService
   ) {
     this.form = this.fb.group({
       topic: ['', Validators.required],
@@ -172,20 +173,9 @@ export class GenerateCourseDialogComponent {
 
   generate() {
     if (this.form.valid) {
-      this.loading = true;
       const { topic, additionalInfo } = this.form.value;
-
-      this.apiService.generateCourse(topic, additionalInfo).subscribe({
-        next: (res) => {
-          this.loading = false;
-          this.dialogRef.close(true); // Return true on success
-        },
-        error: (err) => {
-          this.loading = false;
-          console.error('Error generating course:', err);
-          alert('Ошибка генерации: ' + (err.error?.detail || err.message));
-        }
-      });
+      this.courseGenService.startGeneration(topic, 'Beginners', additionalInfo);
+      this.dialogRef.close(true);
     }
   }
 
@@ -691,14 +681,12 @@ export class SubjectsComponent implements OnInit {
 
   openGenerateDialog() {
     const dialogRef = this.dialog.open(GenerateCourseDialogComponent, {
-      width: '500px',
-      disableClose: true // Prevent closing while generating
+      width: '500px'
     });
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        this.loadSubjects(); // Reload to show the new course
-        alert('Курс успешно создан AI!');
+        this.snackBar.open('Генерация курса запущена в фоновом режиме! Следите за прогрессом в виджете.', 'Отлично', { duration: 4000 });
       }
     });
   }
