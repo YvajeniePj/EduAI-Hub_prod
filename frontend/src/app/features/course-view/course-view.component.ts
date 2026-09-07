@@ -2843,8 +2843,13 @@ export class CourseViewComponent implements OnInit, OnDestroy {
   }
 
   openUploadMaterial() {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     const dialogRef = this.dialog.open(UploadMaterialDialogComponent, {
       width: '600px',
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
       data: { subjectId: this.subjectId }
     });
 
