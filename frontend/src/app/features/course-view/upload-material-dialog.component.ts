@@ -27,12 +27,12 @@ import { ApiService } from '../../core/services/api.service';
     <h2 mat-dialog-title>Загрузить материал</h2>
     <mat-dialog-content>
       <form [formGroup]="uploadForm">
-        <div class="file-upload-area">
-            <input type="file" #fileInput (change)="onFileSelected($event)" multiple class="file-input" id="fileInputDlg">
-            <label for="fileInputDlg" class="file-label">
+        <div class="file-upload-area" (click)="fileInput.click()">
+            <input type="file" #fileInput (change)="onFileSelected($event)" multiple style="display: none">
+            <div class="file-label">
               <mat-icon>attach_file</mat-icon>
               <span>{{ selectedFiles.length > 0 ? selectedFiles.length + ' файл(ов) выбрано' : 'Выберите файлы' }}</span>
-            </label>
+            </div>
         </div>
 
         <mat-form-field appearance="outline" class="full-width">
@@ -72,9 +72,7 @@ import { ApiService } from '../../core/services/api.service';
     }
     .file-upload-area {
         margin-bottom: 16px;
-    }
-    .file-input {
-      display: none;
+        cursor: pointer;
     }
     .file-label {
       display: flex;
@@ -88,7 +86,7 @@ import { ApiService } from '../../core/services/api.service';
       background: #fafafa;
       justify-content: center;
     }
-    .file-label:hover {
+    .file-upload-area:hover .file-label {
       border-color: #3f51b5;
       background: #f3f4ff;
     }
@@ -129,7 +127,12 @@ export class UploadMaterialDialogComponent {
   }
 
   onFileSelected(event: any) {
-    this.selectedFiles = Array.from(event.target.files);
+    if (event.target?.files) {
+      this.selectedFiles = Array.from(event.target.files);
+    }
+    if (event.target) {
+      event.target.value = '';
+    }
   }
 
   upload() {

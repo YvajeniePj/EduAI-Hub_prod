@@ -294,15 +294,17 @@ interface Message {
             </div>
 
             <div class="chat-pill-input-bar">
-              <label class="pill-attach-btn" 
-                     [class.disabled]="sending" 
-                     title="Прикрепить файл или фото">
-                <input type="file" 
-                       (change)="onFileSelected($event)" 
-                       [disabled]="sending" 
-                       class="pill-native-file-input" />
+              <button type="button" 
+                      class="pill-attach-btn" 
+                      (click)="chatFileInput.click()" 
+                      [disabled]="sending" 
+                      title="Прикрепить файл или фото">
                 <mat-icon>attach_file</mat-icon>
-              </label>
+              </button>
+              <input #chatFileInput 
+                     type="file" 
+                     (change)="onFileSelected($event)" 
+                     style="display: none;" />
               <input type="text" 
                      [(ngModel)]="newMessageContent" 
                      (keyup.enter)="sendChatMessage()"
@@ -1219,7 +1221,6 @@ interface Message {
       box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
     }
     .pill-attach-btn {
-      position: relative;
       background: transparent;
       border: none;
       color: #71717a;
@@ -1229,37 +1230,28 @@ interface Message {
       justify-content: center;
       padding: 6px;
       border-radius: 50%;
-      transition: color 0.15s, transform 0.15s;
+      transition: color 0.15s, transform 0.15s, background-color 0.15s;
       user-select: none;
-      overflow: hidden;
       width: 32px;
       height: 32px;
       min-width: 32px;
     }
-    .pill-native-file-input {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0;
-      cursor: pointer;
-      z-index: 2;
+    .pill-attach-btn:hover {
+      color: #111111;
+      background: rgba(0, 0, 0, 0.05);
+      transform: scale(1.1);
     }
-    .pill-attach-btn.disabled {
+    .pill-attach-btn.disabled,
+    .pill-attach-btn:disabled {
       opacity: 0.4;
+      cursor: not-allowed;
       pointer-events: none;
+      transform: none;
     }
     .pill-attach-btn mat-icon {
       font-size: 20px;
       width: 20px;
       height: 20px;
-      pointer-events: none;
-      z-index: 1;
-    }
-    .pill-attach-btn:hover {
-      color: #111111;
-      transform: scale(1.1);
     }
     .pill-input {
       flex: 1;

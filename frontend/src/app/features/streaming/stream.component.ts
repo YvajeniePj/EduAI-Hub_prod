@@ -244,15 +244,17 @@ interface ChatMessage {
           </div>
 
           <div class="chat-input-bar">
-            <label class="btn-stream-attach" 
-                   [class.disabled]="uploadingFile" 
-                   title="Прикрепить файл или фото">
-              <input type="file" 
-                     (change)="onFileSelected($event)" 
-                     [disabled]="uploadingFile" 
-                     class="stream-native-file-input" />
+            <button type="button" 
+                    class="btn-stream-attach" 
+                    (click)="streamFileInput.click()" 
+                    [disabled]="uploadingFile" 
+                    title="Прикрепить файл или фото">
               <mat-icon>attach_file</mat-icon>
-            </label>
+            </button>
+            <input #streamFileInput 
+                   type="file" 
+                   (change)="onFileSelected($event)" 
+                   style="display: none;" />
             <input 
               type="text" 
               class="chat-text-input" 
@@ -877,8 +879,6 @@ interface ChatMessage {
 
     /* Attachment Styles in Stream Chat */
     .btn-stream-attach {
-      position: relative;
-      overflow: hidden;
       width: 38px;
       height: 38px;
       border-radius: 50%;
@@ -893,31 +893,23 @@ interface ChatMessage {
       flex-shrink: 0;
       user-select: none;
     }
-    .stream-native-file-input {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0;
-      cursor: pointer;
-      z-index: 2;
-    }
     .btn-stream-attach:hover {
       background: #f1f5f9;
       color: #09090b;
       border-color: #cbd5e1;
+      transform: scale(1.05);
     }
+    .btn-stream-attach:disabled,
     .btn-stream-attach.disabled {
       opacity: 0.4;
+      cursor: not-allowed;
       pointer-events: none;
+      transform: none;
     }
     .btn-stream-attach mat-icon {
       font-size: 20px;
       width: 20px;
       height: 20px;
-      pointer-events: none;
-      z-index: 1;
     }
 
     /* Pending Attachment Chip */

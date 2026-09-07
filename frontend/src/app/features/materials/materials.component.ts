@@ -56,11 +56,13 @@ import { Subject, takeUntil } from 'rxjs';
         </mat-card-header>
         <mat-card-content>
           <div class="upload-section">
-            <input type="file" #fileInput (change)="onFileSelected($event)" multiple class="file-input" id="fileInput">
-            <label for="fileInput" class="file-label">
-              <mat-icon>attach_file</mat-icon>
-              <span>{{ selectedFiles.length > 0 ? selectedFiles.length + ' файл(ов) выбрано' : 'Выберите файлы' }}</span>
-            </label>
+            <div class="file-upload-area" (click)="fileInput.click()">
+              <input type="file" #fileInput (change)="onFileSelected($event)" multiple style="display: none">
+              <div class="file-label">
+                <mat-icon>attach_file</mat-icon>
+                <span>{{ selectedFiles.length > 0 ? selectedFiles.length + ' файл(ов) выбрано' : 'Выберите файлы' }}</span>
+              </div>
+            </div>
             
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Описание (опционально)</mat-label>
@@ -201,8 +203,8 @@ import { Subject, takeUntil } from 'rxjs';
       gap: 16px;
     }
 
-    .file-input {
-      display: none;
+    .file-upload-area {
+      cursor: pointer;
     }
 
     .file-label {
@@ -217,7 +219,7 @@ import { Subject, takeUntil } from 'rxjs';
       background: #fafafa;
     }
 
-    .file-label:hover {
+    .file-upload-area:hover .file-label {
       border-color: #3f51b5;
       background: #f3f4ff;
     }
@@ -441,7 +443,12 @@ export class MaterialsComponent implements OnInit, OnDestroy {
   }
 
   onFileSelected(event: any) {
-    this.selectedFiles = Array.from(event.target.files);
+    if (event.target?.files) {
+      this.selectedFiles = Array.from(event.target.files);
+    }
+    if (event.target) {
+      event.target.value = '';
+    }
   }
 
   uploadFiles() {
