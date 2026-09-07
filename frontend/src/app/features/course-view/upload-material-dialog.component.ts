@@ -27,8 +27,8 @@ import { ApiService } from '../../core/services/api.service';
     <h2 mat-dialog-title>Загрузить материал</h2>
     <mat-dialog-content>
       <form [formGroup]="uploadForm">
+        <input type="file" #fileInput (change)="onFileSelected($event)" multiple style="display: none">
         <button type="button" class="file-upload-area" (click)="fileInput.click()" cdkFocusInitial>
-            <input type="file" #fileInput (change)="onFileSelected($event)" multiple style="display: none">
             <div class="file-label">
               <mat-icon>attach_file</mat-icon>
               <span>{{ selectedFiles.length > 0 ? selectedFiles.length + ' файл(ов) выбрано' : 'Выберите файлы' }}</span>

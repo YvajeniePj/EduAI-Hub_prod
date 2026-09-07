@@ -56,13 +56,13 @@ import { Subject, takeUntil } from 'rxjs';
         </mat-card-header>
         <mat-card-content>
           <div class="upload-section">
-            <div class="file-upload-area" (click)="fileInput.click()">
-              <input type="file" #fileInput (change)="onFileSelected($event)" multiple style="display: none">
+            <input type="file" #fileInput (change)="onFileSelected($event)" multiple style="display: none">
+            <button type="button" class="file-upload-area" (click)="fileInput.click()">
               <div class="file-label">
                 <mat-icon>attach_file</mat-icon>
                 <span>{{ selectedFiles.length > 0 ? selectedFiles.length + ' файл(ов) выбрано' : 'Выберите файлы' }}</span>
               </div>
-            </div>
+            </button>
             
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Описание (опционально)</mat-label>
@@ -204,7 +204,13 @@ import { Subject, takeUntil } from 'rxjs';
     }
 
     .file-upload-area {
+      width: 100%;
+      background: transparent;
+      border: none;
+      padding: 0;
       cursor: pointer;
+      display: block;
+      text-align: inherit;
     }
 
     .file-label {
