@@ -724,12 +724,13 @@ export class ApiService {
   }
 
   // Advanced AI Course Generation
-  suggestCourseStructure(topic: string, targetAudience: string = 'Beginners', additionalInfo?: string, sourceMaterials?: any[]): Observable<any> {
+  suggestCourseStructure(topic: string, targetAudience: string = 'Beginners', additionalInfo?: string, sourceMaterials?: any[], desiredModules: number = 3): Observable<any> {
     return this.http.post<any>(`${API_URL}/ai/suggest-structure`, {
       topic,
       target_audience: targetAudience,
       additional_info: additionalInfo,
-      source_materials: sourceMaterials
+      source_materials: sourceMaterials,
+      desired_modules: desiredModules
     });
   }
 

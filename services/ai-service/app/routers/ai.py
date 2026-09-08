@@ -754,6 +754,7 @@ class SuggestStructureRequest(BaseModel):
     topic: str
     target_audience: str = "Beginners"
     additional_info: Optional[str] = None
+    desired_modules: Optional[int] = 3
     source_materials: Optional[List[SourceMaterial]] = None
 
 class GenerateCourseAdvancedRequest(BaseModel):
@@ -1061,30 +1062,47 @@ async def generate_lesson_content(topic: str, module_title: str, lesson_title: s
         rag_str = f"\n\nМАТЕРИАЛЫ ПРЕПОДАВАТЕЛЯ ДЛЯ ЭТОГО УРОКА (извлечено из прикреплённых документов/TeX):\n{source_material_context}\n\nВАЖНО: Обязательно используй факты, формулы, теоремы и терминологию из прикреплённых материалов преподавателя!"
     
     system_msg = (
-        "Ты - автор учебных материалов. Пиши развёрнутый, понятный учебный текст. "
-        "Используй заголовки, списки, примеры. Не повторяй то, что уже было в предыдущих уроках. "
-        "Если предоставлены материалы преподавателя или формулы TeX/LaTeX, обязательно включай их в текст. "
-        "Пиши на русском языке. Отвечай только текстом урока, без JSON и обёрток."
+        "Ты - опытный методист высшей категории и ассистент преподавателя. "
+        "Твоя цель - составить структурированный, качественный методический конспект и материалы урока для преподавателя и студентов. "
+        "Оформляй ответ строго в формате Markdown с понятными заголовками уровня ## и четкими списками. "
+        "Обязательно отделяй абзацы и списки пустыми строками, чтобы текст легко читался. "
+        "Если в материалах преподавателя есть формулы, теоремы или определения TeX/LaTeX, обязательно включай их (в нотации $...$ или $$...$$). "
+        "Пиши на русском языке без лишних вступительных фраз."
     )
     
-    user_msg = f"""Напиши учебный материал для урока "{lesson_title}" в модуле "{module_title}" курса "{topic}".
-{f"Дополнительные указания: {additional_info}" if additional_info else ""}
+    user_msg = f"""Составь методический конспект и материалы для урока "{lesson_title}" (Модуль: "{module_title}", Тема курса: "{topic}").
+{f"Дополнительные указания преподавателя: {additional_info}" if additional_info else ""}
 {context_str}
 {rag_str}
 
-Требования:
-- Объём: 2000-4000 символов
-- Включи теоретическое объяснение с примерами и формулами
-- Используй маркированные списки для ключевых понятий
-- Добавь практические примеры где уместно
-- Завершай кратким резюме ключевых тезисов"""
+Требования к структуре (обязательно используй именно эти 4 раздела с заголовками ##):
+
+## 📋 Краткая сводка урока
+Концентрированная выжимка темы (2-3 емких абзаца): суть урока, ключевая идея, практическая значимость и что студент освоит по итогам.
+
+## 🔑 Ключевые термины и определения
+Список ключевых понятий с четкими формулировками. Если уместно, приведи формулы в LaTeX-формате:
+- **Термин 1** — определение...
+- **Термин 2** — определение...
+
+## 🎙️ Методический сценарий для преподавателя
+Пошаговый план проведения занятия с акцентами и таймингом:
+1. **Введение и актуализация (5-10 мин)**: проблемный вопрос или интригующий пример из жизни для вовлечения аудитории.
+2. **Разбор теоретической части (15-20 мин)**: ключевые тезисы, интуитивные аналогии и наглядные примеры.
+3. **Практическая демонстрация (15 мин)**: разбор реального практического кейса, фрагмента кода или задачи.
+4. **Интерактив и проверка понимания (10 мин)**: 2-3 контрольных вопроса для быстрой дискуссии со студентами.
+
+## 💡 Рекомендации AI: Что добавить в урок
+- **Идеи практических задач**: 1-2 задачи для самостоятельной или домашней работы.
+- **Кейсы из реальной индустрии**: примеры применения этой темы в компаниях и современных сервисах.
+- **Частые ошибки и заблуждения**: на чем студенты чаще всего спотыкаются и как это предотвратить."""
     
     messages = [
         {"role": "system", "content": system_msg},
         {"role": "user", "content": user_msg}
     ]
     
-    result = await chat_completion(messages, temperature=0.5, max_tokens=3000)
+    result = await chat_completion(messages, temperature=0.3, max_tokens=3500)
     return result
 
 
@@ -1176,31 +1194,44 @@ async def generate_video_plan(topic: str, module_title: str, lesson_title: str, 
 @router.post("/suggest-structure")
 async def suggest_course_structure(request: SuggestStructureRequest):
     """AI suggests a course structure (modules and lessons with types) based on topic"""
-    def _fallback_structure() -> dict:
+    desired_count = request.desired_modules or 3
+    # Check if user mentioned module count in topic or additional_info
+    combined_info = f"{request.topic} {request.additional_info or ''}"
+    m_count = re.search(r'(\d+)\s*(?:модул|модулей|модуля)', combined_info, re.IGNORECASE)
+    if m_count:
+        try:
+            val = int(m_count.group(1))
+            if 2 <= val <= 6:
+                desired_count = val
+        except:
+            pass
+
+    def _fallback_structure(count: int = desired_count) -> dict:
         topic_clean = request.topic.strip()
+        modules = []
+        templates = [
+            ("Введение и базовые концепции", "Фундаментальные понятия, терминология и основы темы"),
+            ("Практические методы и применение", "Разбор ключевых алгоритмов, инструментов и практики"),
+            ("Продвинутые техники и архитектура", "Углубленный анализ, оптимизация и сложные сценарии"),
+            ("Интеграция и реальные кейсы", "Реализация комплексных проектов и разбор ошибок"),
+            ("Итоговая практика и специализация", "Самостоятельное проектирование и закрепление знаний"),
+            ("Мастерство и профессиональные практики", "Лучшие индустриальные подходы и масштабирование")
+        ]
+        for i in range(count):
+            t_title, t_desc = templates[i % len(templates)]
+            modules.append({
+                "title": f"Модуль {i+1}. {t_title}",
+                "description": t_desc,
+                "lessons": [
+                    {"title": f"Основы раздела {i+1}", "lesson_type": "lecture"},
+                    {"title": f"Практический разбор темы {i+1}", "lesson_type": "lecture"},
+                    {"title": f"Проверка знаний по модулю {i+1}", "lesson_type": "test", "question_count": 5}
+                ]
+            })
         return {
             "title": topic_clean,
             "description": f"Образовательный курс по теме: {topic_clean}",
-            "modules": [
-                {
-                    "title": f"Модуль 1. Основы {topic_clean}",
-                    "description": "Базовые понятия и введение в тему",
-                    "lessons": [
-                        {"title": "Введение и ключевые понятия", "lesson_type": "lecture"},
-                        {"title": "Практические основы и примеры", "lesson_type": "lecture"},
-                        {"title": "Проверка знаний", "lesson_type": "test", "question_count": 5}
-                    ]
-                },
-                {
-                    "title": f"Модуль 2. Углубленное изучение {topic_clean}",
-                    "description": "Продвинутые техники и разбор задач",
-                    "lessons": [
-                        {"title": "Продвинутые концепции", "lesson_type": "lecture"},
-                        {"title": "Разбор практических кейсов", "lesson_type": "lecture"},
-                        {"title": "Итоговый тест", "lesson_type": "test", "question_count": 5}
-                    ]
-                }
-            ]
+            "modules": modules
         }
 
     def _robust_parse_json(text: str):
@@ -1275,10 +1306,11 @@ async def suggest_course_structure(request: SuggestStructureRequest):
 {materials_context}
 
 Требования:
-1. Создай от 2 до 3 модулей.
-2. В каждом модуле от 2 до 3 уроков.
-3. Типы уроков: "lecture" (теоретический материал), "video" (видеоурок), "test" (тест для проверки знаний).
-4. Каждый модуль должен заканчиваться тестом (lesson_type: "test", question_count: 5).
+1. Создай РОВНО {desired_count} модуля(ей) - строго ровно {desired_count}, не больше и не меньше!
+2. В каждом модуле от 2 до 4 уроков.
+3. Названия модулей должны быть содержательными и тематическими (НЕ дублируй шаблон "Основы [полная тема курса]", формулируй краткие логические названия разделов, например: "Модуль 1. Основные концепции", "Модуль 2. Алгоритмы классификации").
+4. Типы уроков: "lecture" (теоретический материал), "video" (видеоурок), "test" (тест для проверки знаний).
+5. Каждый модуль должен заканчиваться тестом (lesson_type: "test", question_count: 5).
 
 Формат ответа (строго валидный JSON):
 {{
@@ -1305,27 +1337,34 @@ async def suggest_course_structure(request: SuggestStructureRequest):
         
         if not result:
             logger.warning("Empty response from chat_completion in suggest_structure, returning fallback")
-            return _fallback_structure()
+            return _fallback_structure(desired_count)
         
         structure = _robust_parse_json(result)
         
         if not structure or not isinstance(structure, dict) or not structure.get("modules"):
             logger.warning(f"Could not parse valid JSON from AI response: {result[:300]}. Using fallback.")
-            return _fallback_structure()
+            return _fallback_structure(desired_count)
         
-        # Ensure modules and lessons have required fields
-        for mod in structure.get("modules", []):
+        # Ensure modules and lessons have required fields & clean duplicate wording
+        cleaned_modules = []
+        for idx, mod in enumerate(structure.get("modules", [])):
+            if "title" not in mod or not mod["title"].strip():
+                mod["title"] = f"Модуль {idx + 1}"
+            else:
+                mod["title"] = re.sub(r'Основы\s+(Введение\s+в\s+)', r'\1', mod["title"])
             if "lessons" not in mod or not isinstance(mod["lessons"], list):
                 mod["lessons"] = [{"title": "Введение", "lesson_type": "lecture"}]
             for l in mod["lessons"]:
                 if "lesson_type" not in l:
                     l["lesson_type"] = "lecture"
+            cleaned_modules.append(mod)
+        structure["modules"] = cleaned_modules
         
         return structure
         
     except Exception as e:
         logger.error(f"Error suggesting course structure: {e}. Falling back to default.")
-        return _fallback_structure()
+        return _fallback_structure(desired_count)
 
 @router.post("/generate-course-advanced")
 async def generate_course_advanced(request: GenerateCourseAdvancedRequest, x_user_name: Optional[str] = Header(None)):

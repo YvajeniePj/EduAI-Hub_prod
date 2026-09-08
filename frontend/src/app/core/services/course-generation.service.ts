@@ -53,6 +53,13 @@ export class CourseGenerationService {
     }
   }
 
+  registerCustomTask(task: CourseGenTask): string {
+    const currentTasks = [task, ...this.tasksSubject.value.filter(t => t.id !== task.id)];
+    this.tasksSubject.next(currentTasks);
+    this.saveToStorage(currentTasks);
+    return task.id;
+  }
+
   startGeneration(topic: string, targetAudience: string = 'Beginners', additionalInfo?: string): string {
     const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 

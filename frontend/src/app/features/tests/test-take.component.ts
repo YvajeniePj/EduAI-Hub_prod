@@ -319,6 +319,8 @@ import { debounceTime } from 'rxjs/operators';
       display: flex;
       gap: 24px;
       align-items: flex-start;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .test-header {
@@ -341,9 +343,9 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .test-title {
-      font-family: 'Instrument Serif', Georgia, serif;
-      font-size: 34px;
-      font-weight: 400;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 32px;
+      font-weight: 700;
       color: #09090b;
       margin: 0 0 10px 0;
       line-height: 1.2;
@@ -481,6 +483,7 @@ import { debounceTime } from 'rxjs/operators';
 
     .test-form {
       flex: 1;
+      min-width: 0;
       background: rgba(255, 255, 255, 0.78);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
@@ -488,25 +491,32 @@ import { debounceTime } from 'rxjs/operators';
       border-radius: 20px;
       padding: 32px;
       box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+      box-sizing: border-box;
     }
 
     .questions-carousel {
       position: relative;
+      width: 100%;
     }
 
     .carousel-wrapper {
       overflow: hidden;
       margin-bottom: 32px;
+      width: 100%;
     }
 
     .carousel-track {
       display: flex;
+      width: 100%;
       transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       will-change: transform;
     }
 
     .question-card {
       min-width: 100%;
+      max-width: 100%;
+      width: 100%;
+      box-sizing: border-box;
       flex-shrink: 0;
       border-radius: 16px;
       border: 1px solid rgba(0, 0, 0, 0.08);
@@ -742,6 +752,9 @@ import { debounceTime } from 'rxjs/operators';
 
     .quick-nav-sidebar {
       width: 280px;
+      min-width: 240px;
+      flex-shrink: 0;
+      box-sizing: border-box;
       background: rgba(255, 255, 255, 0.78);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
@@ -756,9 +769,9 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .sidebar-title {
-      font-family: 'Instrument Serif', Georgia, serif;
-      font-size: 20px;
-      font-weight: 400;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 18px;
+      font-weight: 600;
       color: #09090b;
       margin: 0 0 16px 0;
       padding-bottom: 12px;
@@ -953,10 +966,10 @@ import { debounceTime } from 'rxjs/operators';
     }
 
     .error-content h2 {
-      font-family: 'Instrument Serif', Georgia, serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #18181b;
-      font-size: 28px;
-      font-weight: 400;
+      font-size: 26px;
+      font-weight: 600;
       margin: 0 0 10px 0;
     }
 
@@ -998,7 +1011,7 @@ import { debounceTime } from 'rxjs/operators';
       border-radius: 8px;
     }
 
-    @media (max-width: 1200px) {
+    @media (max-width: 1280px) {
       .test-main-layout {
         flex-direction: column;
       }

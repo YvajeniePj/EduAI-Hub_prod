@@ -14,7 +14,7 @@ import { RouterModule } from '@angular/router';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
-import { CourseGenerationService } from '../../core/services/course-generation.service';
+import { CourseGenerationService, CourseGenTask } from '../../core/services/course-generation.service';
 
 @Component({
   selector: 'app-generate-course-dialog',
@@ -32,10 +32,16 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
     MatSnackBarModule
   ],
   template: `
-    <h2 mat-dialog-title class="dialog-title">
-      <mat-icon class="title-icon">auto_awesome</mat-icon>
-      AI Генерация курса
-    </h2>
+    <div class="dialog-header-row">
+      <h2 mat-dialog-title class="dialog-title">
+        <mat-icon class="title-icon">auto_awesome</mat-icon>
+        AI Генерация курса
+      </h2>
+      <button *ngIf="generating" type="button" class="btn-minimize-dialog" (click)="minimizeToDock()" title="Свернуть в виджет в правом нижнем углу">
+        <mat-icon>minimize</mat-icon>
+        <span>Свернуть в виджет</span>
+      </button>
+    </div>
     <mat-dialog-content class="dialog-content-body">
       <!-- Step 1: Parameters -->
       <div *ngIf="step === 1 && !suggestingStructure && !generating">
@@ -43,6 +49,19 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
           <mat-label>Тема курса</mat-label>
           <input matInput [(ngModel)]="topic" required placeholder="Например: Основы Python или Теория графов">
         </mat-form-field>
+
+        <div class="audience-section">
+          <label class="section-label">Количество модулей в курсе</label>
+          <div class="audience-pills">
+            <button *ngFor="let count of [2, 3, 4, 5]"
+                    type="button"
+                    class="audience-pill"
+                    [class.active]="desiredModules === count"
+                    (click)="desiredModules = count">
+              {{count}} {{count === 1 ? 'модуль' : (count >= 2 && count <= 4 ? 'модуля' : 'модулей')}}
+            </button>
+          </div>
+        </div>
 
         <div class="audience-section">
           <label class="section-label">Уровень аудитории</label>
@@ -220,12 +239,41 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
     </mat-dialog-actions>
   `,
   styles: [`
+    .dialog-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px 0 !important;
+    }
+    .btn-minimize-dialog {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f4f4f5;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #3f3f46;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-minimize-dialog:hover {
+      background: #18181b;
+      color: #fff;
+    }
+    .btn-minimize-dialog mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
     .dialog-title {
       font-family: 'Inter', sans-serif !important;
       font-size: 22px !important;
       font-weight: 600 !important;
       color: #09090b !important;
-      padding: 20px 24px 8px !important;
+      padding: 8px 0 !important;
       margin: 0 !important;
       display: flex;
       align-items: center;
@@ -482,6 +530,8 @@ export class GenerateCourseDialogComponent {
   targetAudience = 'Beginners';
   additionalInfo = '';
   suggestingStructure = false;
+  desiredModules = 3;
+  currentTaskId: string | null = null;
   generating = false;
   generatingStatus = 'Подготовка к генерации...';
 
@@ -593,7 +643,7 @@ export class GenerateCourseDialogComponent {
     if (!this.topic.trim()) return;
     this.suggestingStructure = true;
 
-    this.apiService.suggestCourseStructure(this.topic, this.targetAudience, this.additionalInfo, this.sourceMaterials)
+    this.apiService.suggestCourseStructure(this.topic, this.targetAudience, this.additionalInfo, this.sourceMaterials, this.desiredModules)
       .subscribe({
         next: (res: any) => {
           this.blueprint = {
@@ -621,18 +671,22 @@ export class GenerateCourseDialogComponent {
   }
 
   goToStep2Manual() {
+    const modules = [];
+    const count = this.desiredModules || 3;
+    for (let i = 1; i <= count; i++) {
+      modules.push({
+        title: `Модуль ${i}`,
+        description: '',
+        lessons: [
+          { title: `Урок ${i}.1`, lesson_type: 'lecture', question_count: 5 },
+          { title: `Проверка знаний ${i}`, lesson_type: 'test', question_count: 5 }
+        ]
+      });
+    }
     this.blueprint = {
       title: this.topic,
       description: '',
-      modules: [
-        {
-          title: 'Модуль 1',
-          description: '',
-          lessons: [
-            { title: 'Урок 1', lesson_type: 'lecture', question_count: 5 }
-          ]
-        }
-      ]
+      modules
     };
     this.step = 2;
   }
@@ -667,8 +721,14 @@ export class GenerateCourseDialogComponent {
            this.blueprint.modules.every((m: any) => m.title?.trim() && m.lessons.length > 0);
   }
 
+  minimizeToDock() {
+    this.snackBar.open('Генерация продолжается в фоновом режиме. Следите за прогрессом в правом нижнем виджете.', 'Понятно', { duration: 5000 });
+    this.dialogRef.close({ minimized: true, taskId: this.currentTaskId });
+  }
+
   generateCourse() {
     this.generating = true;
+    this.dialogRef.disableClose = true;
     this.progressPercent = 5;
     this.currentPhaseText = 'Инициализация';
     this.generatingStatus = 'Подготовка к генерации и запуск RAG-конвейера...';
@@ -676,6 +736,19 @@ export class GenerateCourseDialogComponent {
 
     const currentUser = this.authService.getCurrentUser();
     const userName = currentUser?.name;
+
+    this.currentTaskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    const newTask: CourseGenTask = {
+      id: this.currentTaskId,
+      topic: this.blueprint.title || this.topic,
+      targetAudience: this.targetAudience,
+      additionalInfo: this.additionalInfo,
+      status: 'generating',
+      progress: 5,
+      statusText: 'Инициализация генерации...',
+      createdAt: Date.now()
+    };
+    this.courseGenService.registerCustomTask(newTask);
 
     this.apiService.generateCourseStream(
       this.blueprint,
@@ -702,23 +775,54 @@ export class GenerateCourseDialogComponent {
             const label = data.lessonType === 'test' ? 'Тест' : 'Урок';
             this.completedSteps.push(`Готов ${label}: ${data.lessonTitle}`);
           }
+          if (this.currentTaskId) {
+            this.courseGenService.updateTask(this.currentTaskId, {
+              progress: this.progressPercent,
+              statusText: this.generatingStatus,
+              subjectId: this.generatedSubjectId || undefined
+            });
+          }
         } else if (event.type === 'completed') {
           this.progressPercent = 100;
           this.currentPhaseText = 'Готово!';
           this.generatingStatus = data.message || 'Курс успешно создан!';
           this.generatedSubjectId = data.subject_id;
-          this.snackBar.open('Курс успешно сгенерирован с материалами RAG!', 'Отлично', { duration: 5000 });
+          if (this.currentTaskId) {
+            this.courseGenService.updateTask(this.currentTaskId, {
+              status: 'completed',
+              progress: 100,
+              statusText: 'Курс готов!',
+              subjectId: data.subject_id
+            });
+          }
+          this.snackBar.open('Курс успешно сгенерирован!', 'Отлично', { duration: 5000 });
           setTimeout(() => {
             this.dialogRef.close(true);
           }, 1500);
         } else if (event.type === 'error') {
           this.generating = false;
+          this.dialogRef.disableClose = false;
+          if (this.currentTaskId) {
+            this.courseGenService.updateTask(this.currentTaskId, {
+              status: 'error',
+              statusText: 'Ошибка генерации',
+              error: data.message
+            });
+          }
           this.snackBar.open(data.message || 'Ошибка генерации курса', 'OK', { duration: 5000 });
         }
       },
       error: (err: any) => {
         this.generating = false;
+        this.dialogRef.disableClose = false;
         const msg = err.message || 'Ошибка генерации курса';
+        if (this.currentTaskId) {
+          this.courseGenService.updateTask(this.currentTaskId, {
+            status: 'error',
+            statusText: 'Ошибка генерации',
+            error: msg
+          });
+        }
         this.snackBar.open(msg, 'OK', { duration: 5000 });
       }
     });

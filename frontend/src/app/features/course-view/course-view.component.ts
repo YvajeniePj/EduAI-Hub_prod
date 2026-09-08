@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, Inject } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { DomSanitizer, SafeResourceUrl, SafeHtml } from '@angular/platform-browser';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -254,12 +254,12 @@ interface TreeNode {
           </div>
         </mat-tab>
 
-        <!-- Tab 2: Задания -->
-        <mat-tab label="Задания">
+        <!-- Tab 2: Материалы курса -->
+        <mat-tab label="Материалы курса">
           <!-- Classwork List (viewingLessonMode === false) -->
           <div class="tab-content-container assignments-tab-container" *ngIf="!viewingLessonMode">
             <div class="classwork-header-bar">
-              <h2 class="classwork-title">Задания и Материалы курса</h2>
+              <h2 class="classwork-title">Материалы и задания курса</h2>
               <div class="actions" *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'">
                 <button class="pill-btn pill-btn-outline" (click)="openCreateTest()">
                   ☆ Создать тест
@@ -336,10 +336,14 @@ interface TreeNode {
                         </div>
                       </div>
                       <div class="item-actions">
+                        <button class="pill-btn pill-btn-outline pill-sm edit-test-btn" (click)="editTest(test.id)" title="Редактировать тест и вопросы">
+                          <mat-icon class="btn-sm-icon">edit</mat-icon>
+                          <span>Редактировать</span>
+                        </button>
                         <mat-checkbox [checked]="test.peer_review_enabled === 'true'" (change)="togglePeerReview(test, $event.checked)" class="peer-review-check">
                           Включить кросс-проверку
                         </mat-checkbox>
-                        <button mat-icon-button (click)="deleteTest(test.id)" class="delete-icon-btn">
+                        <button mat-icon-button (click)="deleteTest(test.id)" class="delete-icon-btn" title="Удалить тест">
                           <mat-icon>close</mat-icon>
                         </button>
                       </div>
@@ -445,7 +449,7 @@ interface TreeNode {
                   <div class="content-body">
                       <!-- Text content -->
                       <div *ngIf="selectedLesson.content?.text_content" class="text-content">
-                        <div [innerHTML]="selectedLesson.content.text_content"></div>
+                        <div class="lesson-markdown-body" [innerHTML]="renderMarkdown(selectedLesson.content.text_content)"></div>
                       </div>
 
                       <!-- Video content -->
@@ -535,6 +539,13 @@ interface TreeNode {
                                         (click)="openPeerReviewDialog(selectedLesson.content.test_id)">
                                   <mat-icon style="font-size: 18px; width: 18px; height: 18px;">rate_review</mat-icon>
                                   <span>Кросс-проверка</span>
+                                </button>
+                                <button type="button" 
+                                        class="pill-btn pill-btn-outline" 
+                                        *ngIf="currentUser?.role === 'teacher' || currentUser?.role === 'admin' || currentUser?.role === 'hidden_admin'" 
+                                        (click)="editTest(selectedLesson.content.test_id)">
+                                  <mat-icon style="font-size: 18px; width: 18px; height: 18px;">edit</mat-icon>
+                                  <span>Редактировать тест</span>
                                 </button>
                               </div>
                             </div>
@@ -2424,6 +2435,251 @@ interface TreeNode {
       color: rgba(255, 255, 255, 0.65);
       font-size: 12.5px;
     }
+
+    /* Teacher Edit Test Button */
+    .edit-test-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 12px !important;
+      font-size: 12.5px !important;
+      font-weight: 500;
+      color: #18181b;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      border-radius: 16px;
+      transition: all 0.2s;
+    }
+    .edit-test-btn:hover {
+      background: #18181b;
+      color: #fff;
+    }
+    .btn-sm-icon {
+      font-size: 15px !important;
+      width: 15px !important;
+      height: 15px !important;
+      line-height: 15px !important;
+    }
+
+    /* Lesson Markdown & Teacher Scaffold Styles */
+    .lesson-markdown-body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #18181b;
+      line-height: 1.7;
+      font-size: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .lesson-markdown-body .lesson-h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #09090b;
+      margin: 12px 0 6px 0;
+      letter-spacing: -0.02em;
+    }
+
+    .lesson-markdown-body .lesson-h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: #27272a;
+      margin: 16px 0 6px 0;
+    }
+
+    .lesson-markdown-body .lesson-p {
+      margin: 0 0 10px 0;
+      color: #27272a;
+      line-height: 1.7;
+    }
+
+    .lesson-markdown-body .lesson-ul,
+    .lesson-markdown-body .lesson-ol {
+      margin: 4px 0 14px 20px;
+      padding-left: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .lesson-markdown-body .lesson-ul li,
+    .lesson-markdown-body .lesson-ol li {
+      color: #27272a;
+      line-height: 1.6;
+    }
+
+    /* Scaffold Cards */
+    .scaffold-card {
+      border-radius: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
+      overflow: hidden;
+      margin: 12px 0;
+      transition: all 0.2s ease;
+    }
+    .scaffold-card:hover {
+      box-shadow: 0 8px 28px -4px rgba(0, 0, 0, 0.06);
+    }
+
+    .scaffold-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .scaffold-title {
+      font-size: 16.5px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .scaffold-body {
+      padding: 18px 22px;
+      font-size: 14.5px;
+      line-height: 1.7;
+    }
+
+    /* Card Themes */
+    .scaffold-summary {
+      border-left: 4px solid #6366f1;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(255, 255, 255, 0.95) 100%);
+    }
+    .scaffold-summary .scaffold-header {
+      background: rgba(99, 102, 241, 0.05);
+      color: #4338ca;
+    }
+
+    .scaffold-terms {
+      border-left: 4px solid #10b981;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(255, 255, 255, 0.95) 100%);
+    }
+    .scaffold-terms .scaffold-header {
+      background: rgba(16, 185, 129, 0.05);
+      color: #065f46;
+    }
+
+    .scaffold-scenario {
+      border-left: 4px solid #8b5cf6;
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, rgba(255, 255, 255, 0.95) 100%);
+    }
+    .scaffold-scenario .scaffold-header {
+      background: rgba(139, 92, 246, 0.05);
+      color: #5b21b6;
+    }
+
+    .scaffold-ai {
+      border-left: 4px solid #f59e0b;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.03) 0%, rgba(255, 255, 255, 0.95) 100%);
+    }
+    .scaffold-ai .scaffold-header {
+      background: rgba(245, 158, 11, 0.05);
+      color: #92400e;
+    }
+
+    .scaffold-generic {
+      border-left: 4px solid #71717a;
+    }
+
+    /* Math and Formulas */
+    .lesson-math-block {
+      background: #0f172a;
+      color: #f8fafc;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 12px 0;
+      position: relative;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      overflow-x: auto;
+    }
+    .math-tag {
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      background: rgba(255, 255, 255, 0.15);
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #94a3b8;
+    }
+    .lesson-inline-math {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-family: 'Courier New', Courier, monospace;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 14px;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* Code Blocks */
+    .lesson-code-block {
+      background: #18181b;
+      color: #fafafa;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 12px 0;
+      overflow-x: auto;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 13.5px;
+      position: relative;
+    }
+    .code-header-badge {
+      font-size: 11px;
+      color: #a1a1aa;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+    .lesson-inline-code {
+      background: #f4f4f5;
+      color: #09090b;
+      font-family: 'Consolas', monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13.5px;
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    /* Tables */
+    .lesson-table-container {
+      overflow-x: auto;
+      margin: 14px 0;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,0.08);
+      background: #fff;
+    }
+    .lesson-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .lesson-table th {
+      background: #f4f4f5;
+      color: #18181b;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+    .lesson-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(0,0,0,0.04);
+      color: #3f3f46;
+    }
+    .lesson-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .lesson-hr {
+      border: none;
+      border-top: 1px solid rgba(0,0,0,0.08);
+      margin: 20px 0;
+    }
   `]
 })
 export class CourseViewComponent implements OnInit, OnDestroy {
@@ -2441,6 +2697,189 @@ export class CourseViewComponent implements OnInit, OnDestroy {
     const title = (announcement.title || '').toLowerCase();
     const content = (announcement.content || '').toLowerCase();
     return title.includes('прямой эфир') || content.includes('/stream') || content.includes('начал трансляцию');
+  }
+
+  editTest(testId: string) {
+    if (!testId) return;
+    this.router.navigate(['/tests/edit', testId], {
+      queryParams: { returnTo: `/courses/${this.subjectId}` }
+    });
+  }
+
+  private markdownCache = new Map<string, SafeHtml>();
+
+  renderMarkdown(text: string | null | undefined): SafeHtml {
+    if (!text) return '';
+    if (this.markdownCache.has(text)) {
+      return this.markdownCache.get(text)!;
+    }
+    const html = this.parseMarkdownToHtml(text);
+    const safe = this.sanitizer.bypassSecurityTrustHtml(html);
+    this.markdownCache.set(text, safe);
+    return safe;
+  }
+
+  private parseMarkdownToHtml(raw: string): string {
+    if (!raw) return '';
+    let text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    // Escape raw HTML characters
+    text = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // 1. Code blocks ```code```
+    text = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (_m, lang, code) => {
+      return `<pre class="lesson-code-block"><div class="code-header-badge">${lang || 'code'}</div><code>${code.trim()}</code></pre>`;
+    });
+
+    // 2. Display math $$...$$
+    text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_m, math) => {
+      return `<div class="lesson-math-block"><span class="math-tag">LaTeX</span><div class="math-body">${math.trim()}</div></div>`;
+    });
+
+    // 3. Inline math $...$
+    text = text.replace(/\$([^$\n]+?)\$/g, (_m, math) => {
+      return `<span class="lesson-inline-math">${math}</span>`;
+    });
+
+    // 4. Inline bold, italic, code
+    text = text.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*([^*]+?)\*/g, '<em>$1</em>');
+    text = text.replace(/`([^`]+?)`/g, '<code class="lesson-inline-code">$1</code>');
+
+    // 5. Horizontal divider
+    text = text.replace(/^(?:---|\*\*\*|___)\s*$/gm, '<hr class="lesson-hr" />');
+
+    // 6. Tables
+    text = text.replace(/((?:^\|.+?\|\s*$\n?)+)/gm, (match) => {
+      const rows = match.trim().split('\n').map(r => r.trim()).filter(Boolean);
+      if (rows.length < 2) return match;
+      let html = '<div class="lesson-table-container"><table class="lesson-table">';
+      let isHeader = true;
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.includes('---') || row.includes(':--') || row.includes('--:')) {
+          isHeader = false;
+          continue;
+        }
+        const cells = row.split('|').map(c => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+        if (isHeader && i === 0) {
+          html += '<thead><tr>' + cells.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+        } else {
+          html += '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
+        }
+      }
+      html += '</tbody></table></div>';
+      return html;
+    });
+
+    // 7. Parse line by line for Headings, Lists, Cards and Paragraphs
+    const lines = text.split('\n');
+    const out: string[] = [];
+    let inCard = false;
+    let inList = false;
+    let listType = ''; // 'ul' | 'ol'
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Heading 2 or 1
+      const h2Match = trimmed.match(/^##\s+(.+)$/);
+      const h1Match = trimmed.match(/^#\s+(.+)$/);
+      const h3Match = trimmed.match(/^###\s+(.+)$/);
+
+      if (h1Match || h2Match || h3Match) {
+        if (inList) {
+          out.push(listType === 'ul' ? '</ul>' : '</ol>');
+          inList = false;
+        }
+
+        if (h1Match) {
+          if (inCard) {
+            out.push('</div></div>');
+            inCard = false;
+          }
+          out.push(`<h1 class="lesson-h1">${h1Match[1]}</h1>`);
+        } else if (h2Match) {
+          if (inCard) {
+            out.push('</div></div>');
+            inCard = false;
+          }
+          const rawTitle = h2Match[1];
+          let cardType = 'scaffold-generic';
+          if (rawTitle.includes('📋') || rawTitle.toLowerCase().includes('сводка')) {
+            cardType = 'scaffold-summary';
+          } else if (rawTitle.includes('🔑') || rawTitle.toLowerCase().includes('термин')) {
+            cardType = 'scaffold-terms';
+          } else if (rawTitle.includes('🎙️') || rawTitle.toLowerCase().includes('сценарий')) {
+            cardType = 'scaffold-scenario';
+          } else if (rawTitle.includes('💡') || rawTitle.toLowerCase().includes('рекомендац')) {
+            cardType = 'scaffold-ai';
+          }
+          out.push(
+            `<div class="scaffold-card ${cardType}">` +
+            `<div class="scaffold-header"><span class="scaffold-title">${rawTitle}</span></div>` +
+            `<div class="scaffold-body">`
+          );
+          inCard = true;
+        } else if (h3Match) {
+          out.push(`<h3 class="lesson-h3">${h3Match[1]}</h3>`);
+        }
+        continue;
+      }
+
+      // Unordered list
+      const ulMatch = trimmed.match(/^[-*]\s+(.+)$/);
+      if (ulMatch) {
+        if (!inList || listType !== 'ul') {
+          if (inList) out.push(listType === 'ul' ? '</ul>' : '</ol>');
+          out.push('<ul class="lesson-ul">');
+          inList = true;
+          listType = 'ul';
+        }
+        out.push(`<li>${ulMatch[1]}</li>`);
+        continue;
+      }
+
+      // Ordered list
+      const olMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+      if (olMatch) {
+        if (!inList || listType !== 'ol') {
+          if (inList) out.push(listType === 'ul' ? '</ul>' : '</ol>');
+          out.push('<ol class="lesson-ol">');
+          inList = true;
+          listType = 'ol';
+        }
+        out.push(`<li>${olMatch[2]}</li>`);
+        continue;
+      }
+
+      // Exit list if non-list line
+      if (inList && trimmed !== '') {
+        out.push(listType === 'ul' ? '</ul>' : '</ol>');
+        inList = false;
+      }
+
+      if (trimmed === '') {
+        // empty line
+      } else if (!trimmed.startsWith('<div') && !trimmed.startsWith('</div') && !trimmed.startsWith('<pre') && !trimmed.startsWith('<table') && !trimmed.startsWith('<hr')) {
+        out.push(`<p class="lesson-p">${trimmed}</p>`);
+      } else {
+        out.push(trimmed);
+      }
+    }
+
+    if (inList) {
+      out.push(listType === 'ul' ? '</ul>' : '</ol>');
+    }
+    if (inCard) {
+      out.push('</div></div>');
+    }
+
+    return out.join('\n');
   }
 
   subjectId: string = '';
