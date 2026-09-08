@@ -1,10 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Inject, Optional } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -37,12 +37,26 @@ import { CourseGenerationService, CourseGenTask } from '../../core/services/cour
         <mat-icon class="title-icon">auto_awesome</mat-icon>
         AI Генерация курса
       </h2>
-      <button *ngIf="generating" type="button" class="btn-minimize-dialog" (click)="minimizeToDock()" title="Свернуть в виджет в правом нижнем углу">
-        <mat-icon>minimize</mat-icon>
-        <span>Свернуть в виджет</span>
-      </button>
+      <div class="header-right-actions">
+        <button *ngIf="generating || suggestingStructure" type="button" class="btn-minimize-dialog" (click)="minimizeToDock()" title="Свернуть в виджет в правом нижнем углу">
+          <mat-icon>minimize</mat-icon>
+          <span>Свернуть в виджет</span>
+        </button>
+        <button type="button" class="btn-close-header" (click)="safeClose()" title="Закрыть окно">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
     </div>
     <mat-dialog-content class="dialog-content-body">
+      <!-- Restored Draft Alert Banner -->
+      <div class="draft-restored-banner" *ngIf="hasRestoredDraft && !generating">
+        <div class="draft-banner-left">
+          <mat-icon>history</mat-icon>
+          <span>Восстановлен черновик курса</span>
+        </div>
+        <button type="button" class="btn-reset-draft" (click)="resetDraft()">Начать заново</button>
+      </div>
+
       <!-- Step 1: Parameters -->
       <div *ngIf="step === 1 && !suggestingStructure && !generating">
         <mat-form-field appearance="outline" class="full-width">
@@ -244,6 +258,70 @@ import { CourseGenerationService, CourseGenTask } from '../../core/services/cour
       align-items: center;
       justify-content: space-between;
       padding: 12px 24px 0 !important;
+    }
+    .header-right-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-close-header {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: transparent;
+      color: #71717a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-close-header:hover {
+      background: #f4f4f5;
+      color: #09090b;
+    }
+    .btn-close-header mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    .draft-restored-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 8px 14px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: #1e40af;
+    }
+    .draft-banner-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+    .draft-banner-left mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #3b82f6;
+    }
+    .btn-reset-draft {
+      background: transparent;
+      border: none;
+      color: #2563eb;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+    .btn-reset-draft:hover {
+      color: #1d4ed8;
     }
     .btn-minimize-dialog {
       display: inline-flex;
@@ -524,7 +602,7 @@ import { CourseGenerationService, CourseGenTask } from '../../core/services/cour
     .pill-btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
   `]
 })
-export class GenerateCourseDialogComponent {
+export class GenerateCourseDialogComponent implements OnInit {
   step = 1;
   topic = '';
   targetAudience = 'Beginners';
@@ -534,6 +612,7 @@ export class GenerateCourseDialogComponent {
   currentTaskId: string | null = null;
   generating = false;
   generatingStatus = 'Подготовка к генерации...';
+  hasRestoredDraft = false;
 
   // RAG Source Materials
   sourceMaterials: { filename: string; text: string; char_count: number }[] = [];
@@ -558,8 +637,80 @@ export class GenerateCourseDialogComponent {
     private apiService: ApiService,
     private snackBar: MatSnackBar,
     private courseGenService: CourseGenerationService,
-    private authService: AuthService
-  ) {}
+    private authService: AuthService,
+    @Optional() @Inject(MAT_DIALOG_DATA) public dialogData: any
+  ) {
+    this.dialogRef.disableClose = true;
+  }
+
+  ngOnInit() {
+    this.dialogRef.disableClose = true;
+
+    if (this.dialogData?.task) {
+      const task = this.dialogData.task;
+      this.currentTaskId = task.id;
+      this.topic = task.topic || '';
+      this.targetAudience = task.targetAudience || 'Beginners';
+      this.additionalInfo = task.additionalInfo || '';
+      if (task.blueprint && task.blueprint.modules && task.blueprint.modules.length > 0) {
+        this.blueprint = task.blueprint;
+        this.step = 2;
+      }
+      if (task.status === 'generating') {
+        this.generating = true;
+        this.progressPercent = task.progress || 10;
+        this.generatingStatus = task.statusText || 'Генерация курса...';
+      }
+    } else {
+      const draft = this.courseGenService.getDraft();
+      if (draft && (draft.topic || (draft.blueprint && draft.blueprint.modules && draft.blueprint.modules.length > 0))) {
+        this.topic = draft.topic || '';
+        this.targetAudience = draft.targetAudience || 'Beginners';
+        this.additionalInfo = draft.additionalInfo || '';
+        this.desiredModules = draft.desiredModules || 3;
+        this.sourceMaterials = draft.sourceMaterials || [];
+        if (draft.blueprint && draft.blueprint.modules && draft.blueprint.modules.length > 0) {
+          this.blueprint = draft.blueprint;
+          this.step = draft.step || 2;
+        }
+        this.hasRestoredDraft = true;
+      }
+    }
+  }
+
+  saveCurrentDraft() {
+    if (!this.generating) {
+      this.courseGenService.saveDraft({
+        topic: this.topic,
+        targetAudience: this.targetAudience,
+        additionalInfo: this.additionalInfo,
+        desiredModules: this.desiredModules,
+        sourceMaterials: this.sourceMaterials,
+        blueprint: this.blueprint,
+        step: this.step
+      });
+    }
+  }
+
+  resetDraft() {
+    this.courseGenService.clearDraft();
+    this.hasRestoredDraft = false;
+    this.step = 1;
+    this.topic = '';
+    this.additionalInfo = '';
+    this.sourceMaterials = [];
+    this.blueprint = { title: '', description: '', modules: [] };
+    this.snackBar.open('Черновик сброшен', 'OK', { duration: 2500 });
+  }
+
+  safeClose() {
+    if (this.generating) {
+      this.minimizeToDock();
+      return;
+    }
+    this.saveCurrentDraft();
+    this.dialogRef.close();
+  }
 
   get totalExtractedChars(): number {
     return this.sourceMaterials.reduce((acc, m) => acc + (m.char_count || 0), 0);
@@ -642,6 +793,21 @@ export class GenerateCourseDialogComponent {
   suggestStructure() {
     if (!this.topic.trim()) return;
     this.suggestingStructure = true;
+    this.currentTaskId = 'struct_' + Date.now();
+
+    // Register structuring task in the dock so user can see it right away!
+    const structTask: CourseGenTask = {
+      id: this.currentTaskId,
+      topic: this.topic.trim(),
+      targetAudience: this.targetAudience,
+      additionalInfo: this.additionalInfo,
+      status: 'structuring',
+      progress: 25,
+      statusText: 'AI проектирует структуру курса...',
+      createdAt: Date.now()
+    };
+    this.courseGenService.registerCustomTask(structTask);
+    this.saveCurrentDraft();
 
     this.apiService.suggestCourseStructure(this.topic, this.targetAudience, this.additionalInfo, this.sourceMaterials, this.desiredModules)
       .subscribe({
@@ -661,9 +827,21 @@ export class GenerateCourseDialogComponent {
           };
           this.suggestingStructure = false;
           this.step = 2;
+          if (this.currentTaskId) {
+            this.courseGenService.updateTask(this.currentTaskId, {
+              status: 'pending',
+              progress: 50,
+              statusText: 'Структура готова! Нажмите для открытия',
+              blueprint: this.blueprint
+            });
+          }
+          this.saveCurrentDraft();
         },
         error: (err: any) => {
           this.suggestingStructure = false;
+          if (this.currentTaskId) {
+            this.courseGenService.removeTask(this.currentTaskId);
+          }
           this.snackBar.open('Сервер AI временно недоступен. Открываем шаблон для настройки структуры.', 'OK', { duration: 5000 });
           this.goToStep2Manual();
         }
@@ -829,7 +1007,7 @@ export class GenerateCourseDialogComponent {
   }
 
   cancel() {
-    this.dialogRef.close();
+    this.safeClose();
   }
 }
 
@@ -1328,14 +1506,21 @@ export class SubjectsComponent implements OnInit {
     });
   }
 
-  openGenerateDialog() {
+  openGenerateDialog(initialData?: any) {
     const dialogRef = this.dialog.open(GenerateCourseDialogComponent, {
-      width: '500px'
+      width: '720px',
+      maxWidth: '96vw',
+      maxHeight: '92vh',
+      disableClose: true,
+      data: initialData
     });
 
     dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.snackBar.open('Генерация курса запущена в фоновом режиме! Следите за прогрессом в виджете.', 'Отлично', { duration: 4000 });
+      if (result && result !== true && result.minimized) {
+        // Minimized to dock
+      } else if (result) {
+        this.snackBar.open('Курс успешно создан!', 'Отлично', { duration: 4000 });
+        this.loadSubjects();
       }
     });
   }

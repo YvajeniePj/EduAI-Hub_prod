@@ -3,13 +3,15 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { CourseGenerationService, CourseGenTask } from '../services/course-generation.service';
+import { GenerateCourseDialogComponent } from '../../features/subjects/subjects.component';
 import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-course-generation-dock',
   standalone: true,
-  imports: [CommonModule, RouterModule, MatIconModule, MatTooltipModule],
+  imports: [CommonModule, RouterModule, MatIconModule, MatTooltipModule, MatDialogModule],
   template: `
     <div class="dock-container" *ngIf="(tasks$ | async) as tasks">
       <ng-container *ngIf="tasks.length > 0">
@@ -62,6 +64,14 @@ import { Observable } from 'rxjs';
               <!-- Progress bar -->
               <div class="progress-track" *ngIf="task.status !== 'completed' && task.status !== 'error'">
                 <div class="progress-fill" [style.width.%]="task.progress"></div>
+              </div>
+
+              <!-- Structuring / Pending / Generating Action -->
+              <div class="task-actions-row" *ngIf="task.status === 'structuring' || task.status === 'pending' || task.status === 'generating'">
+                <button type="button" class="pill-btn-small dark" (click)="openTaskDialog(task)">
+                  <mat-icon>open_in_new</mat-icon>
+                  <span>{{ task.status === 'pending' ? 'Открыть структуру' : (task.status === 'structuring' ? 'Открыть статус' : 'Прогресс генерации') }}</span>
+                </button>
               </div>
 
               <!-- Completed Action -->
@@ -429,7 +439,8 @@ export class CourseGenerationDockComponent implements OnInit {
 
   constructor(
     private courseGenService: CourseGenerationService,
-    private router: Router
+    private router: Router,
+    private dialog: MatDialog
   ) {
     this.tasks$ = this.courseGenService.tasks$;
   }
@@ -453,7 +464,25 @@ export class CourseGenerationDockComponent implements OnInit {
     if (completed > 0) {
       return `Курс готов к просмотру! (${completed})`;
     }
+    const structuring = tasks.filter(t => t.status === 'structuring').length;
+    if (structuring > 0) {
+      return `AI проектирует структуру (${tasks.length})`;
+    }
+    const pending = tasks.filter(t => t.status === 'pending').length;
+    if (pending > 0) {
+      return `Структура готова (${tasks.length})`;
+    }
     return `Генерация курсов (${tasks.length})`;
+  }
+
+  openTaskDialog(task: CourseGenTask): void {
+    this.dialog.open(GenerateCourseDialogComponent, {
+      width: '720px',
+      maxWidth: '96vw',
+      maxHeight: '92vh',
+      disableClose: true,
+      data: { task }
+    });
   }
 
   dismissTask(taskId: string): void {

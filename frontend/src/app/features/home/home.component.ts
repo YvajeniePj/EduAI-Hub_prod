@@ -609,15 +609,19 @@ export class HomeComponent implements OnInit {
     });
   }
 
-  openGenerateDialog() {
+  openGenerateDialog(initialData?: any) {
     const dialogRef = this.dialog.open(GenerateCourseDialogComponent, {
-      width: '640px',
-      maxHeight: '90vh',
-      disableClose: false
+      width: '720px',
+      maxWidth: '96vw',
+      maxHeight: '92vh',
+      disableClose: true,
+      data: initialData
     });
 
     dialogRef.afterClosed().subscribe(result => {
-      if (result) {
+      if (result && result !== true && result.minimized) {
+        // Minimized to dock
+      } else if (result) {
         this.loadSubjects();
         this.snackBar.open('Курс добавлен в очередь генерации. Отслеживайте прогресс в виджете.', 'OK', { duration: 5000 });
       }

@@ -13,6 +13,7 @@ export interface CourseGenTask {
   subjectId?: string;
   error?: string;
   createdAt: number;
+  blueprint?: any;
 }
 
 @Injectable({
@@ -20,6 +21,7 @@ export interface CourseGenTask {
 })
 export class CourseGenerationService {
   private readonly STORAGE_KEY = 'eduai_course_gen_tasks';
+  private readonly DRAFT_KEY = 'eduai_course_gen_draft';
   private tasksSubject = new BehaviorSubject<CourseGenTask[]>([]);
   public tasks$: Observable<CourseGenTask[]> = this.tasksSubject.asObservable();
 
@@ -150,4 +152,28 @@ export class CourseGenerationService {
     this.tasksSubject.next(updated);
     this.saveToStorage(updated);
   }
+
+  saveDraft(draft: any): void {
+    try {
+      localStorage.setItem(this.DRAFT_KEY, JSON.stringify(draft));
+    } catch (e) {
+      console.warn('Could not save draft', e);
+    }
+  }
+
+  getDraft(): any | null {
+    try {
+      const stored = localStorage.getItem(this.DRAFT_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  clearDraft(): void {
+    try {
+      localStorage.removeItem(this.DRAFT_KEY);
+    } catch (e) {}
+  }
 }
+
