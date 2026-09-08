@@ -1176,12 +1176,86 @@ async def generate_video_plan(topic: str, module_title: str, lesson_title: str, 
 @router.post("/suggest-structure")
 async def suggest_course_structure(request: SuggestStructureRequest):
     """AI suggests a course structure (modules and lessons with types) based on topic"""
+    def _fallback_structure() -> dict:
+        topic_clean = request.topic.strip()
+        return {
+            "title": topic_clean,
+            "description": f"Образовательный курс по теме: {topic_clean}",
+            "modules": [
+                {
+                    "title": f"Модуль 1. Основы {topic_clean}",
+                    "description": "Базовые понятия и введение в тему",
+                    "lessons": [
+                        {"title": "Введение и ключевые понятия", "lesson_type": "lecture"},
+                        {"title": "Практические основы и примеры", "lesson_type": "lecture"},
+                        {"title": "Проверка знаний", "lesson_type": "test", "question_count": 5}
+                    ]
+                },
+                {
+                    "title": f"Модуль 2. Углубленное изучение {topic_clean}",
+                    "description": "Продвинутые техники и разбор задач",
+                    "lessons": [
+                        {"title": "Продвинутые концепции", "lesson_type": "lecture"},
+                        {"title": "Разбор практических кейсов", "lesson_type": "lecture"},
+                        {"title": "Итоговый тест", "lesson_type": "test", "question_count": 5}
+                    ]
+                }
+            ]
+        }
+
+    def _robust_parse_json(text: str):
+        if not text:
+            return None
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                return data
+        except:
+            pass
+        m = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+        if m:
+            try:
+                data = json.loads(m.group(1))
+                if isinstance(data, dict):
+                    return data
+            except:
+                pass
+        start = text.find('{')
+        end = text.rfind('}')
+        if start != -1 and end != -1 and end > start:
+            candidate = text[start:end+1]
+            try:
+                data = json.loads(candidate)
+                if isinstance(data, dict):
+                    return data
+            except:
+                cleaned = re.sub(r',\s*([\]\}])', r'\1', candidate)
+                try:
+                    data = json.loads(cleaned)
+                    if isinstance(data, dict):
+                        return data
+                except:
+                    pass
+        if start != -1:
+            truncated = text[start:]
+            truncated = re.sub(r',\s*"[^"]*$', '', truncated)
+            open_braces = truncated.count('{') - truncated.count('}')
+            open_brackets = truncated.count('[') - truncated.count(']')
+            repaired = truncated + (']' * max(0, open_brackets)) + ('}' * max(0, open_braces))
+            repaired = re.sub(r',\s*([\]\}])', r'\1', repaired)
+            try:
+                data = json.loads(repaired)
+                if isinstance(data, dict):
+                    return data
+            except:
+                pass
+        return None
+
     try:
         system_msg = (
             "Ты - опытный методист-разработчик образовательных курсов. "
             "Твоя задача - предложить оптимальную структуру курса по заданной теме. "
-            "Структура должна быть логичной и включать разные типы уроков. "
-            "Отвечай строго в JSON формате без какого-либо дополнительного текста."
+            "Отвечай строго в валидном JSON формате без какого-либо дополнительного текста."
         )
         
         materials_context = ""
@@ -1201,13 +1275,12 @@ async def suggest_course_structure(request: SuggestStructureRequest):
 {materials_context}
 
 Требования:
-1. Создай от 2 до 5 модулей (в зависимости от сложности темы).
-2. В каждом модуле от 2 до 5 уроков.
-3. Типы уроков: "lecture" (теоретический материал), "video" (видеоурок - план/сценарий), "test" (тест для проверки знаний).
-4. Каждый модуль должен заканчиваться тестом.
-5. Для тестов укажи рекомендуемое количество вопросов (3-10).
+1. Создай от 2 до 3 модулей.
+2. В каждом модуле от 2 до 3 уроков.
+3. Типы уроков: "lecture" (теоретический материал), "video" (видеоурок), "test" (тест для проверки знаний).
+4. Каждый модуль должен заканчиваться тестом (lesson_type: "test", question_count: 5).
 
-Формат ответа (строго JSON):
+Формат ответа (строго валидный JSON):
 {{
   "title": "Название курса",
   "description": "Краткое описание курса (1-2 предложения)",
@@ -1228,36 +1301,31 @@ async def suggest_course_structure(request: SuggestStructureRequest):
             {"role": "user", "content": user_msg}
         ]
         
-        result = await chat_completion(messages, temperature=0.7, max_tokens=2000)
+        result = await chat_completion(messages, temperature=0.2, max_tokens=2500, response_format="json")
         
         if not result:
-            raise HTTPException(status_code=503, detail="AI service unavailable")
+            logger.warning("Empty response from chat_completion in suggest_structure, returning fallback")
+            return _fallback_structure()
         
-        # Extract JSON
-        json_str = None
-        code_block_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', result, re.DOTALL)
-        if code_block_match:
-            json_str = code_block_match.group(1)
-        else:
-            json_match = re.search(r'\{.*\}', result, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
+        structure = _robust_parse_json(result)
         
-        if not json_str:
-            raise HTTPException(status_code=500, detail="No JSON found in AI response")
+        if not structure or not isinstance(structure, dict) or not structure.get("modules"):
+            logger.warning(f"Could not parse valid JSON from AI response: {result[:300]}. Using fallback.")
+            return _fallback_structure()
         
-        try:
-            structure = json.loads(json_str)
-        except json.JSONDecodeError as e:
-            raise HTTPException(status_code=500, detail=f"Failed to parse structure: {str(e)}")
+        # Ensure modules and lessons have required fields
+        for mod in structure.get("modules", []):
+            if "lessons" not in mod or not isinstance(mod["lessons"], list):
+                mod["lessons"] = [{"title": "Введение", "lesson_type": "lecture"}]
+            for l in mod["lessons"]:
+                if "lesson_type" not in l:
+                    l["lesson_type"] = "lecture"
         
         return structure
         
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error suggesting course structure: {e}")
-        raise HTTPException(status_code=500, detail=f"Error suggesting structure: {str(e)}")
+        logger.error(f"Error suggesting course structure: {e}. Falling back to default.")
+        return _fallback_structure()
 
 @router.post("/generate-course-advanced")
 async def generate_course_advanced(request: GenerateCourseAdvancedRequest, x_user_name: Optional[str] = Header(None)):

@@ -614,7 +614,8 @@ export class GenerateCourseDialogComponent {
         },
         error: (err: any) => {
           this.suggestingStructure = false;
-          this.snackBar.open('Не удалось получить структуру от AI. Попробуйте ещё раз.', 'OK', { duration: 4000 });
+          this.snackBar.open('Сервер AI временно недоступен. Открываем шаблон для настройки структуры.', 'OK', { duration: 5000 });
+          this.goToStep2Manual();
         }
       });
   }
