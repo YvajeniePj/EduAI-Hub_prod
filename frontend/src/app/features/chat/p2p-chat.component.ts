@@ -1732,18 +1732,7 @@ export class P2pChatComponent implements OnInit, OnDestroy {
       this.messages.push(tempMsg);
       this.scrollToBottom();
 
-      clearTimeout(this.typingTimer);
-      this.typingTimer = setTimeout(() => {
-        if (this.selectedDialog?.username === recipient) {
-          this.showTypingIndicator = true;
-          this.scrollToBottom();
-          this.cdr.markForCheck();
-          setTimeout(() => {
-            this.showTypingIndicator = false;
-            this.cdr.markForCheck();
-          }, 2200);
-        }
-      }, 800);
+
 
       this.apiService.sendMessage(recipient, payloadContent).subscribe({
         next: (res) => {

@@ -717,4 +717,21 @@ export class ApiService {
     });
   }
 
+  // Advanced AI Course Generation
+  suggestCourseStructure(topic: string, targetAudience: string = 'Beginners', additionalInfo?: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/ai/suggest-structure`, {
+      topic,
+      target_audience: targetAudience,
+      additional_info: additionalInfo
+    });
+  }
+
+  generateCourseAdvanced(blueprint: any, topic: string, userName?: string, additionalInfo?: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/ai/generate-course-advanced`, {
+      topic,
+      additional_info: additionalInfo,
+      user_name: userName,
+      blueprint
+    });
+  }
 }

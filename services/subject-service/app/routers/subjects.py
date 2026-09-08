@@ -98,16 +98,7 @@ async def create_subject(subject: SubjectCreate, background_tasks: BackgroundTas
         db.add(db_teacher)
         db.commit()
 
-    background_tasks.add_task(
-        create_notification,
-        user_name=None, 
-        title="Новый курс создан", 
-        message=f"Создан новый курс: {subject.name}",
-        type="success",
-        related_type="subject",
-        related_id=str(db_subject.id),
-        exclude_user_name=decoded_name
-    )
+
     
     return db_subject
 

@@ -1437,7 +1437,36 @@ async def generate_test(request: Request):
 @app.post("/ai/generate-course")
 async def generate_course(request: Request):
     body = await request.json()
-    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/generate-course", "POST", body, timeout=600.0)
+    headers = {}
+    # Forward user identity to AI service
+    user_name = body.get("user_name")
+    if user_name:
+        from urllib.parse import quote
+        headers["X-User-Name"] = quote(user_name)
+    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/generate-course", "POST", body, timeout=600.0, headers=headers)
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to generate course")
+    return data
+
+
+@app.post("/ai/suggest-structure")
+async def suggest_structure(request: Request):
+    body = await request.json()
+    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/suggest-structure", "POST", body, timeout=120.0)
+    if status != 200:
+        raise HTTPException(status_code=status, detail=error or "Failed to suggest structure")
+    return data
+
+
+@app.post("/ai/generate-course-advanced")
+async def generate_course_advanced(request: Request):
+    body = await request.json()
+    headers = {}
+    user_name = body.get("user_name")
+    if user_name:
+        from urllib.parse import quote
+        headers["X-User-Name"] = quote(user_name)
+    data, status, error = await proxy_request(AI_SERVICE_URL, "/ai/generate-course-advanced", "POST", body, timeout=900.0, headers=headers)
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to generate course")
     return data

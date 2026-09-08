@@ -374,7 +374,7 @@ interface TreeNode {
           <!-- Lesson Viewer split layout (viewingLessonMode === true) -->
           <div class="lesson-viewer-container" *ngIf="viewingLessonMode">
             <div class="viewer-header">
-              <button mat-button color="primary" (click)="exitLessonView()" class="back-btn">
+              <button mat-button (click)="exitLessonView()" class="back-btn">
                 <mat-icon>arrow_back</mat-icon>
                 Вернуться к заданиям
               </button>
@@ -385,28 +385,30 @@ interface TreeNode {
               <div class="sidebar">
                 <div class="sidebar-header">
                   <h2>Содержание</h2>
+                  <span class="modules-pill" *ngIf="dataSource.data.length">
+                    {{ dataSource.data.length }} {{ dataSource.data.length === 1 ? 'модуль' : (dataSource.data.length >= 2 && dataSource.data.length <= 4 ? 'модуля' : 'модулей') }}
+                  </span>
                 </div>
                 <div class="sidebar-content">
-                  <mat-tree [dataSource]="dataSource" [treeControl]="treeControl" class="nav-tree">
+                  <mat-tree [dataSource]="dataSource" [treeControl]="treeControl" class="structure-tree">
                     <!-- Lesson Node (Leaf) -->
                     <mat-tree-node *matTreeNodeDef="let node" matTreeNodePadding>
-                      <button mat-button class="nav-item-btn" [class.active]="selectedLesson?.id === node.id" (click)="selectLesson(node)">
-                        <span class="tree-indicator"></span>
-                        <span class="nav-text">{{ node.title }}</span>
-                      </button>
+                      <div class="tree-node-row lesson-row" [class.selected]="selectedLesson?.id === node.id" (click)="selectLesson(node)">
+                        <mat-icon class="node-icon lesson-icon">{{ node.lessonType === 'video' ? 'play_circle_outline' : node.lessonType === 'quiz' ? 'quiz' : (node.lessonType === 'exercise' || node.lessonType === 'material' ? 'assignment' : 'menu_book') }}</mat-icon>
+                        <span class="node-title" [title]="node.title">{{ node.title }}</span>
+                      </div>
                     </mat-tree-node>
 
                     <!-- Module Node (Parent) -->
                     <mat-nested-tree-node *matTreeNodeDef="let node; when: hasChild" matTreeNodePadding>
-                      <div class="module-group">
-                        <button mat-icon-button matTreeNodeToggle [attr.aria-label]="'Toggle ' + node.title">
-                          <mat-icon class="mat-icon-rtl-mirror">
-                            {{ treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
-                          </mat-icon>
+                      <div class="tree-node-row module-row" (click)="treeControl.toggle(node)">
+                        <button type="button" class="toggle-btn" matTreeNodeToggle [attr.aria-label]="'Toggle ' + node.title" (click)="$event.stopPropagation()">
+                          <mat-icon>{{ treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}</mat-icon>
                         </button>
-                        <span class="module-title">{{ node.title }}</span>
+                        <mat-icon class="node-icon folder-icon">folder_open</mat-icon>
+                        <span class="node-title" [title]="node.title">{{ node.title }}</span>
                       </div>
-                      <div [class.example-tree-invisible]="!treeControl.isExpanded(node)" role="group">
+                      <div [class.tree-hidden]="!treeControl.isExpanded(node)" role="group" class="tree-nested-group">
                         <ng-container matTreeNodeOutlet></ng-container>
                       </div>
                     </mat-nested-tree-node>
@@ -874,7 +876,7 @@ interface TreeNode {
 
     .course-header-title {
       margin: 0;
-      font-family: 'Instrument Serif', Georgia, serif;
+      font-family: 'Inter', sans-serif;
       font-size: 28px;
       font-weight: 400;
       color: #09090b;
@@ -1407,7 +1409,7 @@ interface TreeNode {
 
     .classwork-title {
       margin: 0;
-      font-family: 'Instrument Serif', Georgia, serif;
+      font-family: 'Inter', sans-serif;
       font-size: 24px;
       font-weight: 400;
       color: #09090b;
@@ -1686,7 +1688,7 @@ interface TreeNode {
 
     .people-card-title {
       margin: 0;
-      font-family: 'Instrument Serif', Georgia, serif;
+      font-family: 'Inter', sans-serif;
       font-size: 22px;
       font-weight: 400;
       color: #09090b;
@@ -2025,6 +2027,16 @@ interface TreeNode {
       backdrop-filter: blur(12px);
     }
 
+    .back-btn {
+      color: #09090b !important;
+      font-weight: 500;
+      border-radius: 8px;
+    }
+    
+    .back-btn:hover {
+      background-color: rgba(0, 0, 0, 0.04) !important;
+    }
+
     .course-layout {
       display: flex;
       flex: 1;
@@ -2044,11 +2056,24 @@ interface TreeNode {
     .sidebar-header {
       padding: 18px 20px;
       border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modules-pill {
+      font-size: 11px;
+      font-weight: 600;
+      color: #52525b;
+      background: #f4f4f5;
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
     }
 
     .sidebar-header h2 {
       margin: 0;
-      font-family: 'Instrument Serif', Georgia, serif;
+      font-family: 'Inter', sans-serif;
       font-size: 20px;
       color: #09090b;
     }
@@ -2056,7 +2081,108 @@ interface TreeNode {
     .sidebar-content {
       flex: 1;
       overflow-y: auto;
-      padding: 12px 0;
+      padding: 12px 12px;
+    }
+
+    /* Направляющие линии вложенности */
+    .tree-nested-group {
+      border-left: 1.5px solid rgba(0, 0, 0, 0.10);
+      margin-left: 18px;
+      padding-left: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-top: 3px;
+      margin-bottom: 6px;
+    }
+
+    .tree-hidden {
+      display: none !important;
+    }
+
+    /* Строки дерева */
+    .tree-node-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      box-sizing: border-box;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .tree-node-row:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .module-row {
+      font-weight: 500;
+    }
+
+    .lesson-row {
+      font-size: 13px;
+    }
+
+    .lesson-row.selected {
+      background: #18181b;
+      color: #fff;
+    }
+
+    .lesson-row.selected .node-title {
+      color: #fff;
+    }
+
+    .lesson-row.selected .node-icon {
+      color: #fff;
+    }
+
+    .toggle-btn {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: #a1a1aa;
+      border-radius: 4px;
+    }
+
+    .toggle-btn:hover {
+      background: rgba(0, 0, 0, 0.06);
+      color: #09090b;
+    }
+
+    .toggle-btn mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    .node-icon {
+      color: #a1a1aa;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .folder-icon {
+      color: #09090b;
+    }
+
+    .structure-tree {
+      background: transparent;
+    }
+
+    .structure-tree mat-tree-node,
+    .structure-tree mat-nested-tree-node {
+      padding: 0;
+      min-height: auto;
     }
 
     .main-content {
@@ -2115,7 +2241,7 @@ interface TreeNode {
 
     .lesson-title {
       font-size: 22px;
-      font-family: 'Instrument Serif', Georgia, serif;
+      font-family: 'Inter', sans-serif;
       font-weight: 400;
       color: #09090b;
     }

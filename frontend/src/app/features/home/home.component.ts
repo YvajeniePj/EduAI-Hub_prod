@@ -611,14 +611,15 @@ export class HomeComponent implements OnInit {
 
   openGenerateDialog() {
     const dialogRef = this.dialog.open(GenerateCourseDialogComponent, {
-      width: '500px',
-      disableClose: true
+      width: '640px',
+      maxHeight: '90vh',
+      disableClose: false
     });
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
         this.loadSubjects();
-        alert('Курс успешно создан AI!');
+        this.snackBar.open('Курс добавлен в очередь генерации. Отслеживайте прогресс в виджете.', 'OK', { duration: 5000 });
       }
     });
   }

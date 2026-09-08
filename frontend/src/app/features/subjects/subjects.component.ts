@@ -22,161 +22,423 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
     MatProgressSpinnerModule,
-    MatIconModule
+    MatIconModule,
+    MatSnackBarModule
   ],
   template: `
-    <h2 mat-dialog-title class="dialog-title">Сгенерировать курс с AI</h2>
+    <h2 mat-dialog-title class="dialog-title">
+      <mat-icon class="title-icon">auto_awesome</mat-icon>
+      AI Генерация курса
+    </h2>
     <mat-dialog-content class="dialog-content-body">
-      <form [formGroup]="form" *ngIf="!loading; else loadingTpl">
+      <!-- Step 1: Parameters -->
+      <div *ngIf="step === 1 && !suggestingStructure">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Тема курса</mat-label>
-          <input matInput formControlName="topic" required placeholder="Например: Основы Python">
+          <input matInput [(ngModel)]="topic" required placeholder="Например: Основы Python">
         </mat-form-field>
 
+        <div class="audience-section">
+          <label class="section-label">Уровень аудитории</label>
+          <div class="audience-pills">
+            <button *ngFor="let level of audienceLevels"
+                    class="audience-pill"
+                    [class.active]="targetAudience === level.value"
+                    (click)="targetAudience = level.value">
+              {{level.label}}
+            </button>
+          </div>
+        </div>
+
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Дополнительные пожелания</mat-label>
-          <textarea matInput formControlName="additionalInfo" rows="4" placeholder="Например: акцент на практику, разбор библиотек pandas и numpy..."></textarea>
+          <mat-label>Дополнительные указания</mat-label>
+          <textarea matInput [(ngModel)]="additionalInfo" rows="3"
+                    placeholder="Фокус на практику, разбор библиотек..."></textarea>
         </mat-form-field>
 
         <p class="hint">
-          <mat-icon inline>auto_awesome</mat-icon>
-          AI создаст структуру курса, модули, уроки и наполнит их контентом. Это может занять около 1-2 минут.
+          <mat-icon inline>lightbulb</mat-icon>
+          AI предложит структуру курса с модулями и уроками. Вы сможете отредактировать её перед генерацией контента.
         </p>
-      </form>
+      </div>
 
-      <ng-template #loadingTpl>
-        <div class="loading-container">
-          <mat-spinner diameter="44"></mat-spinner>
-          <p>AI генерирует курс...</p>
-          <p class="sub-text">Пожалуйста, не закрывайте окно</p>
+      <!-- Loading: suggesting structure -->
+      <div *ngIf="suggestingStructure" class="loading-container">
+        <mat-spinner diameter="44"></mat-spinner>
+        <p>AI анализирует тему и проектирует структуру...</p>
+        <p class="sub-text">Обычно это занимает 5-10 секунд</p>
+      </div>
+
+      <!-- Step 2: Blueprint Editor -->
+      <div *ngIf="step === 2 && !generating">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Название курса</mat-label>
+          <input matInput [(ngModel)]="blueprint.title">
+        </mat-form-field>
+
+        <div class="blueprint-tree">
+          <div class="tree-header">
+            <span class="tree-title">Структура курса</span>
+            <span class="modules-pill">{{blueprint.modules.length}} модулей</span>
+          </div>
+
+          <div *ngFor="let mod of blueprint.modules; let mi = index" class="module-block">
+            <div class="module-row">
+              <mat-icon class="module-icon">folder</mat-icon>
+              <input class="inline-edit module-name" [(ngModel)]="mod.title" placeholder="Название модуля">
+              <button class="icon-btn-sm" (click)="removeModule(mi)" title="Удалить модуль">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+            <div class="lessons-group">
+              <div *ngFor="let lesson of mod.lessons; let li = index" class="lesson-row">
+                <mat-icon class="lesson-icon">{{getLessonIcon(lesson.lesson_type)}}</mat-icon>
+                <input class="inline-edit lesson-name" [(ngModel)]="lesson.title" placeholder="Название урока">
+                <select class="type-select" [(ngModel)]="lesson.lesson_type" (change)="onTypeChange(lesson)">
+                  <option value="lecture">Лекция</option>
+                  <option value="video">Видео</option>
+                  <option value="test">Тест</option>
+                </select>
+                <input *ngIf="lesson.lesson_type === 'test'" 
+                       type="number" class="q-count" 
+                       [(ngModel)]="lesson.question_count" 
+                       min="2" max="20" title="Кол-во вопросов">
+                <button class="icon-btn-sm" (click)="removeLesson(mod, li)" title="Удалить урок">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <button class="btn-add-lesson" (click)="addLesson(mod)">
+                <mat-icon>add</mat-icon> Добавить урок
+              </button>
+            </div>
+          </div>
+
+          <button class="btn-add-module" (click)="addModule()">
+            <mat-icon>add</mat-icon> Добавить модуль
+          </button>
         </div>
-      </ng-template>
+      </div>
+
+      <!-- Loading: generating course -->
+      <div *ngIf="generating" class="loading-container">
+        <mat-spinner diameter="44"></mat-spinner>
+        <p>{{generatingStatus}}</p>
+        <p class="sub-text">Генерация контента поурочно. Это может занять 2-3 минуты.</p>
+      </div>
     </mat-dialog-content>
-    <mat-dialog-actions align="end" class="dialog-actions-row" *ngIf="!loading">
-      <button type="button" class="pill-btn pill-btn-outline" (click)="cancel()">Отмена</button>
-      <button type="button" class="pill-btn pill-btn-dark" (click)="generate()" [disabled]="!form.valid">
-        <mat-icon>auto_awesome</mat-icon>
-        <span>Сгенерировать</span>
+
+    <mat-dialog-actions align="end" class="dialog-actions-row" *ngIf="!suggestingStructure && !generating">
+      <button type="button" class="pill-btn pill-btn-outline" (click)="step === 2 ? step = 1 : cancel()">
+        {{step === 2 ? '← Назад' : 'Отмена'}}
+      </button>
+      <div *ngIf="step === 1" class="action-btns">
+        <button type="button" class="pill-btn pill-btn-outline" (click)="suggestStructure()" [disabled]="!topic.trim()">
+          <mat-icon>psychology</mat-icon>
+          <span>AI: Предложить структуру</span>
+        </button>
+        <button type="button" class="pill-btn pill-btn-dark" (click)="goToStep2Manual()" [disabled]="!topic.trim()">
+          <mat-icon>edit_note</mat-icon>
+          <span>Создать вручную</span>
+        </button>
+      </div>
+      <button *ngIf="step === 2" type="button" class="pill-btn pill-btn-dark" 
+              (click)="generateCourse()" [disabled]="!canGenerate()">
+        <mat-icon>rocket_launch</mat-icon>
+        <span>Сгенерировать курс</span>
       </button>
     </mat-dialog-actions>
   `,
   styles: [`
     .dialog-title {
-      font-family: 'Instrument Serif', Georgia, serif !important;
-      font-size: 26px !important;
-      font-weight: 400 !important;
+      font-family: 'Inter', sans-serif !important;
+      font-size: 22px !important;
+      font-weight: 600 !important;
       color: #09090b !important;
-      padding: 24px 24px 8px !important;
+      padding: 20px 24px 8px !important;
       margin: 0 !important;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
+    .title-icon { color: #8b5cf6; }
     .dialog-content-body {
       padding: 12px 24px !important;
+      max-height: 65vh;
+      overflow-y: auto;
     }
-    .full-width {
-      width: 100%;
-      margin-bottom: 16px;
+    .full-width { width: 100%; margin-bottom: 12px; }
+    .section-label {
+      font-size: 13px; font-weight: 500; color: #3f3f46;
+      margin-bottom: 8px; display: block;
     }
+    .audience-section { margin-bottom: 16px; }
+    .audience-pills { display: flex; gap: 8px; }
+    .audience-pill {
+      padding: 7px 16px; border-radius: 20px; font-size: 13px;
+      border: 1px solid rgba(0,0,0,0.12); background: #fff;
+      cursor: pointer; transition: all 0.15s; color: #3f3f46;
+    }
+    .audience-pill.active {
+      background: #18181b; color: #fff; border-color: #18181b;
+    }
+    .audience-pill:hover:not(.active) { background: #f4f4f5; }
     .hint {
-      font-size: 13px;
-      color: #52525b;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: rgba(0, 0, 0, 0.03);
-      border: 1px solid rgba(0, 0, 0, 0.06);
-      padding: 14px;
-      border-radius: 12px;
-      line-height: 1.4;
+      font-size: 13px; color: #52525b;
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.15);
+      padding: 12px 14px; border-radius: 12px; line-height: 1.4;
     }
     .loading-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 32px 24px;
-      text-align: center;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 40px 24px; text-align: center;
     }
-    .loading-container p {
-      margin-top: 16px;
-      font-weight: 600;
-      color: #18181b;
-      font-size: 15px;
+    .loading-container p { margin-top: 16px; font-weight: 600; color: #18181b; font-size: 15px; }
+    .sub-text { font-size: 12.5px; color: #71717a !important; margin-top: 4px !important; font-weight: 400 !important; }
+
+    /* Blueprint tree */
+    .blueprint-tree {
+      background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 14px; padding: 16px; margin-top: 4px;
     }
-    .sub-text {
-      font-size: 12.5px;
-      color: #71717a !important;
-      margin-top: 4px !important;
+    .tree-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
     }
-    .dialog-actions-row {
-      padding: 16px 24px 24px !important;
-      gap: 10px;
+    .tree-title { font-size: 14px; font-weight: 600; color: #18181b; }
+    .modules-pill {
+      font-size: 11px; background: #18181b; color: #fff;
+      padding: 3px 10px; border-radius: 12px;
     }
+    .module-block {
+      margin-bottom: 12px; background: #fff;
+      border: 1px solid rgba(0,0,0,0.08); border-radius: 12px;
+      overflow: hidden;
+    }
+    .module-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; background: rgba(0,0,0,0.02);
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    .module-icon { color: #8b5cf6; font-size: 20px; width: 20px; height: 20px; }
+    .inline-edit {
+      flex: 1; border: none; background: transparent;
+      font-size: 13px; padding: 4px 8px; border-radius: 6px;
+      outline: none; font-family: 'Inter', sans-serif;
+    }
+    .inline-edit:focus { background: rgba(0,0,0,0.04); }
+    .module-name { font-weight: 600; font-size: 13.5px; }
+    .lesson-name { font-weight: 400; }
+    .icon-btn-sm {
+      background: none; border: none; cursor: pointer;
+      color: #a1a1aa; padding: 2px; border-radius: 6px;
+      display: flex; align-items: center; transition: all 0.15s;
+    }
+    .icon-btn-sm:hover { color: #ef4444; background: rgba(239,68,68,0.08); }
+    .icon-btn-sm mat-icon { font-size: 16px; width: 16px; height: 16px; }
+    .lessons-group { padding: 6px 8px 8px 8px; }
+    .lesson-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px; border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .lesson-row:hover { background: rgba(0,0,0,0.03); }
+    .lesson-icon { color: #71717a; font-size: 18px; width: 18px; height: 18px; }
+    .type-select {
+      font-size: 11.5px; padding: 3px 6px; border-radius: 6px;
+      border: 1px solid rgba(0,0,0,0.12); background: #fff;
+      color: #3f3f46; cursor: pointer; font-family: 'Inter', sans-serif;
+    }
+    .q-count {
+      width: 45px; font-size: 12px; padding: 3px 6px;
+      border: 1px solid rgba(0,0,0,0.12); border-radius: 6px;
+      text-align: center; font-family: 'Inter', sans-serif;
+    }
+    .btn-add-lesson {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; color: #8b5cf6; background: none;
+      border: none; cursor: pointer; padding: 6px 8px;
+      border-radius: 8px; margin-top: 2px;
+    }
+    .btn-add-lesson:hover { background: rgba(139,92,246,0.08); }
+    .btn-add-lesson mat-icon { font-size: 16px; width: 16px; height: 16px; }
+    .btn-add-module {
+      display: flex; align-items: center; gap: 6px; width: 100%;
+      justify-content: center; font-size: 13px; color: #71717a;
+      background: none; border: 1.5px dashed rgba(0,0,0,0.15);
+      cursor: pointer; padding: 10px; border-radius: 10px; margin-top: 4px;
+    }
+    .btn-add-module:hover { background: rgba(0,0,0,0.03); color: #18181b; border-color: rgba(0,0,0,0.25); }
+    .btn-add-module mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+    /* Actions */
+    .dialog-actions-row { padding: 12px 24px 20px !important; gap: 8px; }
+    .action-btns { display: flex; gap: 8px; }
     .pill-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 10px 22px;
-      border-radius: 24px;
-      font-size: 13.5px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      border: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 7px; padding: 9px 18px; border-radius: 22px;
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      transition: all 0.15s ease; border: none; font-family: 'Inter', sans-serif;
     }
-    .pill-btn mat-icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-    }
-    .pill-btn-dark {
-      background: #18181b;
-      color: #ffffff;
-    }
-    .pill-btn-dark:hover:not(:disabled) {
-      background: #27272a;
-      transform: translateY(-1px);
-    }
-    .pill-btn-dark:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+    .pill-btn mat-icon { font-size: 16px; width: 16px; height: 16px; }
+    .pill-btn-dark { background: #18181b; color: #ffffff; }
+    .pill-btn-dark:hover:not(:disabled) { background: #27272a; transform: translateY(-1px); }
+    .pill-btn-dark:disabled { opacity: 0.5; cursor: not-allowed; }
     .pill-btn-outline {
-      background: #ffffff;
-      color: #3f3f46;
-      border: 1px solid rgba(0, 0, 0, 0.15);
+      background: #ffffff; color: #3f3f46;
+      border: 1px solid rgba(0,0,0,0.15);
     }
-    .pill-btn-outline:hover {
-      background: #f4f4f5;
-    }
+    .pill-btn-outline:hover:not(:disabled) { background: #f4f4f5; }
+    .pill-btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
   `]
 })
 export class GenerateCourseDialogComponent {
-  form: FormGroup;
-  loading = false;
+  step = 1;
+  topic = '';
+  targetAudience = 'Beginners';
+  additionalInfo = '';
+  suggestingStructure = false;
+  generating = false;
+  generatingStatus = 'Подготовка к генерации...';
+
+  audienceLevels = [
+    { value: 'Beginners', label: 'Начинающие' },
+    { value: 'Intermediate', label: 'Продвинутые' },
+    { value: 'Advanced', label: 'Эксперты' }
+  ];
+
+  blueprint: any = { title: '', description: '', modules: [] };
 
   constructor(
-    private fb: FormBuilder,
     private dialogRef: MatDialogRef<GenerateCourseDialogComponent>,
-    private courseGenService: CourseGenerationService
-  ) {
-    this.form = this.fb.group({
-      topic: ['', Validators.required],
-      additionalInfo: ['']
+    private apiService: ApiService,
+    private snackBar: MatSnackBar,
+    private courseGenService: CourseGenerationService,
+    private authService: AuthService
+  ) {}
+
+  getLessonIcon(type: string): string {
+    switch (type) {
+      case 'lecture': return 'menu_book';
+      case 'video': return 'play_circle_outline';
+      case 'test': return 'quiz';
+      default: return 'description';
+    }
+  }
+
+  onTypeChange(lesson: any) {
+    if (lesson.lesson_type === 'test' && !lesson.question_count) {
+      lesson.question_count = 5;
+    }
+  }
+
+  suggestStructure() {
+    if (!this.topic.trim()) return;
+    this.suggestingStructure = true;
+
+    this.apiService.suggestCourseStructure(this.topic, this.targetAudience, this.additionalInfo)
+      .subscribe({
+        next: (res: any) => {
+          this.blueprint = {
+            title: res.title || this.topic,
+            description: res.description || '',
+            modules: (res.modules || []).map((m: any) => ({
+              title: m.title || 'Модуль',
+              description: m.description || '',
+              lessons: (m.lessons || []).map((l: any) => ({
+                title: l.title || 'Урок',
+                lesson_type: l.lesson_type || 'lecture',
+                question_count: l.question_count || 5
+              }))
+            }))
+          };
+          this.suggestingStructure = false;
+          this.step = 2;
+        },
+        error: (err: any) => {
+          this.suggestingStructure = false;
+          this.snackBar.open('Не удалось получить структуру от AI. Попробуйте ещё раз.', 'OK', { duration: 4000 });
+        }
+      });
+  }
+
+  goToStep2Manual() {
+    this.blueprint = {
+      title: this.topic,
+      description: '',
+      modules: [
+        {
+          title: 'Модуль 1',
+          description: '',
+          lessons: [
+            { title: 'Урок 1', lesson_type: 'lecture', question_count: 5 }
+          ]
+        }
+      ]
+    };
+    this.step = 2;
+  }
+
+  addModule() {
+    this.blueprint.modules.push({
+      title: `Модуль ${this.blueprint.modules.length + 1}`,
+      description: '',
+      lessons: [{ title: 'Урок 1', lesson_type: 'lecture', question_count: 5 }]
     });
   }
 
-  generate() {
-    if (this.form.valid) {
-      const { topic, additionalInfo } = this.form.value;
-      this.courseGenService.startGeneration(topic, 'Beginners', additionalInfo);
-      this.dialogRef.close(true);
-    }
+  removeModule(index: number) {
+    this.blueprint.modules.splice(index, 1);
+  }
+
+  addLesson(mod: any) {
+    mod.lessons.push({
+      title: `Урок ${mod.lessons.length + 1}`,
+      lesson_type: 'lecture',
+      question_count: 5
+    });
+  }
+
+  removeLesson(mod: any, index: number) {
+    mod.lessons.splice(index, 1);
+  }
+
+  canGenerate(): boolean {
+    return this.blueprint.title?.trim() &&
+           this.blueprint.modules.length > 0 &&
+           this.blueprint.modules.every((m: any) => m.title?.trim() && m.lessons.length > 0);
+  }
+
+  generateCourse() {
+    this.generating = true;
+    this.generatingStatus = 'Создание курса и генерация контента...';
+
+    const currentUser = this.authService.getCurrentUser();
+    const userName = currentUser?.name;
+
+    // Use the advanced generation
+    this.apiService.generateCourseAdvanced(
+      this.blueprint,
+      this.topic,
+      userName,
+      this.additionalInfo
+    ).subscribe({
+      next: (res: any) => {
+        this.generating = false;
+        this.snackBar.open('Курс успешно создан и наполнен контентом!', 'Отлично', { duration: 5000 });
+        this.dialogRef.close(true);
+      },
+      error: (err: any) => {
+        this.generating = false;
+        const msg = err.error?.detail || 'Ошибка генерации курса';
+        this.snackBar.open(msg, 'OK', { duration: 5000 });
+      }
+    });
   }
 
   cancel() {

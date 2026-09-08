@@ -10,6 +10,8 @@ from datetime import datetime
 import httpx
 import os
 import shutil
+import re
+import logging
 from pathlib import Path
 
 from app.database import get_db
@@ -28,12 +30,15 @@ from app.services.grading import grade_multiple_choice, grade_keyword_based
 from app.utils.converters import convert_latex_to_pdf, convert_jupyter_to_html
 import asyncio
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 user_router = APIRouter()
 
 STORAGE_PATH = os.getenv("STORAGE_PATH", "/app/storage")
 
 TEST_SERVICE_URL = os.getenv("TEST_SERVICE_URL", "http://test-service:8002")
+SUBJECT_SERVICE_URL = os.getenv("SUBJECT_SERVICE_URL", "http://subject-service:8001")
 GAMIFICATION_SERVICE_URL = os.getenv("GAMIFICATION_SERVICE_URL", "http://gamification-service:8007")
 
 
@@ -78,6 +83,79 @@ async def award_points(user: str, points: int):
     except Exception as e:
         # Log but don't fail if gamification service is unavailable
         print(f"Failed to award points: {e}")
+
+async def notify_course_teachers_about_submission(subject_id: str, student_name: str, test_title: str, submission_id: str):
+    """Notify only teachers assigned to this course about a new submission, with aggregation"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Get teachers for this course
+            resp = await client.get(f"{SUBJECT_SERVICE_URL}/subjects/{subject_id}/teachers")
+            if resp.status_code != 200:
+                logger.warning(f"Could not fetch teachers for subject {subject_id}: {resp.status_code}")
+                return
+            teachers = resp.json()
+            
+            # Get subject name
+            subj_resp = await client.get(f"{SUBJECT_SERVICE_URL}/subjects/{subject_id}")
+            subject_name = ""
+            if subj_resp.status_code == 200:
+                subject_name = subj_resp.json().get("name", "")
+            
+            for teacher in teachers:
+                teacher_name = teacher.get("user_name")
+                if not teacher_name:
+                    continue
+                
+                # Check for existing unread aggregated notification
+                notif_resp = await client.get(
+                    f"{NOTIFICATION_SERVICE_URL}/notifications",
+                    params={
+                        "user_name": teacher_name,
+                        "is_read": "false"
+                    }
+                )
+                
+                existing_notif = None
+                if notif_resp.status_code == 200:
+                    for n in notif_resp.json():
+                        if n.get("related_type") == "pending_submissions" and n.get("related_id") == str(subject_id):
+                            existing_notif = n
+                            break
+                
+                if existing_notif:
+                    # Update existing aggregated notification - increment count
+                    current_msg = existing_notif.get("message", "")
+                    count_match = re.search(r'Новых работ на проверку: (\d+)', current_msg)
+                    count = int(count_match.group(1)) + 1 if count_match else 2
+                    
+                    # Delete old and create new (since we can only update is_read)
+                    await client.delete(f"{NOTIFICATION_SERVICE_URL}/notifications/{existing_notif['id']}")
+                    await client.post(
+                        f"{NOTIFICATION_SERVICE_URL}/notifications",
+                        json={
+                            "user_name": teacher_name,
+                            "title": "Работы на проверку",
+                            "message": f"Новых работ на проверку: {count} • {subject_name}",
+                            "type": "info",
+                            "related_type": "pending_submissions",
+                            "related_id": str(subject_id)
+                        }
+                    )
+                else:
+                    # Create first notification
+                    await client.post(
+                        f"{NOTIFICATION_SERVICE_URL}/notifications",
+                        json={
+                            "user_name": teacher_name,
+                            "title": "Новая работа на проверку",
+                            "message": f"Новых работ на проверку: 1 • {subject_name}",
+                            "type": "info",
+                            "related_type": "pending_submissions",
+                            "related_id": str(subject_id)
+                        }
+                    )
+    except Exception as e:
+        logger.warning(f"Error notifying teachers about submission: {e}")
 
 
 @router.get("", response_model=List[SubmissionResponse])
@@ -494,17 +572,17 @@ async def finish_submission(
     db.commit()
     db.refresh(submission)
 
-    # Notify teachers about new submission if it's not auto-approved multiple choice
+    # Notify only teachers assigned to this course about new submission
     if test_type.lower() != "multiple_choice":
-        background_tasks.add_task(
-            create_notification,
-            user_name=None, # Broadcast to all teachers/admins
-            title="Новая работа на проверку",
-            message=f"Студент {submission.user} сдал работу по тесту '{test_data.get('title')}'",
-            type="info",
-            related_type="submission",
-            related_id=str(submission.id)
-        )
+        subject_id = test_data.get("subject_id")
+        if subject_id:
+            background_tasks.add_task(
+                notify_course_teachers_about_submission,
+                subject_id=subject_id,
+                student_name=submission.user,
+                test_title=test_data.get('title', 'Тест'),
+                submission_id=str(submission.id)
+            )
 
     return submission
 

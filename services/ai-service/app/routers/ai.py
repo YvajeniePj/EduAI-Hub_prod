@@ -729,6 +729,33 @@ class GenerateCourseRequest(BaseModel):
     additional_info: Optional[str] = None
     user_name: Optional[str] = None
 
+class LessonBlueprint(BaseModel):
+    title: str
+    lesson_type: str = "lecture"  # lecture, test, video
+    question_count: Optional[int] = 5
+
+class ModuleBlueprint(BaseModel):
+    title: str
+    description: Optional[str] = None
+    lessons: List[LessonBlueprint] = []
+
+class CourseBlueprint(BaseModel):
+    title: str
+    description: Optional[str] = None
+    modules: List[ModuleBlueprint] = []
+
+class SuggestStructureRequest(BaseModel):
+    topic: str
+    target_audience: str = "Beginners"
+    additional_info: Optional[str] = None
+
+class GenerateCourseAdvancedRequest(BaseModel):
+    topic: str
+    target_audience: str = "Beginners"
+    additional_info: Optional[str] = None
+    user_name: Optional[str] = None
+    blueprint: CourseBlueprint
+
 
 @router.post("/generate-course")
 async def generate_course(request: GenerateCourseRequest, x_user_name: Optional[str] = Header(None)):
@@ -910,4 +937,338 @@ async def generate_course(request: GenerateCourseRequest, x_user_name: Optional[
         raise
     except Exception as e:
         logger.error(f"Error generating course: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating course: {str(e)}")
+
+
+async def generate_lesson_content(topic: str, module_title: str, lesson_title: str, previous_context: list, additional_info: str = None) -> Optional[str]:
+    """Generate lecture content for a single lesson"""
+    context_str = ""
+    if previous_context:
+        context_str = "\nКонтекст предыдущих уроков курса:\n" + "\n".join(previous_context[-6:])
+    
+    system_msg = (
+        "Ты - автор учебных материалов. Пиши развёрнутый, понятный учебный текст. "
+        "Используй заголовки, списки, примеры. Не повторяй то, что уже было в предыдущих уроках. "
+        "Пиши на русском языке. Отвечай только текстом урока, без JSON и обёрток."
+    )
+    
+    user_msg = f"""Напиши учебный материал для урока "{lesson_title}" в модуле "{module_title}" курса "{topic}".
+{f"Дополнительные указания: {additional_info}" if additional_info else ""}
+{context_str}
+
+Требования:
+- Объём: 2000-4000 символов
+- Включи теоретическое объяснение с примерами
+- Используй маркированные списки для ключевых понятий
+- Добавь практические примеры где уместно
+- Завершай кратким резюме ключевых тезисов"""
+    
+    messages = [
+        {"role": "system", "content": system_msg},
+        {"role": "user", "content": user_msg}
+    ]
+    
+    result = await chat_completion(messages, temperature=0.5, max_tokens=3000)
+    return result
+
+
+async def generate_test_for_lesson(topic: str, module_title: str, lesson_title: str, question_count: int, previous_context: list) -> Optional[list]:
+    """Generate test questions for a lesson"""
+    context_str = ""
+    if previous_context:
+        context_str = "\nМатериал модуля:\n" + "\n".join(previous_context[-6:])
+    
+    system_msg = (
+        "Ты - составитель тестов. Создавай качественные вопросы с одним правильным ответом. "
+        "Отвечай строго в JSON формате - массив вопросов."
+    )
+    
+    user_msg = f"""Создай тест по теме "{lesson_title}" для модуля "{module_title}" курса "{topic}".
+{context_str}
+
+Создай ровно {question_count} вопросов с 4 вариантами ответа.
+
+Формат ответа (строго JSON массив):
+[
+  {{
+    "question_id": "q1",
+    "title": "Текст вопроса?",
+    "test_type": "multiple_choice",
+    "max_points": 2,
+    "options": ["Вариант A", "Вариант B", "Вариант C", "Вариант D"],
+    "correct_answer": "Вариант B"
+  }}
+]"""
+    
+    messages = [
+        {"role": "system", "content": system_msg},
+        {"role": "user", "content": user_msg}
+    ]
+    
+    result = await chat_completion(messages, temperature=0.5, max_tokens=3000)
+    if not result:
+        return None
+    
+    # Parse JSON array
+    try:
+        json_str = None
+        code_block_match = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', result, re.DOTALL)
+        if code_block_match:
+            json_str = code_block_match.group(1)
+        else:
+            arr_match = re.search(r'\[.*\]', result, re.DOTALL)
+            if arr_match:
+                json_str = arr_match.group(0)
+        
+        if json_str:
+            questions = json.loads(json_str)
+            return questions
+    except Exception as e:
+        logger.error(f"Failed to parse test questions: {e}")
+    
+    return None
+
+
+async def generate_video_plan(topic: str, module_title: str, lesson_title: str, previous_context: list) -> Optional[str]:
+    """Generate a video lesson plan/script"""
+    system_msg = (
+        "Ты - автор видеокурсов. Создай детальный план видеоурока. "
+        "Пиши на русском языке. Отвечай только текстом плана."
+    )
+    
+    user_msg = f"""Создай план видеоурока "{lesson_title}" для модуля "{module_title}" курса "{topic}".
+
+Включи:
+- Введение (о чём будет видео)
+- Основные разделы с таймкодами (примерными)
+- Ключевые тезисы для каждого раздела
+- Практическую демонстрацию (если уместно)
+- Заключение и резюме
+
+Объём: 1000-2000 символов."""
+    
+    messages = [
+        {"role": "system", "content": system_msg},
+        {"role": "user", "content": user_msg}
+    ]
+    
+    result = await chat_completion(messages, temperature=0.5, max_tokens=1500)
+    return result
+
+@router.post("/suggest-structure")
+async def suggest_course_structure(request: SuggestStructureRequest):
+    """AI suggests a course structure (modules and lessons with types) based on topic"""
+    try:
+        system_msg = (
+            "Ты - опытный методист-разработчик образовательных курсов. "
+            "Твоя задача - предложить оптимальную структуру курса по заданной теме. "
+            "Структура должна быть логичной и включать разные типы уроков. "
+            "Отвечай строго в JSON формате без какого-либо дополнительного текста."
+        )
+        
+        user_msg = f"""Предложи структуру курса по теме: "{request.topic}"
+Целевая аудитория: {request.target_audience}
+{f"Дополнительные указания: {request.additional_info}" if request.additional_info else ""}
+
+Требования:
+1. Создай от 2 до 5 модулей (в зависимости от сложности темы).
+2. В каждом модуле от 2 до 5 уроков.
+3. Типы уроков: "lecture" (теоретический материал), "video" (видеоурок - план/сценарий), "test" (тест для проверки знаний).
+4. Каждый модуль должен заканчиваться тестом.
+5. Для тестов укажи рекомендуемое количество вопросов (3-10).
+
+Формат ответа (строго JSON):
+{{
+  "title": "Название курса",
+  "description": "Краткое описание курса (1-2 предложения)",
+  "modules": [
+    {{
+      "title": "Название модуля",
+      "description": "Краткое описание модуля",
+      "lessons": [
+        {{"title": "Название урока", "lesson_type": "lecture"}},
+        {{"title": "Проверка знаний", "lesson_type": "test", "question_count": 5}}
+      ]
+    }}
+  ]
+}}"""
+        
+        messages = [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg}
+        ]
+        
+        result = await chat_completion(messages, temperature=0.7, max_tokens=2000)
+        
+        if not result:
+            raise HTTPException(status_code=503, detail="AI service unavailable")
+        
+        # Extract JSON
+        json_str = None
+        code_block_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', result, re.DOTALL)
+        if code_block_match:
+            json_str = code_block_match.group(1)
+        else:
+            json_match = re.search(r'\{.*\}', result, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+        
+        if not json_str:
+            raise HTTPException(status_code=500, detail="No JSON found in AI response")
+        
+        try:
+            structure = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to parse structure: {str(e)}")
+        
+        return structure
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error suggesting course structure: {e}")
+        raise HTTPException(status_code=500, detail=f"Error suggesting structure: {str(e)}")
+
+@router.post("/generate-course-advanced")
+async def generate_course_advanced(request: GenerateCourseAdvancedRequest, x_user_name: Optional[str] = Header(None)):
+    """Generate a full course from a blueprint with lesson-by-lesson content generation"""
+    try:
+        effective_user = request.user_name or x_user_name
+        blueprint = request.blueprint
+        
+        # 1. Create the course (subject)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            headers = {}
+            if effective_user:
+                from urllib.parse import quote
+                headers["X-User-Name"] = quote(effective_user)
+            
+            base_title = blueprint.title.strip()
+            subject_payload = {
+                "name": base_title,
+                "description": blueprint.description or f"Курс по теме: {request.topic}"
+            }
+            resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects", json=subject_payload, headers=headers)
+            if resp.status_code not in [200, 201]:
+                from datetime import datetime
+                suffix = datetime.now().strftime("%d.%m %H:%M")
+                subject_payload["name"] = f"{base_title} ({suffix})"
+                resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects", json=subject_payload, headers=headers)
+                if resp.status_code not in [200, 201]:
+                    import uuid as uuid_mod
+                    subject_payload["name"] = f"{base_title} #{str(uuid_mod.uuid4())[:4]}"
+                    resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects", json=subject_payload, headers=headers)
+                    if resp.status_code not in [200, 201]:
+                        raise HTTPException(status_code=500, detail=f"Failed to create subject: {resp.text}")
+            
+            subject = resp.json()
+            subject_id = subject["id"]
+            
+            # Track generated lesson summaries for context chaining
+            previous_lessons_context = []
+            
+            # 2. Iterate modules from blueprint
+            for mod_idx, mod_bp in enumerate(blueprint.modules):
+                mod_payload = {
+                    "title": mod_bp.title,
+                    "description": mod_bp.description or "",
+                    "order_index": mod_idx
+                }
+                resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects/{subject_id}/modules", json=mod_payload)
+                if resp.status_code not in [200, 201]:
+                    logger.error(f"Failed to create module: {resp.text}")
+                    continue
+                module = resp.json()
+                module_id = module["id"]
+                
+                module_lessons_context = []
+                
+                # 3. Iterate lessons from blueprint
+                for lesson_idx, lesson_bp in enumerate(mod_bp.lessons):
+                    lesson_type = lesson_bp.lesson_type or "lecture"
+                    
+                    lesson_payload = {
+                        "title": lesson_bp.title,
+                        "lesson_type": lesson_type if lesson_type != "test" else "quiz",
+                        "order_index": lesson_idx
+                    }
+                    resp = await client.post(f"{SUBJECT_SERVICE_URL}/modules/{module_id}/lessons", json=lesson_payload)
+                    if resp.status_code not in [200, 201]:
+                        logger.error(f"Failed to create lesson: {resp.text}")
+                        continue
+                    new_lesson = resp.json()
+                    lesson_id = new_lesson["id"]
+                    
+                    if lesson_type == "lecture":
+                        # Generate lecture content
+                        content_text = await generate_lesson_content(
+                            topic=request.topic,
+                            module_title=mod_bp.title,
+                            lesson_title=lesson_bp.title,
+                            previous_context=previous_lessons_context,
+                            additional_info=request.additional_info
+                        )
+                        if content_text:
+                            await client.post(
+                                f"{SUBJECT_SERVICE_URL}/lessons/{lesson_id}/content",
+                                json={"text_content": content_text, "lesson_id": str(lesson_id)}
+                            )
+                            # Add summary for context chaining
+                            summary = content_text[:200] + "..." if len(content_text) > 200 else content_text
+                            module_lessons_context.append(f"- {lesson_bp.title}: {summary}")
+                    
+                    elif lesson_type == "test":
+                        # Generate test with questions
+                        question_count = lesson_bp.question_count or 5
+                        test_data = await generate_test_for_lesson(
+                            topic=request.topic,
+                            module_title=mod_bp.title,
+                            lesson_title=lesson_bp.title,
+                            question_count=question_count,
+                            previous_context=module_lessons_context
+                        )
+                        if test_data:
+                            # Create test via test-service
+                            test_payload = {
+                                "subject_id": str(subject_id),
+                                "title": lesson_bp.title,
+                                "description": f"Тест по модулю: {mod_bp.title}",
+                                "test_type": "multiple_choice",
+                                "ai_generated": True,
+                                "questions": test_data
+                            }
+                            test_resp = await client.post(f"{TEST_SERVICE_URL}/tests", json=test_payload)
+                            if test_resp.status_code in [200, 201]:
+                                test_obj = test_resp.json()
+                                test_id = test_obj["id"]
+                                # Link test to lesson content
+                                await client.post(
+                                    f"{SUBJECT_SERVICE_URL}/lessons/{lesson_id}/content",
+                                    json={"test_id": str(test_id), "lesson_id": str(lesson_id)}
+                                )
+                            else:
+                                logger.error(f"Failed to create test: {test_resp.text}")
+                    
+                    elif lesson_type == "video":
+                        # Generate video lesson plan
+                        video_plan = await generate_video_plan(
+                            topic=request.topic,
+                            module_title=mod_bp.title,
+                            lesson_title=lesson_bp.title,
+                            previous_context=previous_lessons_context
+                        )
+                        if video_plan:
+                            await client.post(
+                                f"{SUBJECT_SERVICE_URL}/lessons/{lesson_id}/content",
+                                json={"text_content": video_plan, "lesson_id": str(lesson_id)}
+                            )
+                
+                previous_lessons_context.extend(module_lessons_context)
+        
+        return {"message": "Course generated successfully", "subject_id": subject_id}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in advanced course generation: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating course: {str(e)}")
