@@ -1,9 +1,10 @@
 """
 AI router - Ollama functions endpoints
 """
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import json
 import re
 import os
@@ -744,10 +745,16 @@ class CourseBlueprint(BaseModel):
     description: Optional[str] = None
     modules: List[ModuleBlueprint] = []
 
+class SourceMaterial(BaseModel):
+    filename: str
+    text: str
+    char_count: Optional[int] = None
+
 class SuggestStructureRequest(BaseModel):
     topic: str
     target_audience: str = "Beginners"
     additional_info: Optional[str] = None
+    source_materials: Optional[List[SourceMaterial]] = None
 
 class GenerateCourseAdvancedRequest(BaseModel):
     topic: str
@@ -755,6 +762,7 @@ class GenerateCourseAdvancedRequest(BaseModel):
     additional_info: Optional[str] = None
     user_name: Optional[str] = None
     blueprint: CourseBlueprint
+    source_materials: Optional[List[SourceMaterial]] = None
 
 
 @router.post("/generate-course")
@@ -940,25 +948,133 @@ async def generate_course(request: GenerateCourseRequest, x_user_name: Optional[
         raise HTTPException(status_code=500, detail=f"Error generating course: {str(e)}")
 
 
-async def generate_lesson_content(topic: str, module_title: str, lesson_title: str, previous_context: list, additional_info: str = None) -> Optional[str]:
-    """Generate lecture content for a single lesson"""
+def chunk_source_materials(materials: Optional[List[SourceMaterial]], chunk_size: int = 1500, overlap: int = 200) -> List[Dict[str, Any]]:
+    """
+    Split source materials (especially parsed .tex / .pdf / .docx) into semantic chunks with metadata.
+    """
+    if not materials:
+        return []
+    
+    all_chunks = []
+    for mat in materials:
+        text = mat.text or ""
+        filename = mat.filename or "Документ"
+        if not text.strip():
+            continue
+        
+        paragraphs = text.split("\n\n")
+        current_chunk = ""
+        current_header = filename
+        
+        for p in paragraphs:
+            p_strip = p.strip()
+            if not p_strip:
+                continue
+            
+            if p_strip.startswith("#"):
+                first_line = p_strip.split("\n")[0]
+                current_header = f"{filename} -> {first_line.replace('#', '').strip()}"
+            
+            if len(current_chunk) + len(p_strip) < chunk_size:
+                current_chunk += ("\n\n" if current_chunk else "") + p_strip
+            else:
+                if current_chunk:
+                    all_chunks.append({
+                        "filename": filename,
+                        "header": current_header,
+                        "content": current_chunk.strip()
+                    })
+                if len(p_strip) > chunk_size:
+                    for i in range(0, len(p_strip), chunk_size - overlap):
+                        part = p_strip[i:i + chunk_size]
+                        all_chunks.append({
+                            "filename": filename,
+                            "header": current_header,
+                            "content": part.strip()
+                        })
+                    current_chunk = ""
+                else:
+                    current_chunk = p_strip
+        
+        if current_chunk:
+            all_chunks.append({
+                "filename": filename,
+                "header": current_header,
+                "content": current_chunk.strip()
+            })
+            
+    return all_chunks
+
+
+def get_relevant_chunks(query: str, chunks: List[Dict[str, Any]], top_k: int = 3, max_chars: int = 3500) -> str:
+    """
+    Find top-k relevant chunks for a given query (lesson/module title) based on term frequency and header overlap.
+    """
+    if not chunks:
+        return ""
+    
+    words = [w.lower() for w in re.findall(r'[a-zA-Zа-яА-Я0-9_]+', query) if len(w) >= 3]
+    if not words:
+        selected = chunks[:top_k]
+        return "\n\n---\n\n".join([f"[{c['header']}]:\n{c['content']}" for c in selected])[:max_chars]
+    
+    scored_chunks = []
+    for c in chunks:
+        content_lower = c["content"].lower()
+        header_lower = c["header"].lower()
+        score = 0
+        for w in words:
+            score += content_lower.count(w) * 1
+            score += header_lower.count(w) * 3
+            if query.lower() in content_lower:
+                score += 5
+        
+        if score > 0:
+            scored_chunks.append((score, c))
+            
+    scored_chunks.sort(key=lambda x: x[0], reverse=True)
+    selected = [c for score, c in scored_chunks[:top_k]]
+    
+    if not selected:
+        selected = chunks[:min(2, len(chunks))]
+        
+    res = []
+    total_len = 0
+    for c in selected:
+        snippet = f"[{c['header']}]:\n{c['content']}"
+        if total_len + len(snippet) > max_chars and res:
+            break
+        res.append(snippet)
+        total_len += len(snippet)
+        
+    return "\n\n---\n\n".join(res)
+
+
+async def generate_lesson_content(topic: str, module_title: str, lesson_title: str, previous_context: list, additional_info: str = None, source_material_context: str = None) -> Optional[str]:
+    """Generate lecture content for a single lesson with RAG support"""
     context_str = ""
     if previous_context:
         context_str = "\nКонтекст предыдущих уроков курса:\n" + "\n".join(previous_context[-6:])
     
+    rag_str = ""
+    if source_material_context:
+        rag_str = f"\n\nМАТЕРИАЛЫ ПРЕПОДАВАТЕЛЯ ДЛЯ ЭТОГО УРОКА (извлечено из прикреплённых документов/TeX):\n{source_material_context}\n\nВАЖНО: Обязательно используй факты, формулы, теоремы и терминологию из прикреплённых материалов преподавателя!"
+    
     system_msg = (
         "Ты - автор учебных материалов. Пиши развёрнутый, понятный учебный текст. "
         "Используй заголовки, списки, примеры. Не повторяй то, что уже было в предыдущих уроках. "
+        "Если предоставлены материалы преподавателя или формулы TeX/LaTeX, обязательно включай их в текст. "
         "Пиши на русском языке. Отвечай только текстом урока, без JSON и обёрток."
     )
     
     user_msg = f"""Напиши учебный материал для урока "{lesson_title}" в модуле "{module_title}" курса "{topic}".
 {f"Дополнительные указания: {additional_info}" if additional_info else ""}
 {context_str}
+{rag_str}
 
 Требования:
 - Объём: 2000-4000 символов
-- Включи теоретическое объяснение с примерами
+- Включи теоретическое объяснение с примерами и формулами
 - Используй маркированные списки для ключевых понятий
 - Добавь практические примеры где уместно
 - Завершай кратким резюме ключевых тезисов"""
@@ -972,11 +1088,13 @@ async def generate_lesson_content(topic: str, module_title: str, lesson_title: s
     return result
 
 
-async def generate_test_for_lesson(topic: str, module_title: str, lesson_title: str, question_count: int, previous_context: list) -> Optional[list]:
+async def generate_test_for_lesson(topic: str, module_title: str, lesson_title: str, question_count: int, previous_context: list, source_material_context: str = None) -> Optional[list]:
     """Generate test questions for a lesson"""
     context_str = ""
     if previous_context:
         context_str = "\nМатериал модуля:\n" + "\n".join(previous_context[-6:])
+    if source_material_context:
+        context_str += f"\n\nМАТЕРИАЛЫ ПРЕПОДАВАТЕЛЯ ДЛЯ ТЕСТА:\n{source_material_context}"
     
     system_msg = (
         "Ты - составитель тестов. Создавай качественные вопросы с одним правильным ответом. "
@@ -1066,9 +1184,21 @@ async def suggest_course_structure(request: SuggestStructureRequest):
             "Отвечай строго в JSON формате без какого-либо дополнительного текста."
         )
         
+        materials_context = ""
+        if request.source_materials:
+            mat_summaries = []
+            for mat in request.source_materials:
+                lines = mat.text.split("\n")
+                headers = [line.strip().replace("#", "").strip() for line in lines if line.strip().startswith("#")][:15]
+                headers_str = ", ".join(headers) if headers else "текстовые материалы"
+                sample = mat.text[:1000].replace("\n", " ")
+                mat_summaries.append(f"Документ '{mat.filename}': разделы: {headers_str}.\nФрагмент: {sample}...")
+            materials_context = "\n\nОПИРАЙСЯ НА ПРИКРЕПЛЁННЫЕ МАТЕРИАЛЫ ПРЕПОДАВАТЕЛЯ (включая TeX/PDF разделы):\n" + "\n".join(mat_summaries)
+
         user_msg = f"""Предложи структуру курса по теме: "{request.topic}"
 Целевая аудитория: {request.target_audience}
 {f"Дополнительные указания: {request.additional_info}" if request.additional_info else ""}
+{materials_context}
 
 Требования:
 1. Создай от 2 до 5 модулей (в зависимости от сложности темы).
@@ -1164,6 +1294,9 @@ async def generate_course_advanced(request: GenerateCourseAdvancedRequest, x_use
             subject = resp.json()
             subject_id = subject["id"]
             
+            # Process RAG chunks from source materials
+            chunks = chunk_source_materials(request.source_materials) if request.source_materials else []
+            
             # Track generated lesson summaries for context chaining
             previous_lessons_context = []
             
@@ -1187,6 +1320,9 @@ async def generate_course_advanced(request: GenerateCourseAdvancedRequest, x_use
                 for lesson_idx, lesson_bp in enumerate(mod_bp.lessons):
                     lesson_type = lesson_bp.lesson_type or "lecture"
                     
+                    # Retrieve RAG chunks for this lesson
+                    rag_context = get_relevant_chunks(f"{mod_bp.title} {lesson_bp.title}", chunks) if chunks else ""
+                    
                     lesson_payload = {
                         "title": lesson_bp.title,
                         "lesson_type": lesson_type if lesson_type != "test" else "quiz",
@@ -1206,7 +1342,8 @@ async def generate_course_advanced(request: GenerateCourseAdvancedRequest, x_use
                             module_title=mod_bp.title,
                             lesson_title=lesson_bp.title,
                             previous_context=previous_lessons_context,
-                            additional_info=request.additional_info
+                            additional_info=request.additional_info,
+                            source_material_context=rag_context
                         )
                         if content_text:
                             await client.post(
@@ -1225,7 +1362,8 @@ async def generate_course_advanced(request: GenerateCourseAdvancedRequest, x_use
                             module_title=mod_bp.title,
                             lesson_title=lesson_bp.title,
                             question_count=question_count,
-                            previous_context=module_lessons_context
+                            previous_context=module_lessons_context,
+                            source_material_context=rag_context
                         )
                         if test_data:
                             # Create test via test-service
@@ -1272,3 +1410,223 @@ async def generate_course_advanced(request: GenerateCourseAdvancedRequest, x_use
     except Exception as e:
         logger.error(f"Error in advanced course generation: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating course: {str(e)}")
+
+@router.post("/generate-course-stream")
+async def generate_course_stream(request: GenerateCourseAdvancedRequest, x_user_name: Optional[str] = Header(None)):
+    """Generate course with real-time SSE progress events and LaTeX/document RAG"""
+    effective_user = request.user_name or x_user_name
+    blueprint = request.blueprint
+
+    async def event_stream():
+        def sse_event(event_type: str, data: dict) -> bytes:
+            return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode("utf-8")
+
+        try:
+            total_modules = len(blueprint.modules)
+            total_lessons = sum(len(m.lessons) for m in blueprint.modules)
+            total_steps = 1 + total_modules + total_lessons + 1
+            current_step = 0
+
+            yield sse_event("progress", {
+                "step": "init",
+                "percent": 5,
+                "message": f"Инициализация курса «{blueprint.title}» в системе..."
+            })
+
+            chunks = chunk_source_materials(request.source_materials) if request.source_materials else []
+            if chunks:
+                yield sse_event("progress", {
+                    "step": "rag",
+                    "percent": 8,
+                    "message": f"RAG: Подготовлено {len(chunks)} смысловых фрагментов из материалов (.tex/pdf/docx)..."
+                })
+
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                headers = {}
+                if effective_user:
+                    from urllib.parse import quote
+                    headers["X-User-Name"] = quote(effective_user)
+
+                base_title = blueprint.title.strip()
+                subject_payload = {
+                    "name": base_title,
+                    "description": blueprint.description or f"Курс по теме: {request.topic}"
+                }
+                resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects", json=subject_payload, headers=headers)
+                if resp.status_code not in [200, 201]:
+                    from datetime import datetime
+                    suffix = datetime.now().strftime("%d.%m %H:%M")
+                    subject_payload["name"] = f"{base_title} ({suffix})"
+                    resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects", json=subject_payload, headers=headers)
+                    if resp.status_code not in [200, 201]:
+                        import uuid as uuid_mod
+                        subject_payload["name"] = f"{base_title} #{str(uuid_mod.uuid4())[:4]}"
+                        resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects", json=subject_payload, headers=headers)
+                        if resp.status_code not in [200, 201]:
+                            yield sse_event("error", {"message": f"Не удалось создать предмет: {resp.text}"})
+                            return
+
+                subject = resp.json()
+                subject_id = subject["id"]
+
+                current_step += 1
+                percent = int((current_step / total_steps) * 85) + 10
+                yield sse_event("progress", {
+                    "step": "course_created",
+                    "percent": percent,
+                    "subject_id": subject_id,
+                    "message": f"Курс «{subject_payload['name']}» успешно создан в системе"
+                })
+
+                previous_lessons_context = []
+                lesson_counter = 0
+
+                for mod_idx, mod_bp in enumerate(blueprint.modules):
+                    mod_payload = {
+                        "title": mod_bp.title,
+                        "description": mod_bp.description or "",
+                        "order_index": mod_idx
+                    }
+                    resp = await client.post(f"{SUBJECT_SERVICE_URL}/subjects/{subject_id}/modules", json=mod_payload)
+                    if resp.status_code not in [200, 201]:
+                        logger.error(f"Failed to create module: {resp.text}")
+                        continue
+                    module = resp.json()
+                    module_id = module["id"]
+
+                    current_step += 1
+                    percent = int((current_step / total_steps) * 85) + 10
+                    yield sse_event("progress", {
+                        "step": "module",
+                        "percent": percent,
+                        "moduleIndex": mod_idx + 1,
+                        "moduleTitle": mod_bp.title,
+                        "message": f"Модуль {mod_idx + 1}: «{mod_bp.title}»"
+                    })
+
+                    module_lessons_context = []
+
+                    for lesson_idx, lesson_bp in enumerate(mod_bp.lessons):
+                        lesson_counter += 1
+                        lesson_type = lesson_bp.lesson_type or "lecture"
+
+                        rag_context = ""
+                        if chunks:
+                            rag_context = get_relevant_chunks(f"{mod_bp.title} {lesson_bp.title}", chunks)
+
+                        current_step += 1
+                        percent = int((current_step / total_steps) * 85) + 10
+
+                        type_name = "лекции" if lesson_type == "lecture" else ("теста" if lesson_type == "test" else "видеоурока")
+                        rag_note = " с опорой на TeX/материалы" if rag_context else ""
+                        yield sse_event("progress", {
+                            "step": "lesson_generating",
+                            "percent": percent,
+                            "current": lesson_counter,
+                            "total": total_lessons,
+                            "lessonTitle": lesson_bp.title,
+                            "lessonType": lesson_type,
+                            "message": f"Генерация {type_name} ({lesson_counter}/{total_lessons}): «{lesson_bp.title}»{rag_note}..."
+                        })
+
+                        lesson_payload = {
+                            "title": lesson_bp.title,
+                            "lesson_type": lesson_type if lesson_type != "test" else "quiz",
+                            "order_index": lesson_idx
+                        }
+                        resp = await client.post(f"{SUBJECT_SERVICE_URL}/modules/{module_id}/lessons", json=lesson_payload)
+                        if resp.status_code not in [200, 201]:
+                            logger.error(f"Failed to create lesson: {resp.text}")
+                            continue
+                        new_lesson = resp.json()
+                        lesson_id = new_lesson["id"]
+
+                        if lesson_type == "lecture":
+                            content_text = await generate_lesson_content(
+                                topic=request.topic,
+                                module_title=mod_bp.title,
+                                lesson_title=lesson_bp.title,
+                                previous_context=previous_lessons_context,
+                                additional_info=request.additional_info,
+                                source_material_context=rag_context
+                            )
+                            if content_text:
+                                await client.post(
+                                    f"{SUBJECT_SERVICE_URL}/lessons/{lesson_id}/content",
+                                    json={"text_content": content_text, "lesson_id": str(lesson_id)}
+                                )
+                                summary = content_text[:200] + "..." if len(content_text) > 200 else content_text
+                                module_lessons_context.append(f"- {lesson_bp.title}: {summary}")
+
+                        elif lesson_type == "test":
+                            question_count = lesson_bp.question_count or 5
+                            test_data = await generate_test_for_lesson(
+                                topic=request.topic,
+                                module_title=mod_bp.title,
+                                lesson_title=lesson_bp.title,
+                                question_count=question_count,
+                                previous_context=module_lessons_context,
+                                source_material_context=rag_context
+                            )
+                            if test_data:
+                                test_payload = {
+                                    "subject_id": str(subject_id),
+                                    "title": lesson_bp.title,
+                                    "description": f"Тест по модулю: {mod_bp.title}",
+                                    "test_type": "multiple_choice",
+                                    "ai_generated": True,
+                                    "questions": test_data
+                                }
+                                test_resp = await client.post(f"{TEST_SERVICE_URL}/tests", json=test_payload)
+                                if test_resp.status_code in [200, 201]:
+                                    test_obj = test_resp.json()
+                                    test_id = test_obj["id"]
+                                    await client.post(
+                                        f"{SUBJECT_SERVICE_URL}/lessons/{lesson_id}/content",
+                                        json={"test_id": str(test_id), "lesson_id": str(lesson_id)}
+                                    )
+
+                        elif lesson_type == "video":
+                            video_plan = await generate_video_plan(
+                                topic=request.topic,
+                                module_title=mod_bp.title,
+                                lesson_title=lesson_bp.title,
+                                previous_context=previous_lessons_context
+                            )
+                            if video_plan:
+                                await client.post(
+                                    f"{SUBJECT_SERVICE_URL}/lessons/{lesson_id}/content",
+                                    json={"text_content": video_plan, "lesson_id": str(lesson_id)}
+                                )
+
+                        yield sse_event("progress", {
+                            "step": "lesson_completed",
+                            "percent": percent,
+                            "current": lesson_counter,
+                            "total": total_lessons,
+                            "lessonTitle": lesson_bp.title,
+                            "lessonType": lesson_type,
+                            "message": f"Урок готов ({lesson_counter}/{total_lessons}): «{lesson_bp.title}»"
+                        })
+
+                    previous_lessons_context.extend(module_lessons_context)
+
+                yield sse_event("completed", {
+                    "step": "done",
+                    "percent": 100,
+                    "subject_id": str(subject_id),
+                    "message": f"Курс «{blueprint.title}» полностью сгенерирован и готов к изучению!"
+                })
+
+        except Exception as e:
+            logger.error(f"Error in generate_course_stream: {e}")
+            yield sse_event("error", {"message": f"Ошибка генерации курса: {str(e)}"})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
+    )

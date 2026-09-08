@@ -1227,6 +1227,33 @@ async def create_material(request: Request, current_user: dict = Depends(get_cur
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@app.post("/materials/extract-text")
+async def extract_material_text_proxy(request: Request):
+    """Proxy text extraction request to material-service"""
+    form = await request.form()
+    files = {}
+    for key, value in form.items():
+        if hasattr(value, "filename") and hasattr(value, "read"):
+            content = await value.read()
+            files[key] = (value.filename, content, value.content_type or "application/octet-stream")
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(f"{MATERIAL_SERVICE_URL}/materials/extract-text", files=files)
+            if resp.status_code != 200:
+                try:
+                    err = resp.json()
+                except Exception:
+                    err = resp.text
+                raise HTTPException(status_code=resp.status_code, detail=err)
+            return resp.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error extracting text in gateway: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/materials/{material_id}")
 async def get_material(material_id: str):
     data, status, error = await proxy_request(MATERIAL_SERVICE_URL, f"/materials/{material_id}", "GET")
@@ -1470,6 +1497,42 @@ async def generate_course_advanced(request: Request):
     if status != 200:
         raise HTTPException(status_code=status, detail=error or "Failed to generate course")
     return data
+
+
+@app.post("/ai/generate-course-stream")
+async def generate_course_stream_proxy(request: Request):
+    """Proxy course generation SSE stream from AI service"""
+    body = await request.json()
+    headers = {}
+    user_name = body.get("user_name")
+    if user_name:
+        from urllib.parse import quote
+        headers["X-User-Name"] = quote(user_name)
+
+    async def stream_course_proxy():
+        async with httpx.AsyncClient(timeout=900.0) as client:
+            try:
+                async with client.stream(
+                    "POST",
+                    f"{AI_SERVICE_URL}/ai/generate-course-stream",
+                    json=body,
+                    headers=headers
+                ) as response:
+                    async for chunk in response.aiter_bytes():
+                        yield chunk
+            except Exception as e:
+                logger.error(f"Error in stream_course_proxy: {e}")
+                err_payload = json.dumps({"message": f"Ошибка генерации курса: {str(e)}"}, ensure_ascii=False)
+                yield f"event: error\ndata: {err_payload}\n\n".encode("utf-8")
+
+    return StreamingResponse(
+        stream_course_proxy(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/ai/test-feedback")

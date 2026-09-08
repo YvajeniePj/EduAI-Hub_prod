@@ -6,29 +6,92 @@ from typing import Optional
 
 
 def clean_latex_text(raw_text: str) -> str:
-    """Strip LaTeX preamble, comments, and markup to leave clean educational text."""
+    """
+    Parse and clean LaTeX text into structured Markdown suitable for educational LLM RAG.
+    Preserves math formulas ($...$, $$...$$), structural headers (\section -> ## Раздел: ...),
+    definitions, theorems, proofs, and bullet lists.
+    """
     import re
     text = raw_text
-    # Extract body if \begin{document} is present
+
+    # 1. Extract body if \begin{document} is present
     if '\\begin{document}' in text:
         text = text.split('\\begin{document}', 1)[1]
     if '\\end{document}' in text:
         text = text.split('\\end{document}', 1)[0]
-    
-    # Remove comments
+
+    # 2. Remove LaTeX comments (% ...)
     text = re.sub(r'(?m)^%.*$', '', text)
-    # Remove common formatting commands keeping inner text
-    text = re.sub(r'\\(?:textbf|textit|emph|underline|section|subsection|subsubsection|paragraph|caption)\{([^}]*)\}', r'\1', text)
-    # Remove inline math dollar signs
-    text = re.sub(r'\$([^$]+)\$', r'\1', text)
-    # Remove citations, refs, labels, packages
-    text = re.sub(r'\\(?:cite|ref|label|input|include|usepackage|documentclass)\{[^}]*\}', '', text)
-    # Remove remaining backslash commands
-    text = re.sub(r'\\[a-zA-Z]+(\[[^\]]*\])?(\{([^}]*)\})?', r' \3 ', text)
-    # Clean braces and excessive whitespace
-    text = text.replace('{', '').replace('}', '')
+
+    # 3. Preserve display math environments
+    text = re.sub(r'\\begin\{(?:equation|align|gather|multline)\*?\}(.*?)\\end\{(?:equation|align|gather|multline)\*?\}', r'\n$$\1$$\n', text, flags=re.DOTALL)
+    text = re.sub(r'\\\[(.*?)\\\]', r'\n$$\1$$\n', text, flags=re.DOTALL)
+    text = re.sub(r'\\\((.*?)\\\)', r'$\1$', text, flags=re.DOTALL)
+
+    # 4. Map structural headers into Markdown headers
+    text = re.sub(r'\\chapter\*?\{([^}]+)\}', r'\n\n# Глава: \1\n', text)
+    text = re.sub(r'\\section\*?\{([^}]+)\}', r'\n\n## Раздел: \1\n', text)
+    text = re.sub(r'\\subsection\*?\{([^}]+)\}', r'\n\n### Тема: \1\n', text)
+    text = re.sub(r'\\subsubsection\*?\{([^}]+)\}', r'\n\n#### \1\n', text)
+    text = re.sub(r'\\paragraph\*?\{([^}]+)\}', r'\n\n**\1:** ', text)
+
+    # 5. Map theorems, definitions, examples
+    def _replace_env(match, prefix):
+        title = match.group(1)
+        if title:
+            return f"\n**{prefix} ({title.strip()}):** "
+        return f"\n**{prefix}:** "
+
+    text = re.sub(r'\\begin\{(?:definition|defn)\*?\}(?:\[(.*?)\])?', lambda m: _replace_env(m, "Определение"), text)
+    text = re.sub(r'\\end\{(?:definition|defn)\*?\}', r'\n', text)
+    text = re.sub(r'\\begin\{(?:theorem|thm)\*?\}(?:\[(.*?)\])?', lambda m: _replace_env(m, "Теорема"), text)
+    text = re.sub(r'\\end\{(?:theorem|thm)\*?\}', r'\n', text)
+    text = re.sub(r'\\begin\{(?:lemma|lem)\*?\}(?:\[(.*?)\])?', lambda m: _replace_env(m, "Лемма"), text)
+    text = re.sub(r'\\end\{(?:lemma|lem)\*?\}', r'\n', text)
+    text = re.sub(r'\\begin\{(?:example|exmp)\*?\}(?:\[(.*?)\])?', lambda m: _replace_env(m, "Пример"), text)
+    text = re.sub(r'\\end\{(?:example|exmp)\*?\}', r'\n', text)
+    text = re.sub(r'\\begin\{(?:proof)\*?\}', r'\n*Доказательство:* ', text)
+    text = re.sub(r'\\end\{(?:proof)\*?\}', r' ∎\n', text)
+
+    # 6. Map lists and items
+    text = re.sub(r'\\begin\{(?:itemize|enumerate|description)\}', r'\n', text)
+    text = re.sub(r'\\end\{(?:itemize|enumerate|description)\}', r'\n', text)
+    def _replace_item(match):
+        label = match.group(1)
+        if label:
+            return f"\n- **{label.strip()}:** "
+        return "\n- "
+    text = re.sub(r'\\item(?:\[(.*?)\])?', _replace_item, text)
+
+    # 7. Basic inline styling
+    text = re.sub(r'\\textbf\{([^}]+)\}', r'**\1**', text)
+    text = re.sub(r'\\textit\{([^}]+)\}', r'*\1*', text)
+    text = re.sub(r'\\emph\{([^}]+)\}', r'*\1*', text)
+    text = re.sub(r'\\underline\{([^}]+)\}', r'<u>\1</u>', text)
+    text = re.sub(r'\\texttt\{([^}]+)\}', r'`\1`', text)
+
+    # 8. Strip non-content commands (labels, refs, citations, styling commands)
+    text = re.sub(r'\\(?:cite|ref|eqref|label|input|include|usepackage|documentclass|pagestyle|thispagestyle|geometry)\{[^}]*\}', '', text)
+    text = re.sub(r'\\(?:maketitle|tableofcontents|newpage|clearpage|bigskip|medskip|smallskip|noindent)', '', text)
+
+    # 9. Clean residual non-math single backslashes commands while preserving math
+    segments = re.split(r'(\$\$.*?\$\$|\$.*?\$)', text, flags=re.DOTALL)
+    cleaned_segments = []
+    for seg in segments:
+        if seg and (seg.startswith('$') or seg.startswith('$$')):
+            # This is math, leave it completely untouched!
+            cleaned_segments.append(seg)
+        elif seg:
+            # Clean leftover LaTeX commands in regular prose
+            s = re.sub(r'\\[a-zA-Z]+(\[[^\]]*\])?', ' ', seg)
+            s = s.replace('{', '').replace('}', '')
+            cleaned_segments.append(s)
+
+    text = "".join(cleaned_segments)
+
+    # 10. Normalize whitespace
     text = re.sub(r'[ \t]+', ' ', text)
-    text = re.sub(r'\n\s*\n+', '\n\n', text)
+    text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     return text.strip()
 
 

@@ -187,7 +187,40 @@ async def get_material_text(material_id: UUID, db: Session = Depends(get_db)):
     return {"text": text}
 
 
-@router.post("/{material_id}/annotate")
+@router.post("/extract-text")
+async def extract_text_from_uploaded_file(file: UploadFile = File(...)):
+    """Extract raw and cleaned text from an uploaded file (.tex, .pdf, .docx, .txt, etc.) for RAG"""
+    import tempfile
+    ext = Path(file.filename).suffix.lower() if file.filename else ""
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+
+        mime_type = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+        text = extract_text_from_file(tmp_path, mime_type)
+
+        if text.startswith("Error") or text.startswith("Формат файла"):
+            raise HTTPException(status_code=400, detail=text)
+
+        return {
+            "filename": file.filename,
+            "text": text,
+            "char_count": len(text)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to extract text from {file.filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка извлечения текста: {str(e)}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
 async def create_annotation(
     material_id: UUID,
     db: Session = Depends(get_db)

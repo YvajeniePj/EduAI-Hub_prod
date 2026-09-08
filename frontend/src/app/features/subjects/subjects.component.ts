@@ -38,16 +38,17 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
     </h2>
     <mat-dialog-content class="dialog-content-body">
       <!-- Step 1: Parameters -->
-      <div *ngIf="step === 1 && !suggestingStructure">
+      <div *ngIf="step === 1 && !suggestingStructure && !generating">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Тема курса</mat-label>
-          <input matInput [(ngModel)]="topic" required placeholder="Например: Основы Python">
+          <input matInput [(ngModel)]="topic" required placeholder="Например: Основы Python или Теория графов">
         </mat-form-field>
 
         <div class="audience-section">
           <label class="section-label">Уровень аудитории</label>
           <div class="audience-pills">
             <button *ngFor="let level of audienceLevels"
+                    type="button"
                     class="audience-pill"
                     [class.active]="targetAudience === level.value"
                     (click)="targetAudience = level.value">
@@ -59,19 +60,61 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Дополнительные указания</mat-label>
           <textarea matInput [(ngModel)]="additionalInfo" rows="3"
-                    placeholder="Фокус на практику, разбор библиотек..."></textarea>
+                    placeholder="Фокус на практику, разбор конкретных задач, требования к темам..."></textarea>
         </mat-form-field>
+
+        <!-- Source materials upload section for RAG -->
+        <div class="materials-upload-section">
+          <div class="materials-header">
+            <label class="section-label">
+              <mat-icon inline class="mat-sec-icon">attach_file</mat-icon>
+              Материалы курса для RAG (.tex, .pdf, .docx, .txt)
+            </label>
+            <span *ngIf="totalExtractedChars > 0" class="chars-badge">
+              Извлечено {{totalExtractedChars | number}} знаков
+            </span>
+          </div>
+
+          <div class="file-drop-zone" (click)="fileInput.click()">
+            <input #fileInput type="file" multiple (change)="onFilesSelected($event)" accept=".tex,.latex,.pdf,.docx,.txt,.md" style="display: none;">
+            <mat-icon class="drop-icon">cloud_upload</mat-icon>
+            <div class="drop-text">
+              <span class="drop-primary">Прикрепить учебные материалы или TeX-конспекты</span>
+              <span class="drop-hint">Поддерживаются .tex (LaTeX с формулами), .pdf, .docx, .txt, .md</span>
+            </div>
+            <button type="button" class="btn-browse" (click)="$event.stopPropagation(); fileInput.click()">Обзор</button>
+          </div>
+
+          <!-- Uploaded files chips -->
+          <div *ngIf="sourceMaterials.length > 0" class="file-chips-list">
+            <div *ngFor="let file of sourceMaterials; let fi = index" class="file-chip">
+              <mat-icon class="file-type-icon">{{getFileIcon(file.filename)}}</mat-icon>
+              <div class="file-info">
+                <span class="file-name" [title]="file.filename">{{file.filename}}</span>
+                <span class="file-meta">{{file.char_count | number}} знаков</span>
+              </div>
+              <button type="button" class="chip-remove" (click)="removeMaterial(fi)" title="Удалить">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <div *ngIf="extractingText" class="extracting-indicator">
+            <mat-spinner diameter="18"></mat-spinner>
+            <span>Извлечение текста и разбор TeX-структуры...</span>
+          </div>
+        </div>
 
         <p class="hint">
           <mat-icon inline>lightbulb</mat-icon>
-          AI предложит структуру курса с модулями и уроками. Вы сможете отредактировать её перед генерацией контента.
+          AI проанализирует тему и прикреплённые материалы, предложит модули и уроки, которые можно отредактировать перед генерацией.
         </p>
       </div>
 
       <!-- Loading: suggesting structure -->
       <div *ngIf="suggestingStructure" class="loading-container">
         <mat-spinner diameter="44"></mat-spinner>
-        <p>AI анализирует тему и проектирует структуру...</p>
+        <p>AI анализирует тему и материалы, проектируя структуру...</p>
         <p class="sub-text">Обычно это занимает 5-10 секунд</p>
       </div>
 
@@ -125,11 +168,33 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
         </div>
       </div>
 
-      <!-- Loading: generating course -->
-      <div *ngIf="generating" class="loading-container">
-        <mat-spinner diameter="44"></mat-spinner>
-        <p>{{generatingStatus}}</p>
-        <p class="sub-text">Генерация контента поурочно. Это может занять 2-3 минуты.</p>
+      <!-- Step 3 / Loading: real-time SSE progress dashboard -->
+      <div *ngIf="generating" class="progress-dashboard">
+        <div class="progress-top">
+          <div class="progress-badge">
+            <mat-spinner diameter="20" *ngIf="progressPercent < 100"></mat-spinner>
+            <mat-icon *ngIf="progressPercent >= 100" class="check-done-icon">check_circle</mat-icon>
+            <span class="progress-phase-text">{{currentPhaseText}}</span>
+          </div>
+          <span class="progress-percent-val">{{progressPercent}}%</span>
+        </div>
+
+        <!-- Animated Progress Bar -->
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" [style.width.%]="progressPercent"></div>
+        </div>
+
+        <div class="current-status-box">
+          <p class="status-primary">{{generatingStatus}}</p>
+        </div>
+
+        <!-- Live Step Checklist -->
+        <div class="steps-log" *ngIf="completedSteps.length > 0">
+          <div *ngFor="let step of completedSteps" class="step-log-item">
+            <mat-icon class="step-log-icon">check_circle</mat-icon>
+            <span class="step-log-text">{{step}}</span>
+          </div>
+        </div>
       </div>
     </mat-dialog-content>
 
@@ -175,8 +240,9 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
     .full-width { width: 100%; margin-bottom: 12px; }
     .section-label {
       font-size: 13px; font-weight: 500; color: #3f3f46;
-      margin-bottom: 8px; display: block;
+      margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
     }
+    .mat-sec-icon { font-size: 16px; width: 16px; height: 16px; color: #8b5cf6; }
     .audience-section { margin-bottom: 16px; }
     .audience-pills { display: flex; gap: 8px; }
     .audience-pill {
@@ -193,6 +259,7 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
       display: flex; align-items: center; gap: 10px;
       background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.15);
       padding: 12px 14px; border-radius: 12px; line-height: 1.4;
+      margin-top: 14px;
     }
     .loading-container {
       display: flex; flex-direction: column; align-items: center;
@@ -200,6 +267,71 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
     }
     .loading-container p { margin-top: 16px; font-weight: 600; color: #18181b; font-size: 15px; }
     .sub-text { font-size: 12.5px; color: #71717a !important; margin-top: 4px !important; font-weight: 400 !important; }
+
+    /* Materials upload section */
+    .materials-upload-section {
+      margin-bottom: 16px;
+      background: rgba(0,0,0,0.02);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .materials-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .chars-badge {
+      font-size: 11px; font-weight: 600; color: #059669;
+      background: #ecfdf5; border: 1px solid #a7f3d0;
+      padding: 2px 8px; border-radius: 10px;
+    }
+    .file-drop-zone {
+      display: flex; align-items: center; gap: 12px;
+      border: 1.5px dashed rgba(139,92,246,0.3);
+      background: rgba(139,92,246,0.03);
+      border-radius: 10px; padding: 12px 16px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .file-drop-zone:hover {
+      background: rgba(139,92,246,0.06);
+      border-color: rgba(139,92,246,0.5);
+    }
+    .drop-icon { color: #8b5cf6; font-size: 26px; width: 26px; height: 26px; }
+    .drop-text { flex: 1; display: flex; flex-direction: column; }
+    .drop-primary { font-size: 13px; font-weight: 500; color: #18181b; }
+    .drop-hint { font-size: 11.5px; color: #71717a; margin-top: 2px; }
+    .btn-browse {
+      background: #fff; border: 1px solid rgba(0,0,0,0.15);
+      border-radius: 6px; padding: 5px 12px; font-size: 12px;
+      font-weight: 500; color: #3f3f46; cursor: pointer;
+    }
+    .file-chips-list {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+    }
+    .file-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #fff; border: 1px solid rgba(0,0,0,0.1);
+      border-radius: 8px; padding: 6px 10px; font-size: 12px;
+      max-width: 260px;
+    }
+    .file-type-icon { font-size: 18px; width: 18px; height: 18px; color: #8b5cf6; }
+    .file-info { display: flex; flex-direction: column; overflow: hidden; }
+    .file-name {
+      font-weight: 500; color: #18181b;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 170px;
+    }
+    .file-meta { font-size: 10.5px; color: #71717a; }
+    .chip-remove {
+      background: none; border: none; cursor: pointer;
+      color: #a1a1aa; padding: 2px; display: flex;
+    }
+    .chip-remove:hover { color: #ef4444; }
+    .chip-remove mat-icon { font-size: 14px; width: 14px; height: 14px; }
+    .extracting-indicator {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: #8b5cf6; margin-top: 10px;
+    }
 
     /* Blueprint tree */
     .blueprint-tree {
@@ -276,6 +408,53 @@ import { CourseGenerationService } from '../../core/services/course-generation.s
     .btn-add-module:hover { background: rgba(0,0,0,0.03); color: #18181b; border-color: rgba(0,0,0,0.25); }
     .btn-add-module mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
+    /* SSE Progress Dashboard */
+    .progress-dashboard {
+      padding: 16px 8px;
+    }
+    .progress-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .progress-badge {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .check-done-icon { color: #10b981; font-size: 24px; width: 24px; height: 24px; }
+    .progress-phase-text {
+      font-size: 14px; font-weight: 600; color: #18181b;
+    }
+    .progress-percent-val {
+      font-size: 18px; font-weight: 700; color: #8b5cf6;
+      font-variant-numeric: tabular-nums;
+    }
+    .progress-bar-track {
+      width: 100%; height: 8px; background: rgba(0,0,0,0.08);
+      border-radius: 6px; overflow: hidden; margin-bottom: 14px;
+    }
+    .progress-bar-fill {
+      height: 100%; background: linear-gradient(90deg, #8b5cf6, #ec4899);
+      border-radius: 6px; transition: width 0.3s ease;
+    }
+    .current-status-box {
+      background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.15);
+      border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;
+    }
+    .status-primary {
+      margin: 0; font-size: 13.5px; font-weight: 500; color: #18181b;
+      line-height: 1.4;
+    }
+    .steps-log {
+      display: flex; flex-direction: column; gap: 6px;
+      max-height: 200px; overflow-y: auto; padding-right: 4px;
+    }
+    .step-log-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12.5px; color: #3f3f46; background: rgba(0,0,0,0.02);
+      border-radius: 8px; padding: 6px 10px;
+    }
+    .step-log-icon { color: #10b981; font-size: 16px; width: 16px; height: 16px; }
+    .step-log-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     /* Actions */
     .dialog-actions-row { padding: 12px 24px 20px !important; gap: 8px; }
     .action-btns { display: flex; gap: 8px; }
@@ -306,6 +485,16 @@ export class GenerateCourseDialogComponent {
   generating = false;
   generatingStatus = 'Подготовка к генерации...';
 
+  // RAG Source Materials
+  sourceMaterials: { filename: string; text: string; char_count: number }[] = [];
+  extractingText = false;
+
+  // SSE Progress Dashboard State
+  progressPercent = 0;
+  currentPhaseText = 'Генерация курса';
+  completedSteps: string[] = [];
+  generatedSubjectId: string | null = null;
+
   audienceLevels = [
     { value: 'Beginners', label: 'Начинающие' },
     { value: 'Intermediate', label: 'Продвинутые' },
@@ -321,6 +510,69 @@ export class GenerateCourseDialogComponent {
     private courseGenService: CourseGenerationService,
     private authService: AuthService
   ) {}
+
+  get totalExtractedChars(): number {
+    return this.sourceMaterials.reduce((acc, m) => acc + (m.char_count || 0), 0);
+  }
+
+  getFileIcon(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'tex':
+      case 'latex':
+        return 'functions';
+      case 'pdf':
+        return 'picture_as_pdf';
+      case 'docx':
+      case 'doc':
+        return 'description';
+      case 'md':
+      case 'txt':
+        return 'article';
+      default:
+        return 'insert_drive_file';
+    }
+  }
+
+  onFilesSelected(event: any) {
+    const files: FileList = event.target.files;
+    if (!files || files.length === 0) return;
+
+    this.extractingText = true;
+    const fileArray = Array.from(files);
+    let processed = 0;
+
+    fileArray.forEach(file => {
+      this.apiService.extractMaterialText(file).subscribe({
+        next: (res: any) => {
+          this.sourceMaterials.push({
+            filename: res.filename || file.name,
+            text: res.text,
+            char_count: res.char_count || res.text.length
+          });
+          processed++;
+          if (processed === fileArray.length) {
+            this.extractingText = false;
+            this.snackBar.open(`Материалы успешно обработаны (${this.sourceMaterials.length} файлов)`, 'OK', { duration: 3000 });
+          }
+        },
+        error: (err: any) => {
+          processed++;
+          if (processed === fileArray.length) {
+            this.extractingText = false;
+          }
+          this.snackBar.open(`Ошибка извлечения из ${file.name}: ${err.error?.detail || err.message}`, 'OK', { duration: 4000 });
+        }
+      });
+    });
+
+    // Reset input
+    event.target.value = '';
+  }
+
+  removeMaterial(index: number) {
+    this.sourceMaterials.splice(index, 1);
+  }
 
   getLessonIcon(type: string): string {
     switch (type) {
@@ -341,7 +593,7 @@ export class GenerateCourseDialogComponent {
     if (!this.topic.trim()) return;
     this.suggestingStructure = true;
 
-    this.apiService.suggestCourseStructure(this.topic, this.targetAudience, this.additionalInfo)
+    this.apiService.suggestCourseStructure(this.topic, this.targetAudience, this.additionalInfo, this.sourceMaterials)
       .subscribe({
         next: (res: any) => {
           this.blueprint = {
@@ -416,26 +668,56 @@ export class GenerateCourseDialogComponent {
 
   generateCourse() {
     this.generating = true;
-    this.generatingStatus = 'Создание курса и генерация контента...';
+    this.progressPercent = 5;
+    this.currentPhaseText = 'Инициализация';
+    this.generatingStatus = 'Подготовка к генерации и запуск RAG-конвейера...';
+    this.completedSteps = [];
 
     const currentUser = this.authService.getCurrentUser();
     const userName = currentUser?.name;
 
-    // Use the advanced generation
-    this.apiService.generateCourseAdvanced(
+    this.apiService.generateCourseStream(
       this.blueprint,
       this.topic,
       userName,
-      this.additionalInfo
+      this.additionalInfo,
+      this.sourceMaterials
     ).subscribe({
-      next: (res: any) => {
-        this.generating = false;
-        this.snackBar.open('Курс успешно создан и наполнен контентом!', 'Отлично', { duration: 5000 });
-        this.dialogRef.close(true);
+      next: (event: any) => {
+        const data = event.data;
+        if (event.type === 'progress') {
+          if (data.percent !== undefined) {
+            this.progressPercent = data.percent;
+          }
+          if (data.message) {
+            this.generatingStatus = data.message;
+          }
+          if (data.step === 'course_created' && data.subject_id) {
+            this.generatedSubjectId = data.subject_id;
+            this.completedSteps.push(`Курс «${this.blueprint.title}» создан в системе`);
+          } else if (data.step === 'module') {
+            this.completedSteps.push(`Создан модуль: ${data.moduleTitle}`);
+          } else if (data.step === 'lesson_completed') {
+            const label = data.lessonType === 'test' ? 'Тест' : 'Урок';
+            this.completedSteps.push(`Готов ${label}: ${data.lessonTitle}`);
+          }
+        } else if (event.type === 'completed') {
+          this.progressPercent = 100;
+          this.currentPhaseText = 'Готово!';
+          this.generatingStatus = data.message || 'Курс успешно создан!';
+          this.generatedSubjectId = data.subject_id;
+          this.snackBar.open('Курс успешно сгенерирован с материалами RAG!', 'Отлично', { duration: 5000 });
+          setTimeout(() => {
+            this.dialogRef.close(true);
+          }, 1500);
+        } else if (event.type === 'error') {
+          this.generating = false;
+          this.snackBar.open(data.message || 'Ошибка генерации курса', 'OK', { duration: 5000 });
+        }
       },
       error: (err: any) => {
         this.generating = false;
-        const msg = err.error?.detail || 'Ошибка генерации курса';
+        const msg = err.message || 'Ошибка генерации курса';
         this.snackBar.open(msg, 'OK', { duration: 5000 });
       }
     });

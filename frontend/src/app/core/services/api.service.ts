@@ -717,21 +717,104 @@ export class ApiService {
     });
   }
 
+  extractMaterialText(file: File): Observable<{ filename: string; text: string; char_count: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{ filename: string; text: string; char_count: number }>(`${API_URL}/materials/extract-text`, formData);
+  }
+
   // Advanced AI Course Generation
-  suggestCourseStructure(topic: string, targetAudience: string = 'Beginners', additionalInfo?: string): Observable<any> {
+  suggestCourseStructure(topic: string, targetAudience: string = 'Beginners', additionalInfo?: string, sourceMaterials?: any[]): Observable<any> {
     return this.http.post<any>(`${API_URL}/ai/suggest-structure`, {
       topic,
       target_audience: targetAudience,
-      additional_info: additionalInfo
+      additional_info: additionalInfo,
+      source_materials: sourceMaterials
     });
   }
 
-  generateCourseAdvanced(blueprint: any, topic: string, userName?: string, additionalInfo?: string): Observable<any> {
+  generateCourseAdvanced(blueprint: any, topic: string, userName?: string, additionalInfo?: string, sourceMaterials?: any[]): Observable<any> {
     return this.http.post<any>(`${API_URL}/ai/generate-course-advanced`, {
       topic,
       additional_info: additionalInfo,
       user_name: userName,
-      blueprint
+      blueprint,
+      source_materials: sourceMaterials
+    });
+  }
+
+  generateCourseStream(blueprint: any, topic: string, userName?: string, additionalInfo?: string, sourceMaterials?: any[]): Observable<any> {
+    return new Observable(observer => {
+      const abortController = new AbortController();
+      const token = localStorage.getItem('token') || localStorage.getItem('mockToken');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      fetch(`${API_URL}/ai/generate-course-stream`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          topic,
+          additional_info: additionalInfo,
+          user_name: userName,
+          blueprint,
+          source_materials: sourceMaterials
+        }),
+        signal: abortController.signal
+      })
+        .then(async response => {
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `HTTP ${response.status}`);
+          }
+          if (!response.body) {
+            throw new Error('Response body is null');
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            let currentEvent = 'message';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('event:')) {
+                currentEvent = trimmed.substring(6).trim();
+              } else if (trimmed.startsWith('data:')) {
+                const dataStr = trimmed.substring(5).trim();
+                try {
+                  const parsedData = JSON.parse(dataStr);
+                  observer.next({ type: currentEvent, data: parsedData });
+                } catch (e) {
+                  observer.next({ type: currentEvent, data: dataStr });
+                }
+              }
+            }
+          }
+
+          observer.complete();
+        })
+        .catch(err => {
+          if (err.name !== 'AbortError') {
+            observer.error(err);
+          }
+        });
+
+      return () => {
+        abortController.abort();
+      };
     });
   }
 }
